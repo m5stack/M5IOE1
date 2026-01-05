@@ -1,0 +1,11 @@
+version: "0.0.1"
+description: "M5Stack M5IOE1 Library"
+maintainers:
+  - "M5Stack"
+license: MIT
+dependencies:
+  idf:
+    version: ">=4.4"
+  espressif/i2c_bus:
+    version: "^1.0.0"
+    public: true

@@ -1,0 +1,42 @@
+{
+  "name": "M5IOE1",
+  "version": "0.0.1",
+  "description": "Library for M5Stack M5IOE1",
+  "keywords": [
+    "m5stack",
+    "ioe1"
+  ],
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "authors": [
+    {
+      "name": "M5Stack",
+      "maintainer": true
+    }
+  ],
+  "license": "MIT",
+  "frameworks": [
+    "arduino",
+    "espidf"
+  ],
+  "platforms": [
+    "espressif32"
+  ],
+  "export": {
+    "include": [
+      "src/*",
+      "library.json",
+      "library.properties",
+      "CMakeLists.txt",
+      "idf_component.yml",
+      "LICENSE",
+      "README.md"
+    ]
+  },
+  "build": {
+    "srcDir": "src",
+    "includeDir": "src"
+  }
+}
