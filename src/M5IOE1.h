@@ -61,58 +61,60 @@
 // Register Addresses
 // ============================
 // System
-#define M5IOE1_REG_UID_L            0x00
-#define M5IOE1_REG_UID_H            0x01
-#define M5IOE1_REG_VERSION          0x02
+#define M5IOE1_REG_UID_L            0x00    // R     [7:0] UID Low Byte
+#define M5IOE1_REG_UID_H            0x01    // R     [15:8] UID High Byte
+#define M5IOE1_REG_REV              0x02    // R     [7:0] SW7-SW0 Version
 // GPIO
-#define M5IOE1_REG_GPIO_MODE_L      0x03
-#define M5IOE1_REG_GPIO_MODE_H      0x04
-#define M5IOE1_REG_GPIO_OUT_L       0x05
-#define M5IOE1_REG_GPIO_OUT_H       0x06
-#define M5IOE1_REG_GPIO_IN_L        0x07
-#define M5IOE1_REG_GPIO_IN_H        0x08
-#define M5IOE1_REG_GPIO_PU_L        0x09
-#define M5IOE1_REG_GPIO_PU_H        0x0A
-#define M5IOE1_REG_GPIO_PD_L        0x0B
-#define M5IOE1_REG_GPIO_PD_H        0x0C
-#define M5IOE1_REG_GPIO_IE_L        0x0D
-#define M5IOE1_REG_GPIO_IE_H        0x0E
-#define M5IOE1_REG_GPIO_IT_L        0x0F
-#define M5IOE1_REG_GPIO_IT_H        0x10
-#define M5IOE1_REG_GPIO_IS_L        0x11
-#define M5IOE1_REG_GPIO_IS_H        0x12
-#define M5IOE1_REG_GPIO_DRV_L       0x13
-#define M5IOE1_REG_GPIO_DRV_H       0x14
+#define M5IOE1_REG_GPIO_MODE_L      0x03    // R/W   [7:0] Mode P8-P1
+#define M5IOE1_REG_GPIO_MODE_H      0x04    // R/W   [7:6] Res | [5:0] Mode P14-P9
+#define M5IOE1_REG_GPIO_OUT_L       0x05    // R/W   [7:0] Out P8-P1
+#define M5IOE1_REG_GPIO_OUT_H       0x06    // R/W   [7:6] Res | [5:0] Out P14-P9
+#define M5IOE1_REG_GPIO_IN_L        0x07    // R     [7:0] In P8-P1
+#define M5IOE1_REG_GPIO_IN_H        0x08    // R     [7:6] Res | [5:0] In P14-P9
+#define M5IOE1_REG_GPIO_PU_L        0x09    // R/W   [7:0] PU P8-P1
+#define M5IOE1_REG_GPIO_PU_H        0x0A    // R/W   [7:6] Res | [5:0] PU P14-P9
+#define M5IOE1_REG_GPIO_PD_L        0x0B    // R/W   [7:0] PD P8-P1
+#define M5IOE1_REG_GPIO_PD_H        0x0C    // R/W   [7:6] Res | [5:0] PD P14-P9
+#define M5IOE1_REG_GPIO_IE_L        0x0D    // R/W   [7:0] IE P8-P1
+#define M5IOE1_REG_GPIO_IE_H        0x0E    // R/W   [7:6] Res | [5:0] IE P14-P9
+#define M5IOE1_REG_GPIO_IP_L        0x0F    // R/W   [7:0] IP P8-P1
+#define M5IOE1_REG_GPIO_IP_H        0x10    // R/W   [7:6] Res | [5:0] IP P14-P9
+#define M5IOE1_REG_GPIO_IS_L        0x11    // R     [7:0] IS P8-P1
+#define M5IOE1_REG_GPIO_IS_H        0x12    // R     [7:6] Res | [5:0] IS P14-P9
+#define M5IOE1_REG_GPIO_DRV_L       0x13    // R/W   [7:0] Drive P8-P1
+#define M5IOE1_REG_GPIO_DRV_H       0x14    // R/W   [7:6] Res | [5:0] Drive P14-P9
 // ADC
-#define M5IOE1_REG_ADC_CTRL         0x15
-#define M5IOE1_REG_ADC_DATA_L       0x16
-#define M5IOE1_REG_ADC_DATA_H       0x17
+#define M5IOE1_REG_ADC_CTRL         0x15    // R/W   [7] BUSY | [6] START | [2:0] Channel
+#define M5IOE1_REG_ADC_DATA_L       0x16    // R     [7:0] ADC Data Low
+#define M5IOE1_REG_ADC_DATA_H       0x17    // R     [3:0] ADC Data High
 // Temperature
-#define M5IOE1_REG_TEMP_CTRL        0x18
-#define M5IOE1_REG_TEMP_DATA_L      0x19
-#define M5IOE1_REG_TEMP_DATA_H      0x1A
+#define M5IOE1_REG_TEMP_CTRL        0x18    // R/W   [7] TBUSY | [6] TSTART
+#define M5IOE1_REG_TEMP_DATA_L      0x19    // R     [7:0] Temp Data Low
+#define M5IOE1_REG_TEMP_DATA_H      0x1A    // R     [3:0] Temp Data High
 // PWM
-#define M5IOE1_REG_PWM1_DUTY_L      0x1B
-#define M5IOE1_REG_PWM1_DUTY_H      0x1C
-#define M5IOE1_REG_PWM2_DUTY_L      0x1D
-#define M5IOE1_REG_PWM2_DUTY_H      0x1E
-#define M5IOE1_REG_PWM3_DUTY_L      0x1F
-#define M5IOE1_REG_PWM3_DUTY_H      0x20
-#define M5IOE1_REG_PWM4_DUTY_L      0x21
-#define M5IOE1_REG_PWM4_DUTY_H      0x22
+#define M5IOE1_REG_PWM1_DUTY_L      0x1B    // R/W   [7:0] PWM1 Duty Low
+#define M5IOE1_REG_PWM1_DUTY_H      0x1C    // R/W   [7] EN | [6] POL | [3:0] PWM1 Duty High
+#define M5IOE1_REG_PWM2_DUTY_L      0x1D    // R/W   [7:0] PWM2 Duty Low
+#define M5IOE1_REG_PWM2_DUTY_H      0x1E    // R/W   [7] EN | [6] POL | [3:0] PWM2 Duty High
+#define M5IOE1_REG_PWM3_DUTY_L      0x1F    // R/W   [7:0] PWM3 Duty Low
+#define M5IOE1_REG_PWM3_DUTY_H      0x20    // R/W   [7] EN | [6] POL | [3:0] PWM3 Duty High
+#define M5IOE1_REG_PWM4_DUTY_L      0x21    // R/W   [7:0] PWM4 Duty Low
+#define M5IOE1_REG_PWM4_DUTY_H      0x22    // R/W   [7] EN | [6] POL | [3:0] PWM4 Duty High
 // System Config
-#define M5IOE1_REG_I2C_CFG          0x23
-#define M5IOE1_REG_LED_CFG          0x24
-#define M5IOE1_REG_PWM_FREQ_L       0x25
-#define M5IOE1_REG_PWM_FREQ_H       0x26
-#define M5IOE1_REG_REF_VOLTAGE_L    0x27
-#define M5IOE1_REG_REF_VOLTAGE_H    0x28
-#define M5IOE1_REG_FACTORY_RESET    0x29
+#define M5IOE1_REG_I2C_CFG          0x23    // R/W   [6] INT_PU/PD | [5] WAKE | [4] SPD | [3:0] SLEEP
+#define M5IOE1_REG_LED_CFG          0x24    // R/W   [6] REFRESH | [5:0] LED Num
+#define M5IOE1_REG_PWM_FREQ_L       0x25    // R/W   [7:0] PWM Freq Low
+#define M5IOE1_REG_PWM_FREQ_H       0x26    // R/W   [7:0] PWM Freq High
+#define M5IOE1_REG_REF_VOLTAGE_L    0x27    // R     [7:0] Ref Voltage Low
+#define M5IOE1_REG_REF_VOLTAGE_H    0x28    // R     [15:8] Ref Voltage High
+#define M5IOE1_REG_FACTORY_RESET    0x29    // W     [7:0] Reset Key
 // Data areas
-#define M5IOE1_REG_LED_RAM_START    0x30
+#define M5IOE1_REG_LED_RAM_START    0x30    // R/W   NeoPixel RGB565 Data (32 LEDs x 2B)
 #define M5IOE1_REG_LED_RAM_END      0x6F
-#define M5IOE1_REG_RTC_RAM_START    0x70
+#define M5IOE1_REG_RTC_RAM_START    0x70    // R/W   RTC Retention RAM (32B)
 #define M5IOE1_REG_RTC_RAM_END      0x8F
+// Extended
+#define M5IOE1_REG_AW8737A_PULSE    0x90    // R/W   [7] REFRESH | [6:5] NUM | [4:0] GPIO
 
 // ============================
 // Bit Definitions

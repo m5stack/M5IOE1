@@ -610,7 +610,7 @@ bool M5IOE1::getUID(uint16_t* uid) {
 
 bool M5IOE1::getVersion(uint8_t* version) {
     if (version == nullptr || !_initialized) return false;
-    return _readReg(M5IOE1_REG_VERSION, version);
+    return _readReg(M5IOE1_REG_REV, version);
 }
 
 bool M5IOE1::getRefVoltage(uint16_t* voltage_mv) {
@@ -661,11 +661,12 @@ void M5IOE1::pinMode(uint8_t pin, uint8_t mode) {
             // Disable PWM if enabled on this pin
             if (_isPwmPin(pin)) {
                 uint8_t ch = _getPwmChannel(pin);
-                uint8_t regH = 0;
-                if (_readReg(M5IOE1_REG_PWM1_DUTY_H + ch * 2, &regH)) {
-                    if (regH & M5IOE1_PWM_ENABLE) {
-                        regH &= ~M5IOE1_PWM_ENABLE;
-                        _writeReg(M5IOE1_REG_PWM1_DUTY_H + ch * 2, regH);
+                uint8_t regL = M5IOE1_REG_PWM1_DUTY_L + ch * 2;
+                uint16_t pwmData = 0;
+                if (_readReg16(regL, &pwmData)) {
+                    if (pwmData & ((uint16_t)M5IOE1_PWM_ENABLE << 8)) {
+                        pwmData &= ~((uint16_t)M5IOE1_PWM_ENABLE << 8);
+                        _writeReg16(regL, pwmData);
                     }
                 }
             }
@@ -807,7 +808,7 @@ void M5IOE1::attachInterrupt(uint8_t pin, m5ioe1_callback_t callback, uint8_t mo
     // Configure interrupt
     uint16_t ieReg = 0, itReg = 0;
     _readReg16(M5IOE1_REG_GPIO_IE_L, &ieReg);
-    _readReg16(M5IOE1_REG_GPIO_IT_L, &itReg);
+    _readReg16(M5IOE1_REG_GPIO_IP_L, &itReg);
 
     ieReg |= (1 << pin);
     if (mode == RISING) {
@@ -817,7 +818,7 @@ void M5IOE1::attachInterrupt(uint8_t pin, m5ioe1_callback_t callback, uint8_t mo
     }
 
     _writeReg16(M5IOE1_REG_GPIO_IE_L, ieReg);
-    _writeReg16(M5IOE1_REG_GPIO_IT_L, itReg);
+    _writeReg16(M5IOE1_REG_GPIO_IP_L, itReg);
 
     _pinStates[pin].intrEnabled = true;
     _pinStates[pin].intrRising = (mode == RISING);
@@ -846,7 +847,7 @@ void M5IOE1::attachInterruptArg(uint8_t pin, m5ioe1_callback_arg_t callback, voi
     // Configure interrupt
     uint16_t ieReg = 0, itReg = 0;
     _readReg16(M5IOE1_REG_GPIO_IE_L, &ieReg);
-    _readReg16(M5IOE1_REG_GPIO_IT_L, &itReg);
+    _readReg16(M5IOE1_REG_GPIO_IP_L, &itReg);
 
     ieReg |= (1 << pin);
     if (mode == RISING) {
@@ -856,7 +857,7 @@ void M5IOE1::attachInterruptArg(uint8_t pin, m5ioe1_callback_arg_t callback, voi
     }
 
     _writeReg16(M5IOE1_REG_GPIO_IE_L, ieReg);
-    _writeReg16(M5IOE1_REG_GPIO_IT_L, itReg);
+    _writeReg16(M5IOE1_REG_GPIO_IP_L, itReg);
 
     _pinStates[pin].intrEnabled = true;
     _pinStates[pin].intrRising = (mode == RISING);
@@ -1525,7 +1526,7 @@ bool M5IOE1::_snapshotPinStates() {
     if (!_readReg16(M5IOE1_REG_GPIO_PD_L, &pdReg)) return false;
     if (!_readReg16(M5IOE1_REG_GPIO_DRV_L, &drvReg)) return false;
     if (!_readReg16(M5IOE1_REG_GPIO_IE_L, &ieReg)) return false;
-    if (!_readReg16(M5IOE1_REG_GPIO_IT_L, &itReg)) return false;
+    if (!_readReg16(M5IOE1_REG_GPIO_IP_L, &itReg)) return false;
 
     for (uint8_t pin = 0; pin < M5IOE1_MAX_GPIO_PINS; pin++) {
         _pinStates[pin].isOutput = (modeReg & (1 << pin)) != 0;
@@ -1769,7 +1770,7 @@ bool M5IOE1::_initDevice() {
         return false;
     }
 
-    if (!_readReg(M5IOE1_REG_VERSION, &version)) {
+    if (!_readReg(M5IOE1_REG_REV, &version)) {
         M5IOE1_LOG_E(TAG, "Failed to read device version");
         return false;
     }
