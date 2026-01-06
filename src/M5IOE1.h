@@ -139,6 +139,11 @@
 #define M5IOE1_LED_REFRESH          (1 << 6)
 // Factory Reset
 #define M5IOE1_FACTORY_RESET_KEY    0x3A
+// AW8737A Pulse
+#define M5IOE1_AW8737A_GPIO_MASK    0x1F
+#define M5IOE1_AW8737A_NUM_SHIFT    5
+#define M5IOE1_AW8737A_NUM_MASK     0x03
+#define M5IOE1_AW8737A_REFRESH      (1 << 7)
 
 // ============================
 // ADC Channel Definitions (IO pins that support ADC)
@@ -204,6 +209,24 @@
 // ============================
 #define M5IOE1_DRIVE_PUSHPULL   0x00
 #define M5IOE1_DRIVE_OPENDRAIN  0x01
+
+// ============================
+// AW8737A PULSE Refresh Types
+// ============================
+typedef enum {
+    M5IOE1_AW8737A_REFRESH_WAIT = 0,    // No refresh, wait for next trigger
+    M5IOE1_AW8737A_REFRESH_NOW = 1      // Refresh and execute immediately
+} m5ioe1_aw8737a_refresh_t;
+
+// ============================
+// AW8737A PULSE NUM Types
+// ============================
+typedef enum {
+    M5IOE1_AW8737A_PULSE_NUM_0 = 0,     // 0 pulse
+    M5IOE1_AW8737A_PULSE_NUM_1 = 1,     // 1 pulse
+    M5IOE1_AW8737A_PULSE_NUM_2 = 2,     // 2 pulses
+    M5IOE1_AW8737A_PULSE_NUM_3 = 3      // 3 pulses
+} m5ioe1_aw8737a_pulse_num_t;
 
 // ============================
 // Interrupt Handling Mode
@@ -541,6 +564,30 @@ public:
     bool setLedColor(uint8_t index, m5ioe1_rgb_t color);
     bool refreshLeds();
     bool disableLeds();
+
+    // ========================
+    // AW8737A Pulse Functions
+    // ========================
+    /**
+     * @brief Set AW8737A pulse output configuration
+     * @param pin GPIO pin number (0-13)
+     * @param pulseNum Number of pulses (0-3)
+     * @param refresh Refresh control (WAIT or NOW)
+     * @return true if successful
+     * @note This will automatically configure the pin as output
+     * @note If using open-drain output, external pull-up is required
+     * @note When refresh=NOW, there will be a 20ms delay after execution
+     */
+    bool setAw8737aPulse(uint8_t pin, m5ioe1_aw8737a_pulse_num_t pulseNum, 
+                         m5ioe1_aw8737a_refresh_t refresh = M5IOE1_AW8737A_REFRESH_NOW);
+    
+    /**
+     * @brief Trigger AW8737A pulse refresh
+     * @return true if successful
+     * @note Call setAw8737aPulse with refresh=WAIT first, then call this to trigger
+     * @note There will be a 20ms delay after execution
+     */
+    bool refreshAw8737aPulse();
 
     // ========================
     // RTC RAM Functions

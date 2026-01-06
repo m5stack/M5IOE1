@@ -1112,6 +1112,84 @@ bool M5IOE1::disableLeds() {
 }
 
 // ============================
+// AW8737A Pulse Functions
+// ============================
+
+bool M5IOE1::setAw8737aPulse(uint8_t pin, m5ioe1_aw8737a_pulse_num_t pulseNum, 
+                             m5ioe1_aw8737a_refresh_t refresh) {
+    if (!_initialized) {
+        M5IOE1_LOG_E(TAG, "Device not initialized");
+        return false;
+    }
+
+    // Validate pin range (0-13)
+    if (pin >= M5IOE1_MAX_GPIO_PINS) {
+        M5IOE1_LOG_E(TAG, "Invalid pin number: %d (valid range: 0-%d)", pin, M5IOE1_MAX_GPIO_PINS - 1);
+        return false;
+    }
+
+    // Validate pulse number (0-3)
+    if (pulseNum > M5IOE1_AW8737A_PULSE_NUM_3) {
+        M5IOE1_LOG_E(TAG, "Invalid pulse number: %d (valid range: 0-3)", pulseNum);
+        return false;
+    }
+
+    // Build register value
+    // [7] REFRESH | [6:5] NUM[1:0] | [4:0] GPIO[4:0]
+    uint8_t regValue = 0;
+    regValue |= (pin & M5IOE1_AW8737A_GPIO_MASK);                                    // Bits[4:0]: GPIO selection
+    regValue |= ((pulseNum & M5IOE1_AW8737A_NUM_MASK) << M5IOE1_AW8737A_NUM_SHIFT); // Bits[6:5]: Pulse number
+    if (refresh == M5IOE1_AW8737A_REFRESH_NOW) {
+        regValue |= M5IOE1_AW8737A_REFRESH;                                          // Bit[7]: Refresh flag
+    }
+
+    bool ok = _writeReg(M5IOE1_REG_AW8737A_PULSE, regValue);
+    if (!ok) {
+        M5IOE1_LOG_E(TAG, "Failed to set AW8737A pulse config");
+        return false;
+    }
+
+    M5IOE1_LOG_I(TAG, "AW8737A pulse set: pin=%d, num=%d, refresh=%d (reg=0x%02X)", 
+                 pin, pulseNum, refresh, regValue);
+
+    // If REFRESH bit was set (REFRESH_NOW), wait 20ms as it affects I2C communication
+    if (refresh == M5IOE1_AW8737A_REFRESH_NOW) {
+        M5IOE1_DELAY_MS(20);
+    }
+
+    return true;
+}
+
+bool M5IOE1::refreshAw8737aPulse() {
+    if (!_initialized) {
+        M5IOE1_LOG_E(TAG, "Device not initialized");
+        return false;
+    }
+
+    // Read current register value
+    uint8_t regValue = 0;
+    if (!_readReg(M5IOE1_REG_AW8737A_PULSE, &regValue)) {
+        M5IOE1_LOG_E(TAG, "Failed to read AW8737A pulse register");
+        return false;
+    }
+
+    // Set bit 7 to 1
+    regValue |= M5IOE1_AW8737A_REFRESH;
+
+    if (!_writeReg(M5IOE1_REG_AW8737A_PULSE, regValue)) {
+        M5IOE1_LOG_E(TAG, "Failed to refresh AW8737A pulse");
+        return false;
+    }
+
+    M5IOE1_LOG_I(TAG, "AW8737A pulse refresh triggered (reg=0x%02X)", regValue);
+
+    // Wait 20ms after writing bit 7, as it affects I2C communication
+    M5IOE1_DELAY_MS(20);
+
+    return true;
+}
+
+// ============================
 // RTC RAM Functions
 // ============================
 
