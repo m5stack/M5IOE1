@@ -7,11 +7,13 @@
 #include "M5IOE1.h"
 #include <string.h>
 
+static const char* TAG = "M5IOE1";
+
 #ifdef ARDUINO
     #include <Arduino.h>
     #define M5IOE1_DELAY_MS(ms) delay(ms)
     
-    // Arduino log level control (global variable defined below)
+    // Arduino 日志级别控制 / Arduino log level control
     static m5ioe1_log_level_t _m5ioe1_log_level = M5IOE1_LOG_LEVEL_INFO;
     
     #define M5IOE1_LOG_I(tag, fmt, ...) do { \
@@ -41,19 +43,13 @@
     #define M5IOE1_LOG_I(tag, fmt, ...) ESP_LOGI(tag, fmt, ##__VA_ARGS__)
     #define M5IOE1_LOG_W(tag, fmt, ...) ESP_LOGW(tag, fmt, ##__VA_ARGS__)
     #define M5IOE1_LOG_E(tag, fmt, ...) ESP_LOGE(tag, fmt, ##__VA_ARGS__)
-#endif
-
-static const char* TAG = "M5IOE1";
-
-#ifdef ARDUINO
-// Arduino: log level already defined above as _m5ioe1_log_level
-#else
-// ESP-IDF platform: log level controlled via esp_log_level_set()
-static m5ioe1_log_level_t _m5ioe1_current_log_level = M5IOE1_LOG_LEVEL_INFO;
+    
+    // ESP-IDF 平台日志级别控制 / ESP-IDF platform log level control
+    static m5ioe1_log_level_t _m5ioe1_current_log_level = M5IOE1_LOG_LEVEL_INFO;
 #endif
 
 // ============================
-// Global Log Level Control
+// 全局日志级别控制 / Global Log Level Control
 // ============================
 
 void M5IOE1::setLogLevel(m5ioe1_log_level_t level) {
@@ -62,7 +58,7 @@ void M5IOE1::setLogLevel(m5ioe1_log_level_t level) {
 #else
     _m5ioe1_current_log_level = level;
     
-    // Map M5IOE1 log level to ESP-IDF log level
+    // 将 M5IOE1 日志级别映射到 ESP-IDF 日志级别 / Map M5IOE1 log level to ESP-IDF log level
     esp_log_level_t esp_level;
     switch (level) {
         case M5IOE1_LOG_LEVEL_NONE:
@@ -105,7 +101,7 @@ void M5IOE1::enableDefaultInterruptLog(bool enable) {
 }
 
 // ============================
-// Constructor / Destructor
+// 构造函数 / 析构函数 / Constructor / Destructor
 // ============================
 
 M5IOE1::M5IOE1() {
@@ -156,10 +152,10 @@ M5IOE1::~M5IOE1() {
 #else
     _cleanupInterrupt();
 
-    // Cleanup based on driver type
+    // 根据驱动类型进行清理 / Cleanup based on driver type
     switch (_i2cDriverType) {
         case M5IOE1_I2C_DRIVER_SELF_CREATED:
-            // Self-created: delete device first, then bus
+            // 自创建：先删除设备，再删除总线 / Self-created: delete device first, then bus
             if (_i2c_master_dev) {
                 i2c_master_bus_rm_device(_i2c_master_dev);
                 _i2c_master_dev = nullptr;
@@ -171,20 +167,19 @@ M5IOE1::~M5IOE1() {
             break;
 
         case M5IOE1_I2C_DRIVER_MASTER:
-            // External i2c_master: only delete device if we created it
-            if (_i2c_master_dev && !_busExternal) {
+            // 外部 i2c_master：总是删除我们创建的设备句柄，但不删除总线 / External i2c_master: always delete the device handle we created, but not the bus
+            if (_i2c_master_dev) {
                 i2c_master_bus_rm_device(_i2c_master_dev);
                 _i2c_master_dev = nullptr;
             }
-            // Don't delete bus - it's external
             break;
 
         case M5IOE1_I2C_DRIVER_BUS:
-            // External i2c_bus: only delete device if we created it
-            if (_i2c_device && !_busExternal) {
+            // 外部 i2c_bus：总是删除我们创建的设备句柄，但不删除总线 / External i2c_bus: always delete the device handle we created, but not the bus
+            if (_i2c_device) {
                 i2c_bus_device_delete(&_i2c_device);
+                _i2c_device = nullptr;
             }
-            // Don't delete bus - it's external
             break;
 
         default:
@@ -194,7 +189,7 @@ M5IOE1::~M5IOE1() {
 }
 
 // ============================
-// Initialization Functions
+// 初始化函数 / Initialization Functions
 // ============================
 
 #ifdef ARDUINO
@@ -202,11 +197,11 @@ M5IOE1::~M5IOE1() {
 bool M5IOE1::begin(TwoWire *wire, uint8_t addr, uint8_t sda, uint8_t scl, uint32_t speed, m5ioe1_int_mode_t mode) {
     _wire = wire;
     _addr = addr;
-    _sda = sda;   // Save SDA pin for I2C re-initialization
-    _scl = scl;   // Save SCL pin for I2C re-initialization
+    _sda = sda;   // 保存 SDA 引脚用于 I2C 重新初始化 / Save SDA pin for I2C re-initialization
+    _scl = scl;   // 保存 SCL 引脚用于 I2C 重新初始化 / Save SCL pin for I2C re-initialization
     _intPin = -1;
 
-    // Validate I2C frequency - M5IOE1 only supports 100KHz or 400KHz
+    // 验证 I2C 频率 - M5IOE1 仅支持 100KHz 或 400KHz / Validate I2C frequency - M5IOE1 only supports 100KHz or 400KHz
     if (!_isValidI2cFrequency(speed)) {
         M5IOE1_LOG_W(TAG, "Invalid I2C frequency: %lu Hz. M5IOE1 only supports 100KHz or 400KHz. Falling back to 100KHz.", speed);
         _requestedSpeed = M5IOE1_I2C_FREQ_100K;
@@ -214,20 +209,20 @@ bool M5IOE1::begin(TwoWire *wire, uint8_t addr, uint8_t sda, uint8_t scl, uint32
         _requestedSpeed = speed;
     }
 
-    // Always start with 100KHz - M5IOE1 defaults to 100KHz after power-on/reset
+    // 始终以 100KHz 开始 - M5IOE1 在上电/复位后默认为 100KHz / Always start with 100KHz - M5IOE1 defaults to 100KHz after power-on/reset
     M5IOE1_LOG_I(TAG, "Initializing M5IOE1 with 100KHz (device default)");
     
-    // End any previous I2C session before starting new one (fixes ESP_ERR_INVALID_STATE)
+    // 在开始新的 I2C 会话之前结束之前的会话（修复 ESP_ERR_INVALID_STATE）/ End any previous I2C session before starting new one (fixes ESP_ERR_INVALID_STATE)
     _wire->end();
     M5IOE1_DELAY_MS(10);
     
-    // Initialize I2C bus and check return value
+    // 初始化 I2C 总线并检查返回值 / Initialize I2C bus and check return value
     if (!_wire->begin(sda, scl, M5IOE1_I2C_FREQ_100K)) {
         M5IOE1_LOG_E(TAG, "Failed to initialize I2C bus (SDA=%d, SCL=%d)", sda, scl);
         return false;
     }
     
-    // Give the I2C bus time to stabilize after initialization
+    // 给 I2C 总线时间在初始化后稳定 / Give the I2C bus time to stabilize after initialization
     M5IOE1_DELAY_MS(50);
 
     if (!_initDevice()) {
@@ -237,13 +232,13 @@ bool M5IOE1::begin(TwoWire *wire, uint8_t addr, uint8_t sda, uint8_t scl, uint32
 
     _initialized = true;
 
-    // Take initial snapshot
+    // 获取初始快照 / Take initial snapshot
     _snapshotPinStates();
     _snapshotPwmStates();
     _snapshotAdcState();
     _snapshotI2cConfig();
 
-    // If user requested 400KHz, switch to high-speed mode
+    // 如果用户请求 400KHz，切换到高速模式 / If user requested 400KHz, switch to high-speed mode
     if (_requestedSpeed == M5IOE1_I2C_FREQ_400K) {
         if (!_switchTo400K()) {
             M5IOE1_LOG_W(TAG, "Failed to switch to 400KHz, remaining at 100KHz");
@@ -252,7 +247,7 @@ bool M5IOE1::begin(TwoWire *wire, uint8_t addr, uint8_t sda, uint8_t scl, uint32
 
     M5IOE1_LOG_I(TAG, "M5IOE1 initialized at address 0x%02X (I2C: %lu Hz)", _addr, _requestedSpeed);
 
-    // Set interrupt mode if not disabled
+    // 如果未禁用，设置中断模式 / Set interrupt mode if not disabled
     if (mode != M5IOE1_INT_MODE_DISABLED) {
         setInterruptMode(mode);
     }
@@ -284,7 +279,7 @@ bool M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint32_t spe
     _sda = sda;
     _scl = scl;
 
-    // Validate I2C frequency - M5IOE1 only supports 100KHz or 400KHz
+    // 验证 I2C 频率 - M5IOE1 仅支持 100KHz 或 400KHz / Validate I2C frequency - M5IOE1 only supports 100KHz or 400KHz
     if (!_isValidI2cFrequency(speed)) {
         M5IOE1_LOG_W(TAG, "Invalid I2C frequency: %lu Hz. M5IOE1 only supports 100KHz or 400KHz. Falling back to 100KHz.", speed);
         _requestedSpeed = M5IOE1_I2C_FREQ_100K;
@@ -292,10 +287,10 @@ bool M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint32_t spe
         _requestedSpeed = speed;
     }
 
-    // Always start with 100KHz - M5IOE1 defaults to 100KHz after power-on/reset
+    // 始终以 100KHz 开始 - M5IOE1 在上电/复位后默认为 100KHz / Always start with 100KHz - M5IOE1 defaults to 100KHz after power-on/reset
     M5IOE1_LOG_I(TAG, "Initializing M5IOE1 with 100KHz (device default)");
 
-    // Create I2C master bus using ESP-IDF native driver
+    // 使用 ESP-IDF 原生驱动创建 I2C 主总线 / Create I2C master bus using ESP-IDF native driver
     i2c_master_bus_config_t bus_config = {
         .i2c_port = port,
         .sda_io_num = (gpio_num_t)sda,
@@ -316,7 +311,7 @@ bool M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint32_t spe
         return false;
     }
 
-    // Create device handle at 100KHz
+    // 在 100KHz 创建设备句柄 / Create device handle at 100KHz
     i2c_device_config_t dev_config = {
         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
         .device_address = _addr,
@@ -346,13 +341,13 @@ bool M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint32_t spe
 
     _initialized = true;
 
-    // Take initial snapshot
+    // 获取初始快照 / Take initial snapshot
     _snapshotPinStates();
     _snapshotPwmStates();
     _snapshotAdcState();
     _snapshotI2cConfig();
 
-    // If user requested 400KHz, switch to high-speed mode
+    // 如果用户请求 400KHz，切换到高速模式 / If user requested 400KHz, switch to high-speed mode
     if (_requestedSpeed == M5IOE1_I2C_FREQ_400K) {
         if (!_switchTo400K()) {
             M5IOE1_LOG_W(TAG, "Failed to switch to 400KHz, remaining at 100KHz");
@@ -361,7 +356,7 @@ bool M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint32_t spe
 
     M5IOE1_LOG_I(TAG, "M5IOE1 initialized at address 0x%02X (I2C: %lu Hz)", _addr, _requestedSpeed);
 
-    // Set interrupt mode if not disabled
+    // 如果未禁用，设置中断模式 / Set interrupt mode if not disabled
     if (mode != M5IOE1_INT_MODE_DISABLED) {
         setInterruptMode(mode);
     }
@@ -393,10 +388,10 @@ bool M5IOE1::begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t speed, m5
     _i2cDriverType = M5IOE1_I2C_DRIVER_MASTER;
     _intPin = -1;
     _i2c_master_bus = bus;
-    _sda = -1;  // Unknown for external bus
+    _sda = -1;  // 外部总线未知 / Unknown for external bus
     _scl = -1;
 
-    // Validate I2C frequency
+    // 验证 I2C 频率 / Validate I2C frequency
     if (!_isValidI2cFrequency(speed)) {
         M5IOE1_LOG_W(TAG, "Invalid I2C frequency: %lu Hz. Falling back to 100KHz.", speed);
         _requestedSpeed = M5IOE1_I2C_FREQ_100K;
@@ -406,7 +401,7 @@ bool M5IOE1::begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t speed, m5
 
     M5IOE1_LOG_I(TAG, "Initializing M5IOE1 with 100KHz (device default)");
 
-    // Create device handle at 100KHz
+    // 在 100KHz 创建设备句柄 / Create device handle at 100KHz
     i2c_device_config_t dev_config = {
         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
         .device_address = _addr,
@@ -432,13 +427,13 @@ bool M5IOE1::begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t speed, m5
 
     _initialized = true;
 
-    // Take initial snapshot
+    // 获取初始快照 / Take initial snapshot
     _snapshotPinStates();
     _snapshotPwmStates();
     _snapshotAdcState();
     _snapshotI2cConfig();
 
-    // If user requested 400KHz, switch to high-speed mode
+    // 如果用户请求 400KHz，切换到高速模式 / If user requested 400KHz, switch to high-speed mode
     if (_requestedSpeed == M5IOE1_I2C_FREQ_400K) {
         if (!_switchTo400K()) {
             M5IOE1_LOG_W(TAG, "Failed to switch to 400KHz, remaining at 100KHz");
@@ -478,10 +473,10 @@ bool M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, m5ioe1_in
     _i2cDriverType = M5IOE1_I2C_DRIVER_BUS;
     _intPin = -1;
     _i2c_bus = bus;
-    _sda = -1;  // Unknown for external bus
+    _sda = -1;  // 外部总线未知 / Unknown for external bus
     _scl = -1;
 
-    // Validate I2C frequency
+    // 验证 I2C 频率 / Validate I2C frequency
     if (!_isValidI2cFrequency(speed)) {
         M5IOE1_LOG_W(TAG, "Invalid I2C frequency: %lu Hz. Falling back to 100KHz.", speed);
         _requestedSpeed = M5IOE1_I2C_FREQ_100K;
@@ -491,7 +486,7 @@ bool M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, m5ioe1_in
 
     M5IOE1_LOG_I(TAG, "Initializing M5IOE1 with 100KHz (device default)");
 
-    // Create device handle at 100KHz
+    // 在 100KHz 创建设备句柄 / Create device handle at 100KHz
     _i2c_device = i2c_bus_device_create(_i2c_bus, _addr, M5IOE1_I2C_FREQ_100K);
     if (_i2c_device == nullptr) {
         M5IOE1_LOG_E(TAG, "Failed to create I2C device");
@@ -507,13 +502,13 @@ bool M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, m5ioe1_in
 
     _initialized = true;
 
-    // Take initial snapshot
+    // 获取初始快照 / Take initial snapshot
     _snapshotPinStates();
     _snapshotPwmStates();
     _snapshotAdcState();
     _snapshotI2cConfig();
 
-    // If user requested 400KHz, switch to high-speed mode
+    // 如果用户请求 400KHz，切换到高速模式 / If user requested 400KHz, switch to high-speed mode
     if (_requestedSpeed == M5IOE1_I2C_FREQ_400K) {
         if (!_switchTo400K()) {
             M5IOE1_LOG_W(TAG, "Failed to switch to 400KHz, remaining at 100KHz");
@@ -556,7 +551,8 @@ bool M5IOE1::setInterruptMode(m5ioe1_int_mode_t mode, uint32_t pollingIntervalMs
     if (mode == M5IOE1_INT_MODE_POLLING) {
         return _setupPollingArduino();
     }
-    // Hardware interrupt mode on Arduino would require attachInterrupt
+    // Arduino 上的硬件中断模式需要 attachInterrupt
+    // 这更复杂且特定于平台 / Hardware interrupt mode on Arduino would require attachInterrupt
     // which is more complex and platform-specific
 #else
     _cleanupInterrupt();
@@ -584,7 +580,7 @@ bool M5IOE1::setPollingInterval(float seconds) {
     uint32_t intervalMs = (uint32_t)(seconds * 1000.0f);
     _pollingInterval = intervalMs;
     
-    // If currently in polling mode, restart with new interval
+    // 如果当前处于轮询模式，使用新间隔重新启动 / If currently in polling mode, restart with new interval
     if (_intMode == M5IOE1_INT_MODE_POLLING) {
 #ifdef ARDUINO
         _cleanupPollingArduino();
@@ -600,7 +596,7 @@ bool M5IOE1::setPollingInterval(float seconds) {
 }
 
 // ============================
-// Device Information
+// 设备信息 / Device Information
 // ============================
 
 bool M5IOE1::getUID(uint16_t* uid) {
@@ -619,7 +615,7 @@ bool M5IOE1::getRefVoltage(uint16_t* voltage_mv) {
 }
 
 // ============================
-// GPIO Functions
+// GPIO 功能 / GPIO Functions
 // ============================
 
 void M5IOE1::pinMode(uint8_t pin, uint8_t mode) {
@@ -658,7 +654,7 @@ void M5IOE1::pinMode(uint8_t pin, uint8_t mode) {
             _pinStates[pin].pull = 2;
             break;
         case OUTPUT:
-            // Disable PWM if enabled on this pin
+            // 如果此引脚上启用了 PWM 则禁用 / Disable PWM if enabled on this pin
             if (_isPwmPin(pin)) {
                 uint8_t ch = _getPwmChannel(pin);
                 uint8_t regL = M5IOE1_REG_PWM1_DUTY_L + ch * 2;
@@ -673,7 +669,7 @@ void M5IOE1::pinMode(uint8_t pin, uint8_t mode) {
             modeReg |= (1 << pin);
             puReg &= ~(1 << pin);
             pdReg &= ~(1 << pin);
-            drvReg &= ~(1 << pin);  // Push-pull
+            drvReg &= ~(1 << pin);  // 推挽 / Push-pull
             _pinStates[pin].isOutput = true;
             _pinStates[pin].drive = 0;
             break;
@@ -722,7 +718,7 @@ int M5IOE1::digitalRead(uint8_t pin) {
 }
 
 // ============================
-// Advanced GPIO Functions
+// 高级 GPIO 功能 / Advanced GPIO Functions
 // ============================
 
 bool M5IOE1::setPullMode(uint8_t pin, uint8_t pullMode) {
@@ -781,13 +777,13 @@ bool M5IOE1::getInputState(uint8_t pin, uint8_t* state) {
 }
 
 // ============================
-// Interrupt Functions
+// 中断功能 / Interrupt Functions
 // ============================
 
 void M5IOE1::attachInterrupt(uint8_t pin, m5ioe1_callback_t callback, uint8_t mode) {
     if (!_isValidPin(pin) || callback == nullptr || !_initialized) return;
 
-    // Check for conflicting interrupts
+    // 检查冲突的中断 / Check for conflicting interrupts
     if (_hasConflictingInterrupt(pin)) {
         M5IOE1_LOG_E(TAG, "Interrupt conflict on pin %d", pin);
         return;
@@ -799,13 +795,13 @@ void M5IOE1::attachInterrupt(uint8_t pin, m5ioe1_callback_t callback, uint8_t mo
     _callbacks[pin].enabled = true;
     _callbacks[pin].rising = (mode == RISING);
 
-    // Configure pin as input
+    // 将引脚配置为输入 / Configure pin as input
     uint16_t modeReg = 0;
     _readReg16(M5IOE1_REG_GPIO_MODE_L, &modeReg);
     modeReg &= ~(1 << pin);
     _writeReg16(M5IOE1_REG_GPIO_MODE_L, modeReg);
 
-    // Configure interrupt
+    // 配置中断 / Configure interrupt
     uint16_t ieReg = 0, itReg = 0;
     _readReg16(M5IOE1_REG_GPIO_IE_L, &ieReg);
     _readReg16(M5IOE1_REG_GPIO_IP_L, &itReg);
@@ -838,13 +834,13 @@ void M5IOE1::attachInterruptArg(uint8_t pin, m5ioe1_callback_arg_t callback, voi
     _callbacks[pin].enabled = true;
     _callbacks[pin].rising = (mode == RISING);
 
-    // Configure pin as input
+    // 将引脚配置为输入 / Configure pin as input
     uint16_t modeReg = 0;
     _readReg16(M5IOE1_REG_GPIO_MODE_L, &modeReg);
     modeReg &= ~(1 << pin);
     _writeReg16(M5IOE1_REG_GPIO_MODE_L, modeReg);
 
-    // Configure interrupt
+    // 配置中断 / Configure interrupt
     uint16_t ieReg = 0, itReg = 0;
     _readReg16(M5IOE1_REG_GPIO_IE_L, &ieReg);
     _readReg16(M5IOE1_REG_GPIO_IP_L, &itReg);
@@ -906,17 +902,17 @@ bool M5IOE1::clearInterrupt(uint8_t pin) {
 }
 
 // ============================
-// ADC Functions
+// ADC 功能 / ADC Functions
 // ============================
 
 bool M5IOE1::analogRead(uint8_t channel, uint16_t* result) {
     if (result == nullptr || channel < 1 || channel > 4 || !_initialized) return false;
 
-    // Start conversion
+    // 开始转换 / Start conversion
     uint8_t ctrl = (channel & M5IOE1_ADC_CH_MASK) | M5IOE1_ADC_START;
     if (!_writeReg(M5IOE1_REG_ADC_CTRL, ctrl)) return false;
 
-    // Wait for completion
+    // 等待完成 / Wait for completion
     uint8_t reg = 0;
     int tries = 0;
     do {
@@ -950,7 +946,7 @@ bool M5IOE1::disableAdc() {
 }
 
 // ============================
-// Temperature Sensor
+// 温度传感器 / Temperature Sensor
 // ============================
 
 bool M5IOE1::readTemperature(uint16_t* temperature) {
@@ -982,7 +978,7 @@ bool M5IOE1::isTemperatureBusy() {
 }
 
 // ============================
-// PWM Functions
+// PWM 功能 / PWM Functions
 // ============================
 
 bool M5IOE1::setPwmFrequency(uint16_t frequency) {
@@ -1003,7 +999,7 @@ bool M5IOE1::getPwmFrequency(uint16_t* frequency) {
 bool M5IOE1::setPwmDuty(uint8_t channel, uint8_t duty, bool polarity, bool enable) {
     if (channel > 3 || duty > 100 || !_initialized) return false;
 
-    // Convert percentage to 12-bit (0-4095)
+    // 将百分比转换为 12 位 (0-4095) / Convert percentage to 12-bit (0-4095)
     uint16_t duty12 = (uint16_t)((duty * 0x0FFF) / 100);
     return setPwmDuty12bit(channel, duty12, polarity, enable);
 }
@@ -1011,7 +1007,7 @@ bool M5IOE1::setPwmDuty(uint8_t channel, uint8_t duty, bool polarity, bool enabl
 bool M5IOE1::setPwmDuty12bit(uint8_t channel, uint16_t duty12, bool polarity, bool enable) {
     if (channel > 3 || duty12 > 0x0FFF || !_initialized) return false;
 
-    // Get corresponding pin
+    // 获取对应的引脚 / Get corresponding pin
     uint8_t pin = (channel == 0) ? 8 : (channel == 1) ? 7 : (channel == 2) ? 10 : 9;
 
     uint8_t regL = M5IOE1_REG_PWM1_DUTY_L + (channel * 2);
@@ -1025,7 +1021,7 @@ bool M5IOE1::setPwmDuty12bit(uint8_t channel, uint16_t duty12, bool polarity, bo
     if (!_writeBytes(regL, buf, 2)) return false;
 
     if (enable) {
-        // Set pin to output mode
+        // 将引脚设置为输出模式 / Set pin to output mode
         uint16_t modeReg = 0;
         if (_readReg16(M5IOE1_REG_GPIO_MODE_L, &modeReg)) {
             modeReg |= (1 << pin);
@@ -1059,7 +1055,7 @@ bool M5IOE1::getPwmDuty(uint8_t channel, uint8_t* duty, bool* polarity, bool* en
 }
 
 // ============================
-// NeoPixel LED Functions
+// NeoPixel LED 功能 / NeoPixel LED Functions
 // ============================
 
 bool M5IOE1::setLedCount(uint8_t count) {
@@ -1075,7 +1071,7 @@ bool M5IOE1::setLedCount(uint8_t count) {
 bool M5IOE1::setLedColor(uint8_t index, uint8_t r, uint8_t g, uint8_t b) {
     if (index >= M5IOE1_MAX_LED_COUNT || !_initialized) return false;
 
-    // Convert to RGB565
+    // 转换为 RGB565 / Convert to RGB565
     uint16_t r5 = (r >> 3) & 0x1F;
     uint16_t g6 = (g >> 2) & 0x3F;
     uint16_t b5 = (b >> 3) & 0x1F;
@@ -1112,7 +1108,7 @@ bool M5IOE1::disableLeds() {
 }
 
 // ============================
-// AW8737A Pulse Functions
+// AW8737A 脉冲功能 / AW8737A Pulse Functions
 // ============================
 
 bool M5IOE1::setAw8737aPulse(uint8_t pin, m5ioe1_aw8737a_pulse_num_t pulseNum, 
@@ -1122,25 +1118,26 @@ bool M5IOE1::setAw8737aPulse(uint8_t pin, m5ioe1_aw8737a_pulse_num_t pulseNum,
         return false;
     }
 
-    // Validate pin range (0-13)
+    // 验证引脚范围 (0-13) / Validate pin range (0-13)
     if (pin >= M5IOE1_MAX_GPIO_PINS) {
         M5IOE1_LOG_E(TAG, "Invalid pin number: %d (valid range: 0-%d)", pin, M5IOE1_MAX_GPIO_PINS - 1);
         return false;
     }
 
-    // Validate pulse number (0-3)
+    // 验证脉冲编号 (0-3) / Validate pulse number (0-3)
     if (pulseNum > M5IOE1_AW8737A_PULSE_NUM_3) {
         M5IOE1_LOG_E(TAG, "Invalid pulse number: %d (valid range: 0-3)", pulseNum);
         return false;
     }
 
-    // Build register value
+    // 构建寄存器值
+    // [7] REFRESH | [6:5] NUM[1:0] | [4:0] GPIO[4:0] / Build register value
     // [7] REFRESH | [6:5] NUM[1:0] | [4:0] GPIO[4:0]
     uint8_t regValue = 0;
-    regValue |= (pin & M5IOE1_AW8737A_GPIO_MASK);                                    // Bits[4:0]: GPIO selection
-    regValue |= ((pulseNum & M5IOE1_AW8737A_NUM_MASK) << M5IOE1_AW8737A_NUM_SHIFT); // Bits[6:5]: Pulse number
+    regValue |= (pin & M5IOE1_AW8737A_GPIO_MASK);                                    // 位[4:0]: GPIO 选择 / Bits[4:0]: GPIO selection
+    regValue |= ((pulseNum & M5IOE1_AW8737A_NUM_MASK) << M5IOE1_AW8737A_NUM_SHIFT); // 位[6:5]: 脉冲编号 / Bits[6:5]: Pulse number
     if (refresh == M5IOE1_AW8737A_REFRESH_NOW) {
-        regValue |= M5IOE1_AW8737A_REFRESH;                                          // Bit[7]: Refresh flag
+        regValue |= M5IOE1_AW8737A_REFRESH;                                          // 位[7]: 刷新标志 / Bit[7]: Refresh flag
     }
 
     bool ok = _writeReg(M5IOE1_REG_AW8737A_PULSE, regValue);
@@ -1152,7 +1149,7 @@ bool M5IOE1::setAw8737aPulse(uint8_t pin, m5ioe1_aw8737a_pulse_num_t pulseNum,
     M5IOE1_LOG_I(TAG, "AW8737A pulse set: pin=%d, num=%d, refresh=%d (reg=0x%02X)", 
                  pin, pulseNum, refresh, regValue);
 
-    // If REFRESH bit was set (REFRESH_NOW), wait 20ms as it affects I2C communication
+    // 如果设置了 REFRESH 位 (REFRESH_NOW)，等待 20ms，因为它会影响 I2C 通信 / If REFRESH bit was set (REFRESH_NOW), wait 20ms as it affects I2C communication
     if (refresh == M5IOE1_AW8737A_REFRESH_NOW) {
         M5IOE1_DELAY_MS(20);
     }
@@ -1166,14 +1163,14 @@ bool M5IOE1::refreshAw8737aPulse() {
         return false;
     }
 
-    // Read current register value
+    // 读取当前寄存器值 / Read current register value
     uint8_t regValue = 0;
     if (!_readReg(M5IOE1_REG_AW8737A_PULSE, &regValue)) {
         M5IOE1_LOG_E(TAG, "Failed to read AW8737A pulse register");
         return false;
     }
 
-    // Set bit 7 to 1
+    // 将位 7 设置为 1 / Set bit 7 to 1
     regValue |= M5IOE1_AW8737A_REFRESH;
 
     if (!_writeReg(M5IOE1_REG_AW8737A_PULSE, regValue)) {
@@ -1183,14 +1180,14 @@ bool M5IOE1::refreshAw8737aPulse() {
 
     M5IOE1_LOG_I(TAG, "AW8737A pulse refresh triggered (reg=0x%02X)", regValue);
 
-    // Wait 20ms after writing bit 7, as it affects I2C communication
+    // 写入位 7 后等待 20ms，因为它会影响 I2C 通信 / Wait 20ms after writing bit 7, as it affects I2C communication
     M5IOE1_DELAY_MS(20);
 
     return true;
 }
 
 // ============================
-// RTC RAM Functions
+// RTC RAM 功能 / RTC RAM Functions
 // ============================
 
 bool M5IOE1::writeRtcRam(uint8_t offset, const uint8_t* data, uint8_t length) {
@@ -1214,7 +1211,7 @@ bool M5IOE1::readRtcRam(uint8_t offset, uint8_t* data, uint8_t length) {
 }
 
 // ============================
-// System Configuration
+// 系统配置 / System Configuration
 // ============================
 
 bool M5IOE1::setI2cConfig(uint8_t sleepTime, bool speed400k, bool wakeRising, bool pullOff) {
@@ -1255,7 +1252,7 @@ bool M5IOE1::factoryReset() {
 }
 
 // ============================
-// State Snapshot Functions
+// 状态快照功能 / State Snapshot Functions
 // ============================
 
 void M5IOE1::setAutoSnapshot(bool enable) {
@@ -1277,7 +1274,7 @@ bool M5IOE1::updateSnapshot() {
 }
 
 // ============================
-// Debug Functions
+// 调试功能 / Debug Functions
 // ============================
 
 bool M5IOE1::getModeReg(uint16_t* reg) {
@@ -1311,13 +1308,13 @@ bool M5IOE1::getDriveReg(uint16_t* reg) {
 }
 
 // ============================
-// Configuration Validation
+// 配置验证 / Configuration Validation
 // ============================
 
 m5ioe1_validation_t M5IOE1::validateConfig(uint8_t pin, m5ioe1_config_type_t configType, bool enable) {
     m5ioe1_validation_t result = {false, {0}, 0xFF};
 
-    // Basic validation
+    // 基本验证 / Basic validation
     if (!_isValidPin(pin)) {
         snprintf(result.error_msg, sizeof(result.error_msg), "Invalid pin %d", pin);
         return result;
@@ -1328,7 +1325,7 @@ m5ioe1_validation_t M5IOE1::validateConfig(uint8_t pin, m5ioe1_config_type_t con
         return result;
     }
 
-    // If disabling, no conflict check needed
+    // 如果禁用，无需冲突检查 / If disabling, no conflict check needed
     if (!enable) {
         result.valid = true;
         return result;
@@ -1339,7 +1336,7 @@ m5ioe1_validation_t M5IOE1::validateConfig(uint8_t pin, m5ioe1_config_type_t con
     switch (configType) {
         case M5IOE1_CONFIG_GPIO_INPUT:
         case M5IOE1_CONFIG_GPIO_OUTPUT:
-            // Check if pin is being used for special functions
+            // 检查引脚是否用于特殊功能 / Check if pin is being used for special functions
             if (_hasActivePwm(pin)) {
                 snprintf(result.error_msg, sizeof(result.error_msg),
                          "Pin %d is used for PWM. Disable first (e.g. setPwmDuty)", pin);
@@ -1358,7 +1355,7 @@ m5ioe1_validation_t M5IOE1::validateConfig(uint8_t pin, m5ioe1_config_type_t con
             break;
 
         case M5IOE1_CONFIG_GPIO_INTERRUPT:
-            // Check interrupt mutex constraint
+            // 检查中断互斥约束 / Check interrupt mutex constraint
             if (_getInterruptMutexPin(pin, &mutexPin)) {
                 if (_hasActiveInterrupt(mutexPin)) {
                     snprintf(result.error_msg, sizeof(result.error_msg),
@@ -1367,7 +1364,7 @@ m5ioe1_validation_t M5IOE1::validateConfig(uint8_t pin, m5ioe1_config_type_t con
                     return result;
                 }
             }
-            // Check I2C sleep mode conflict for IO5
+            // 检查 IO5 的 I2C 睡眠模式冲突 / Check I2C sleep mode conflict for IO5
             if (pin == 4 && _hasI2cSleepEnabled()) {  // IO5 is pin index 4
                 snprintf(result.error_msg, sizeof(result.error_msg),
                          "IO5 interrupt disabled when I2C sleep enabled");
@@ -1376,13 +1373,13 @@ m5ioe1_validation_t M5IOE1::validateConfig(uint8_t pin, m5ioe1_config_type_t con
             break;
 
         case M5IOE1_CONFIG_ADC:
-            // Check if pin supports ADC
+            // 检查引脚是否支持 ADC / Check if pin supports ADC
             if (!_isAdcPin(pin)) {
                 snprintf(result.error_msg, sizeof(result.error_msg),
                          "Pin %d does not support ADC", pin);
                 return result;
             }
-            // Check if pin is configured as output
+            // 检查引脚是否配置为输出 / Check if pin is configured as output
             if (_pinStatesValid && _pinStates[pin].isOutput) {
                 snprintf(result.error_msg, sizeof(result.error_msg),
                          "Pin %d is configured as output", pin);
@@ -1391,7 +1388,7 @@ m5ioe1_validation_t M5IOE1::validateConfig(uint8_t pin, m5ioe1_config_type_t con
             break;
 
         case M5IOE1_CONFIG_PWM:
-            // Check if pin supports PWM
+            // 检查引脚是否支持 PWM / Check if pin supports PWM
             if (!_isPwmPin(pin)) {
                 snprintf(result.error_msg, sizeof(result.error_msg),
                          "Pin %d does not support PWM", pin);
@@ -1400,19 +1397,19 @@ m5ioe1_validation_t M5IOE1::validateConfig(uint8_t pin, m5ioe1_config_type_t con
             break;
 
         case M5IOE1_CONFIG_NEOPIXEL:
-            // NeoPixel only works on IO14 (pin index 13)
+            // NeoPixel 仅在 IO14 上工作（引脚索引 13）/ NeoPixel only works on IO14 (pin index 13)
             if (!_isNeopixelPin(pin)) {
                 snprintf(result.error_msg, sizeof(result.error_msg),
                          "NeoPixel only supported on IO14 (pin 13)");
                 return result;
             }
-            // Check if pin has active interrupt
+            // 检查引脚是否有活动中断 / Check if pin has active interrupt
             if (_hasActiveInterrupt(pin)) {
                 snprintf(result.error_msg, sizeof(result.error_msg),
                          "IO14 has active interrupt, conflicts with NeoPixel");
                 return result;
             }
-            // Check interrupt mutex (IO10 and IO14 are mutex)
+            // 检查中断互斥（IO10 和 IO14 是互斥的）/ Check interrupt mutex (IO10 and IO14 are mutex)
             if (_getInterruptMutexPin(pin, &mutexPin)) {
                 if (_hasActiveInterrupt(mutexPin)) {
                     snprintf(result.error_msg, sizeof(result.error_msg),
@@ -1424,7 +1421,7 @@ m5ioe1_validation_t M5IOE1::validateConfig(uint8_t pin, m5ioe1_config_type_t con
             break;
 
         case M5IOE1_CONFIG_I2C_SLEEP:
-            // I2C sleep mode disables IO5 interrupt
+            // I2C 睡眠模式禁用 IO5 中断 / I2C sleep mode disables IO5 interrupt
             if (_hasActiveInterrupt(4)) {  // IO5 is pin index 4
                 snprintf(result.error_msg, sizeof(result.error_msg),
                          "I2C sleep mode will disable IO5 interrupt");
@@ -1443,7 +1440,7 @@ m5ioe1_validation_t M5IOE1::validateConfig(uint8_t pin, m5ioe1_config_type_t con
 }
 
 // ============================
-// Internal Helper Functions
+// 内部辅助函数 / Internal Helper Functions
 // ============================
 
 bool M5IOE1::_writeReg(uint8_t reg, uint8_t value) {
@@ -1547,12 +1544,12 @@ bool M5IOE1::_isValidPin(uint8_t pin) {
 }
 
 bool M5IOE1::_isAdcPin(uint8_t pin) {
-    // ADC pins: IO2(1), IO4(3), IO5(4), IO7(6)
+    // ADC 引脚：IO2(1), IO4(3), IO5(4), IO7(6) / ADC pins: IO2(1), IO4(3), IO5(4), IO7(6)
     return (pin == 1 || pin == 3 || pin == 4 || pin == 6);
 }
 
 bool M5IOE1::_isPwmPin(uint8_t pin) {
-    // PWM pins: IO8(7), IO9(8), IO10(9), IO11(10)
+    // PWM 引脚：IO8(7), IO9(8), IO10(9), IO11(10) / PWM pins: IO8(7), IO9(8), IO10(9), IO11(10)
     return (pin == 7 || pin == 8 || pin == 9 || pin == 10);
 }
 
@@ -1676,14 +1673,14 @@ bool M5IOE1::_switchTo400K() {
         return false;
     }
 
-    // Step 1: Read current I2C config
+    // 步骤 1：读取当前 I2C 配置 / Step 1: Read current I2C config
     uint8_t i2cCfg = 0;
     if (!_readReg(M5IOE1_REG_I2C_CFG, &i2cCfg)) {
         M5IOE1_LOG_E(TAG, "Failed to read I2C config register");
         return false;
     }
 
-    // Step 2: Set 400KHz mode bit in device
+    // 步骤 2：在设备中设置 400KHz 模式位 / Step 2: Set 400KHz mode bit in device
     i2cCfg |= M5IOE1_I2C_SPEED_400K;
     if (!_writeReg(M5IOE1_REG_I2C_CFG, i2cCfg)) {
         M5IOE1_LOG_E(TAG, "Failed to write I2C config register for 400KHz mode");
@@ -1692,22 +1689,23 @@ bool M5IOE1::_switchTo400K() {
 
     M5IOE1_LOG_I(TAG, "M5IOE1 I2C config set to 400KHz mode");
 
-    // Step 3: Small delay to allow device to process the configuration change
+    // 步骤 3：短暂延迟以允许设备处理配置更改 / Step 3: Small delay to allow device to process the configuration change
     M5IOE1_DELAY_MS(5);
 
-    // Step 4: Switch host I2C bus to 400KHz
+    // 步骤 4：将主机 I2C 总线切换到 400KHz / Step 4: Switch host I2C bus to 400KHz
 #ifdef ARDUINO
     if (_wire != nullptr) {
-        // Must use Wire.end() + Wire.begin() to properly switch I2C frequency on ESP32
+        // 必须使用 Wire.end() + Wire.begin() 在 ESP32 上正确切换 I2C 频率
+        // 仅使用 setClock() 会在较新的 ESP32 Arduino 核心上导致 ESP_ERR_INVALID_STATE / Must use Wire.end() + Wire.begin() to properly switch I2C frequency on ESP32
         // Using only setClock() causes ESP_ERR_INVALID_STATE on newer ESP32 Arduino cores
         _wire->end();
-        M5IOE1_DELAY_MS(10);  // Allow I2C bus to settle
+        M5IOE1_DELAY_MS(10);  // 允许 I2C 总线稳定 / Allow I2C bus to settle
         if (!_wire->begin(_sda, _scl, M5IOE1_I2C_FREQ_400K)) {
             M5IOE1_LOG_E(TAG, "Failed to re-initialize I2C bus at 400KHz");
             // Try to recover with 100KHz
             _wire->begin(_sda, _scl, M5IOE1_I2C_FREQ_100K);
             _requestedSpeed = M5IOE1_I2C_FREQ_100K;
-            // Revert device config
+            // 恢复设备配置 / Revert device config
             i2cCfg &= ~M5IOE1_I2C_SPEED_400K;
             _writeReg(M5IOE1_REG_I2C_CFG, i2cCfg);
             return false;
@@ -1716,13 +1714,13 @@ bool M5IOE1::_switchTo400K() {
         M5IOE1_LOG_I(TAG, "Host I2C bus switched to 400KHz");
     }
 #else
-    // ESP-IDF: Handle different driver types
+    // ESP-IDF：处理不同的驱动类型 / ESP-IDF: Handle different driver types
     esp_err_t ret;
     
     switch (_i2cDriverType) {
         case M5IOE1_I2C_DRIVER_SELF_CREATED:
         case M5IOE1_I2C_DRIVER_MASTER:
-            // For i2c_master driver: remove device and add with new speed
+            // 对于 i2c_master 驱动：删除设备并以新速度重新添加 / For i2c_master driver: remove device and add with new speed
             if (_i2c_master_dev != nullptr) {
                 ret = i2c_master_bus_rm_device(_i2c_master_dev);
                 if (ret != ESP_OK) {
@@ -1731,7 +1729,7 @@ bool M5IOE1::_switchTo400K() {
                 }
                 _i2c_master_dev = nullptr;
                 
-                // Recreate device handle with 400KHz
+                // 以 400KHz 重新创建设备句柄 / Recreate device handle with 400KHz
                 i2c_device_config_t dev_config = {
                     .dev_addr_length = I2C_ADDR_BIT_LEN_7,
                     .device_address = _addr,
@@ -1745,7 +1743,7 @@ bool M5IOE1::_switchTo400K() {
                 ret = i2c_master_bus_add_device(_i2c_master_bus, &dev_config, &_i2c_master_dev);
                 if (ret != ESP_OK) {
                     M5IOE1_LOG_E(TAG, "Failed to add I2C device at 400KHz: %s", esp_err_to_name(ret));
-                    // Try to recover with 100KHz
+                    // 尝试以 100KHz 恢复 / Try to recover with 100KHz
                     dev_config.scl_speed_hz = M5IOE1_I2C_FREQ_100K;
                     i2c_master_bus_add_device(_i2c_master_bus, &dev_config, &_i2c_master_dev);
                     _requestedSpeed = M5IOE1_I2C_FREQ_100K;
@@ -1756,7 +1754,7 @@ bool M5IOE1::_switchTo400K() {
             break;
             
         case M5IOE1_I2C_DRIVER_BUS:
-            // For i2c_bus driver: delete device and create with new speed
+            // 对于 i2c_bus 驱动：删除设备并以新速度创建 / For i2c_bus driver: delete device and create with new speed
             if (_i2c_device != nullptr) {
                 ret = i2c_bus_device_delete(&_i2c_device);
                 if (ret != ESP_OK) {
@@ -1764,11 +1762,11 @@ bool M5IOE1::_switchTo400K() {
                     return false;
                 }
                 
-                // Recreate device handle with 400KHz
+                // 以 400KHz 重新创建设备句柄 / Recreate device handle with 400KHz
                 _i2c_device = i2c_bus_device_create(_i2c_bus, _addr, M5IOE1_I2C_FREQ_400K);
                 if (_i2c_device == nullptr) {
                     M5IOE1_LOG_E(TAG, "Failed to create I2C device at 400KHz");
-                    // Try to recover with 100KHz
+                    // 尝试以 100KHz 恢复 / Try to recover with 100KHz
                     _i2c_device = i2c_bus_device_create(_i2c_bus, _addr, M5IOE1_I2C_FREQ_100K);
                     _requestedSpeed = M5IOE1_I2C_FREQ_100K;
                     return false;
@@ -1783,23 +1781,23 @@ bool M5IOE1::_switchTo400K() {
     }
 #endif
 
-    // Step 5: Verify communication still works
+    // 步骤 5：验证通信仍然有效 / Step 5: Verify communication still works
     uint16_t uid = 0;
     if (!_readReg16(M5IOE1_REG_UID_L, &uid)) {
         M5IOE1_LOG_E(TAG, "Communication failed after switching to 400KHz, reverting to 100KHz");
 
-        // Revert device config
+        // 恢复设备配置 / Revert device config
         i2cCfg &= ~M5IOE1_I2C_SPEED_400K;
 #ifdef ARDUINO
         if (_wire != nullptr) {
-            // Re-initialize I2C bus at 100KHz
+            // 以 100KHz 重新初始化 I2C 总线 / Re-initialize I2C bus at 100KHz
             _wire->end();
             M5IOE1_DELAY_MS(10);
             _wire->begin(_sda, _scl, M5IOE1_I2C_FREQ_100K);
             M5IOE1_DELAY_MS(10);
         }
 #else
-        // Revert based on driver type
+        // 根据驱动类型恢复 / Revert based on driver type
         switch (_i2cDriverType) {
             case M5IOE1_I2C_DRIVER_SELF_CREATED:
             case M5IOE1_I2C_DRIVER_MASTER:
@@ -1830,7 +1828,7 @@ bool M5IOE1::_switchTo400K() {
         return false;
     }
 
-    // Update I2C config cache
+    // 更新 I2C 配置缓存 / Update I2C config cache
     _i2cConfig.speed400k = true;
     _requestedSpeed = M5IOE1_I2C_FREQ_400K;
 
@@ -1839,7 +1837,7 @@ bool M5IOE1::_switchTo400K() {
 }
 
 bool M5IOE1::_initDevice() {
-    // Read device info to verify communication
+    // 读取设备信息以验证通信 / Read device info to verify communication
     uint16_t uid = 0;
     uint8_t version = 0;
 
@@ -1877,7 +1875,7 @@ void M5IOE1::_handleInterrupt() {
 }
 
 bool M5IOE1::_pinsConflict(uint8_t a, uint8_t b) {
-    // Interrupt conflict pairs (1-based IO numbers):
+    // 中断冲突对（1-based IO 编号）：/ Interrupt conflict pairs (1-based IO numbers):
     // (1,6), (2,3), (7,12), (8,9), (10,14), (11,13)
     uint8_t A = a + 1, B = b + 1;
 
@@ -1899,13 +1897,13 @@ bool M5IOE1::_hasConflictingInterrupt(uint8_t pin) {
 }
 
 // ============================
-// Configuration Validation Helpers
+// 配置验证辅助函数 / Configuration Validation Helpers
 // ============================
 
 bool M5IOE1::_getInterruptMutexPin(uint8_t pin, uint8_t* mutexPin) {
     if (mutexPin == nullptr) return false;
 
-    // Interrupt mutex pairs (0-based pin indices):
+    // 中断互斥对（0-based 引脚索引）：/ Interrupt mutex pairs (0-based pin indices):
     // IO1(0) <-> IO6(5)
     // IO2(1) <-> IO3(2)
     // IO7(6) <-> IO12(11)
@@ -1937,7 +1935,7 @@ bool M5IOE1::_getInterruptMutexPin(uint8_t pin, uint8_t* mutexPin) {
 }
 
 bool M5IOE1::_isNeopixelPin(uint8_t pin) {
-    // NeoPixel LED function only available on IO14 (pin index 13)
+    // NeoPixel LED 功能仅在 IO14 上可用（引脚索引 13）/ NeoPixel LED function only available on IO14 (pin index 13)
     return (pin == 13);
 }
 
@@ -1951,7 +1949,7 @@ bool M5IOE1::_hasActiveAdc(uint8_t pin) {
     if (!_isAdcPin(pin)) return false;
     if (!_adcStateValid) return false;
 
-    // Check if the ADC is currently using this pin's channel
+    // 检查 ADC 当前是否正在使用此引脚的通道 / Check if the ADC is currently using this pin's channel
     uint8_t channel = _getAdcChannel(pin);
     return (_adcState.activeChannel == channel);
 }
@@ -1974,7 +1972,7 @@ bool M5IOE1::_isLedEnabled() {
 }
 
 // ============================
-// I2C Config Snapshot
+// I2C 配置快照 / I2C Config Snapshot
 // ============================
 
 void M5IOE1::_clearI2cConfig() {
@@ -1994,7 +1992,7 @@ bool M5IOE1::_snapshotI2cConfig() {
     _i2cConfig.pullOff = (cfg & M5IOE1_I2C_PULL_OFF) != 0;
     _i2cConfigValid = true;
 
-    // Also snapshot LED config
+    // 同时快照 LED 配置 / Also snapshot LED config
     uint8_t ledCfg = 0;
     if (_readReg(M5IOE1_REG_LED_CFG, &ledCfg)) {
         _ledCount = ledCfg & M5IOE1_LED_NUM_MASK;
@@ -2005,7 +2003,7 @@ bool M5IOE1::_snapshotI2cConfig() {
 }
 
 // ============================
-// Snapshot Verification
+// 快照验证 / Snapshot Verification
 // ============================
 
 m5ioe1_snapshot_verify_t M5IOE1::verifySnapshot() {
@@ -2016,14 +2014,14 @@ m5ioe1_snapshot_verify_t M5IOE1::verifySnapshot() {
         return result;
     }
 
-    // Verify GPIO registers
+    // 验证 GPIO 寄存器 / Verify GPIO registers
     if (_pinStatesValid) {
         uint16_t actualMode = 0, actualOutput = 0;
 
         if (_readReg16(M5IOE1_REG_GPIO_MODE_L, &actualMode) &&
             _readReg16(M5IOE1_REG_GPIO_OUT_L, &actualOutput)) {
 
-            // Build expected values from cache
+            // 从缓存构建期望值 / Build expected values from cache
             uint16_t expectedMode = 0, expectedOutput = 0;
             for (uint8_t i = 0; i < M5IOE1_MAX_GPIO_PINS; i++) {
                 if (_pinStates[i].isOutput) {
@@ -2048,7 +2046,7 @@ m5ioe1_snapshot_verify_t M5IOE1::verifySnapshot() {
         }
     }
 
-    // Verify PWM registers
+    // 验证 PWM 寄存器 / Verify PWM registers
     if (_pwmStatesValid) {
         uint16_t actualFreq = 0;
         if (_readReg16(M5IOE1_REG_PWM_FREQ_L, &actualFreq)) {
@@ -2076,7 +2074,7 @@ m5ioe1_snapshot_verify_t M5IOE1::verifySnapshot() {
         }
     }
 
-    // Verify ADC registers
+    // 验证 ADC 寄存器 / Verify ADC registers
     if (_adcStateValid) {
         uint8_t ctrl = 0;
         if (_readReg(M5IOE1_REG_ADC_CTRL, &ctrl)) {
@@ -2092,7 +2090,7 @@ m5ioe1_snapshot_verify_t M5IOE1::verifySnapshot() {
 }
 
 // ============================
-// Cached State Query Functions
+// 缓存状态查询函数 / Cached State Query Functions
 // ============================
 
 bool M5IOE1::getCachedPwmFrequency(uint16_t* frequency) {
@@ -2138,7 +2136,7 @@ bool M5IOE1::getCachedPinState(uint8_t pin, bool* isOutput, uint8_t* level, uint
 }
 
 // ============================
-// Platform-Specific Functions
+// 平台特定函数 / Platform-Specific Functions
 // ============================
 
 #ifdef ARDUINO
@@ -2233,7 +2231,7 @@ bool M5IOE1::_setupHardwareInterrupt() {
         return false;
     }
 
-    // Create task to handle interrupts
+    // 创建任务以处理中断 / Create task to handle interrupts
     xTaskCreatePinnedToCore(
         [](void* arg) {
             M5IOE1* self = static_cast<M5IOE1*>(arg);
@@ -2269,8 +2267,10 @@ void M5IOE1::_cleanupInterrupt() {
         _intrQueue = nullptr;
     }
     if (_intPin >= 0) {
-        // 移除 GPIO ISR handler，如果返回错误（如"GPIO isr service is not installed"）可忽略
-        // 该错误表示当前未安装 ISR service，无需移除，属于预期行为
+        // 移除 GPIO ISR handler / Remove GPIO ISR handler
+        // 如果返回错误（如"GPIO isr service is not installed"）可忽略
+        // 该错误表示当前未安装 ISR service，无需移除，属于预期行为 / The returned error (e.g., "GPIO isr service is not installed") can be ignored
+        // This error indicates that the ISR service is not currently installed and does not need to be removed, which is expected behavior
         esp_err_t err = gpio_isr_handler_remove((gpio_num_t)_intPin);
         if (err != ESP_OK) {
             M5IOE1_LOG_W(TAG, "gpio_isr_handler_remove failed (can be ignored if ISR service was not installed): %s", esp_err_to_name(err));
