@@ -11,6 +11,16 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifdef ARDUINO
+// Arduino: FreeRTOS headers included via Arduino framework
+#else
+// ESP-IDF specific includes
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
+#include "esp_attr.h"
+#endif
+
 // ============================
 // IO Pin Definitions
 // ============================
@@ -619,11 +629,18 @@ public:
      */
     bool getCachedPinState(uint8_t pin, bool* isOutput, uint8_t* level, uint8_t* pull);
 
+    /**
+     * @brief Enable or disable default interrupt logging when no callback is registered
+     * @param enable true to enable logging, false to disable (default)
+     */
+    void enableDefaultInterruptLog(bool enable);
+
 private:
     // Device state
     uint8_t _addr;
     bool _initialized;
     bool _autoSnapshot;
+    bool _enableDefaultIsrLog;
     uint32_t _requestedSpeed;  // User requested I2C speed (for 400K switch)
 
     // Interrupt mode
@@ -760,18 +777,18 @@ private:
     void _clearI2cConfig();
     bool _snapshotI2cConfig();
 
-#ifndef ARDUINO
+#ifdef ARDUINO
+    // Arduino specific
+    bool _setupPollingArduino();
+    void _cleanupPollingArduino();
+    static void _pollTaskArduino(void* arg);
+#else
     // ESP-IDF specific
     static void _pollTaskFunc(void* arg);
     static void IRAM_ATTR _isrHandler(void* arg);
     bool _setupHardwareInterrupt();
     bool _setupPolling();
     void _cleanupInterrupt();
-#else
-    // Arduino specific
-    bool _setupPollingArduino();
-    void _cleanupPollingArduino();
-    static void _pollTaskArduino(void* arg);
 #endif
 };
 

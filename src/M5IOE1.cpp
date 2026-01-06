@@ -45,7 +45,9 @@
 
 static const char* TAG = "M5IOE1";
 
-#ifndef ARDUINO
+#ifdef ARDUINO
+// Arduino: log level already defined above as _m5ioe1_log_level
+#else
 // ESP-IDF platform: log level controlled via esp_log_level_set()
 static m5ioe1_log_level_t _m5ioe1_current_log_level = M5IOE1_LOG_LEVEL_INFO;
 #endif
@@ -98,6 +100,10 @@ m5ioe1_log_level_t M5IOE1::getLogLevel() {
 #endif
 }
 
+void M5IOE1::enableDefaultInterruptLog(bool enable) {
+    _enableDefaultIsrLog = enable;
+}
+
 // ============================
 // Constructor / Destructor
 // ============================
@@ -106,6 +112,7 @@ M5IOE1::M5IOE1() {
     _addr = M5IOE1_DEFAULT_ADDR;
     _initialized = false;
     _autoSnapshot = true;
+    _enableDefaultIsrLog = false;
     _requestedSpeed = M5IOE1_I2C_FREQ_DEFAULT;
     _intMode = M5IOE1_INT_MODE_DISABLED;
     _intPin = -1;
@@ -144,9 +151,11 @@ M5IOE1::M5IOE1() {
 }
 
 M5IOE1::~M5IOE1() {
-#ifndef ARDUINO
+#ifdef ARDUINO
+    _cleanupPollingArduino();
+#else
     _cleanupInterrupt();
-    
+
     // Cleanup based on driver type
     switch (_i2cDriverType) {
         case M5IOE1_I2C_DRIVER_SELF_CREATED:
@@ -160,7 +169,7 @@ M5IOE1::~M5IOE1() {
                 _i2c_master_bus = nullptr;
             }
             break;
-            
+
         case M5IOE1_I2C_DRIVER_MASTER:
             // External i2c_master: only delete device if we created it
             if (_i2c_master_dev && !_busExternal) {
@@ -169,7 +178,7 @@ M5IOE1::~M5IOE1() {
             }
             // Don't delete bus - it's external
             break;
-            
+
         case M5IOE1_I2C_DRIVER_BUS:
             // External i2c_bus: only delete device if we created it
             if (_i2c_device && !_busExternal) {
@@ -177,12 +186,10 @@ M5IOE1::~M5IOE1() {
             }
             // Don't delete bus - it's external
             break;
-            
+
         default:
             break;
     }
-#else
-    _cleanupPollingArduino();
 #endif
 }
 
@@ -299,6 +306,7 @@ bool M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint32_t spe
         .trans_queue_depth = 0,
         .flags = {
             .enable_internal_pullup = true,
+            .allow_pd = false,
         },
     };
 
@@ -542,7 +550,15 @@ bool M5IOE1::setInterruptMode(m5ioe1_int_mode_t mode, uint32_t pollingIntervalMs
     _intMode = mode;
     _pollingInterval = pollingIntervalMs;
 
-#ifndef ARDUINO
+#ifdef ARDUINO
+    _cleanupPollingArduino();
+
+    if (mode == M5IOE1_INT_MODE_POLLING) {
+        return _setupPollingArduino();
+    }
+    // Hardware interrupt mode on Arduino would require attachInterrupt
+    // which is more complex and platform-specific
+#else
     _cleanupInterrupt();
 
     if (mode == M5IOE1_INT_MODE_POLLING) {
@@ -554,14 +570,6 @@ bool M5IOE1::setInterruptMode(m5ioe1_int_mode_t mode, uint32_t pollingIntervalMs
         }
         return _setupHardwareInterrupt();
     }
-#else
-    _cleanupPollingArduino();
-
-    if (mode == M5IOE1_INT_MODE_POLLING) {
-        return _setupPollingArduino();
-    }
-    // Hardware interrupt mode on Arduino would require attachInterrupt
-    // which is more complex and platform-specific
 #endif
 
     return true;
@@ -578,12 +586,12 @@ bool M5IOE1::setPollingInterval(float seconds) {
     
     // If currently in polling mode, restart with new interval
     if (_intMode == M5IOE1_INT_MODE_POLLING) {
-#ifndef ARDUINO
-        _cleanupInterrupt();
-        return _setupPolling();
-#else
+#ifdef ARDUINO
         _cleanupPollingArduino();
         return _setupPollingArduino();
+#else
+        _cleanupInterrupt();
+        return _setupPolling();
 #endif
     }
     
@@ -1265,7 +1273,7 @@ m5ioe1_validation_t M5IOE1::validateConfig(uint8_t pin, m5ioe1_config_type_t con
             }
             if (_isNeopixelPin(pin) && _isLedEnabled()) {
                 snprintf(result.error_msg, sizeof(result.error_msg),
-                         "Pin %d (IO14) is used for NeoPixel. Disable first (disableLeds())", pin);
+                         "Pin %d (IO14) used for NeoPixel; call disableLeds()", pin);
                 return result;
             }
             break;
@@ -1775,6 +1783,10 @@ void M5IOE1::_handleInterrupt() {
 
     for (uint8_t pin = 0; pin < M5IOE1_MAX_GPIO_PINS; pin++) {
         if ((status & (1 << pin)) && _callbacks[pin].enabled) {
+            if (_enableDefaultIsrLog) {
+                M5IOE1_LOG_I(TAG, "Pin %d triggered by %s edge", pin, _callbacks[pin].rising ? "RISING" : "FALLING");
+            }
+
             if (_callbacks[pin].callbackArg != nullptr) {
                 _callbacks[pin].callbackArg(_callbacks[pin].arg);
             } else if (_callbacks[pin].callback != nullptr) {
@@ -2050,12 +2062,47 @@ bool M5IOE1::getCachedPinState(uint8_t pin, bool* isOutput, uint8_t* level, uint
 // Platform-Specific Functions
 // ============================
 
-#ifndef ARDUINO
+#ifdef ARDUINO
+
+static M5IOE1* _arduinoPollingInstance = nullptr;
+static TaskHandle_t _arduinoPollingTask = nullptr;
+
+void M5IOE1::_pollTaskArduino(void* arg) {
+    M5IOE1* self = static_cast<M5IOE1*>(arg);
+
+    while (true) {
+        uint16_t status = self->getInterruptStatus();
+        if (status != 0) {
+            self->_handleInterrupt();
+        }
+        vTaskDelay(pdMS_TO_TICKS(self->_pollingInterval));
+    }
+}
+
+bool M5IOE1::_setupPollingArduino() {
+    _arduinoPollingInstance = this;
+
+    BaseType_t ok = xTaskCreatePinnedToCore(
+        _pollTaskArduino, "m5ioe1_poll", 4096, this, 5, &_arduinoPollingTask, tskNO_AFFINITY
+    );
+    return ok == pdPASS;
+}
+
+void M5IOE1::_cleanupPollingArduino() {
+    if (_arduinoPollingTask) {
+        vTaskDelete(_arduinoPollingTask);
+        _arduinoPollingTask = nullptr;
+    }
+    _arduinoPollingInstance = nullptr;
+}
+
+#else // ESP-IDF
 
 void M5IOE1::_pollTaskFunc(void* arg) {
     M5IOE1* self = static_cast<M5IOE1*>(arg);
 
     while (true) {
+        ESP_LOGI(TAG, "Polling...");
         uint16_t status = self->getInterruptStatus();
         if (status != 0) {
             self->_handleInterrupt();
@@ -2143,42 +2190,13 @@ void M5IOE1::_cleanupInterrupt() {
         _intrQueue = nullptr;
     }
     if (_intPin >= 0) {
-        gpio_isr_handler_remove((gpio_num_t)_intPin);
-    }
-}
-
-#else // ARDUINO
-
-static M5IOE1* _arduinoPollingInstance = nullptr;
-static TaskHandle_t _arduinoPollingTask = nullptr;
-
-void M5IOE1::_pollTaskArduino(void* arg) {
-    M5IOE1* self = static_cast<M5IOE1*>(arg);
-
-    while (true) {
-        uint16_t status = self->getInterruptStatus();
-        if (status != 0) {
-            self->_handleInterrupt();
+        // 移除 GPIO ISR handler，如果返回错误（如"GPIO isr service is not installed"）可忽略
+        // 该错误表示当前未安装 ISR service，无需移除，属于预期行为
+        esp_err_t err = gpio_isr_handler_remove((gpio_num_t)_intPin);
+        if (err != ESP_OK) {
+            M5IOE1_LOG_W(TAG, "gpio_isr_handler_remove failed (can be ignored if ISR service was not installed): %s", esp_err_to_name(err));
         }
-        vTaskDelay(pdMS_TO_TICKS(self->_pollingInterval));
     }
-}
-
-bool M5IOE1::_setupPollingArduino() {
-    _arduinoPollingInstance = this;
-
-    BaseType_t ok = xTaskCreatePinnedToCore(
-        _pollTaskArduino, "m5ioe1_poll", 4096, this, 5, &_arduinoPollingTask, tskNO_AFFINITY
-    );
-    return ok == pdPASS;
-}
-
-void M5IOE1::_cleanupPollingArduino() {
-    if (_arduinoPollingTask) {
-        vTaskDelete(_arduinoPollingTask);
-        _arduinoPollingTask = nullptr;
-    }
-    _arduinoPollingInstance = nullptr;
 }
 
 #endif
