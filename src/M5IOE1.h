@@ -671,6 +671,39 @@ public:
     bool factoryReset();
 
     // ========================
+    // 自动唤醒功能
+    // Auto Wake Feature
+    // ========================
+    /**
+     * @brief Enable/disable automatic wake signal before I2C operations
+     *        启用/禁用 I2C 操作前的自动唤醒信号
+     * @param enable true to enable auto-wake, false to disable
+     * @note When IOE1 enters sleep mode (I2C sleep timeout), it needs a
+     *       START signal on SDA to wake up. This feature automatically
+     *       sends the wake signal when needed.
+     *       当 IOE1 进入睡眠模式（I2C 睡眠超时）后，需要在 SDA 上发送
+     *       START 信号来唤醒。此功能会在需要时自动发送唤醒信号。
+     * @note Even without enabling this option, communication will likely
+     *       succeed in most cases, as the first I2C transaction itself
+     *       can wake the device. Enable this for guaranteed reliability.
+     *       即使不启用此选项，通讯在大多数情况下也能成功，因为第一次
+     *       I2C 传输本身就能唤醒设备。启用此选项可确保可靠性。
+     */
+    void setAutoWakeEnable(bool enable);
+
+    /**
+     * @brief Check if auto wake is enabled / 检查自动唤醒是否启用
+     * @return true if enabled
+     */
+    bool isAutoWakeEnabled() const;
+
+    /**
+     * @brief Manually send wake signal to IOE1 / 手动发送唤醒信号到 IOE1
+     * @return true if successful
+     */
+    bool sendWakeSignal();
+
+    // ========================
     // 状态快照功能
     // State Snapshot Functions
     // ========================
@@ -767,6 +800,13 @@ private:
     bool _enableDefaultIsrLog;
     uint32_t _requestedSpeed;  // 用户请求的 I2C 速度（用于 400K 切换）
                             // User requested I2C speed (for 400K switch)
+
+    // 自动唤醒状态
+    // Auto wake state
+    bool _autoWakeEnabled;      // 自动唤醒是否启用
+                                // Whether auto wake is enabled
+    uint32_t _lastCommTime;     // 上次通信时间（毫秒）
+                                // Last communication time (milliseconds)
 
     // 中断模式
     // Interrupt mode
@@ -909,6 +949,10 @@ private:
 
     bool _initDevice();
     void _handleInterrupt();
+
+    // 自动唤醒检查
+    // Auto wake check
+    void _checkAutoWake();
 
     // I2C 频率验证和切换
     // I2C frequency validation and switching

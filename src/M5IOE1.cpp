@@ -12,7 +12,8 @@ static const char* TAG = "M5IOE1";
 #ifdef ARDUINO
     #include <Arduino.h>
     #define M5IOE1_DELAY_MS(ms) delay(ms)
-    
+    #define M5IOE1_GET_TIME_MS() millis()
+
     // Arduino 日志级别控制
     // Arduino log level control
     static m5ioe1_log_level_t _m5ioe1_log_level = M5IOE1_LOG_LEVEL_INFO;
@@ -41,6 +42,7 @@ static const char* TAG = "M5IOE1";
     #include "freertos/queue.h"
     #include "driver/gpio.h"
     #define M5IOE1_DELAY_MS(ms) vTaskDelay(pdMS_TO_TICKS(ms))
+    #define M5IOE1_GET_TIME_MS() (xTaskGetTickCount() * portTICK_PERIOD_MS)
     #define M5IOE1_LOG_I(tag, fmt, ...) ESP_LOGI(tag, fmt, ##__VA_ARGS__)
     #define M5IOE1_LOG_W(tag, fmt, ...) ESP_LOGW(tag, fmt, ##__VA_ARGS__)
     #define M5IOE1_LOG_E(tag, fmt, ...) ESP_LOGE(tag, fmt, ##__VA_ARGS__)
@@ -115,6 +117,8 @@ M5IOE1::M5IOE1() {
     _autoSnapshot = true;
     _enableDefaultIsrLog = false;
     _requestedSpeed = M5IOE1_I2C_FREQ_DEFAULT;
+    _autoWakeEnabled = false;
+    _lastCommTime = 0;
     _intMode = M5IOE1_INT_MODE_DISABLED;
     _intPin = -1;
     _pollingInterval = 5000;
@@ -1345,6 +1349,54 @@ bool M5IOE1::factoryReset() {
 }
 
 // ============================
+// 自动唤醒功能
+// Auto Wake Feature
+// ============================
+
+void M5IOE1::setAutoWakeEnable(bool enable) {
+    _autoWakeEnabled = enable;
+    if (enable) {
+        _lastCommTime = M5IOE1_GET_TIME_MS();
+    }
+}
+
+bool M5IOE1::isAutoWakeEnabled() const {
+    return _autoWakeEnabled;
+}
+
+bool M5IOE1::sendWakeSignal() {
+#ifdef ARDUINO
+    M5IOE1_I2C_SEND_WAKE(_wire, _addr);
+    return true;
+#else
+    switch (_i2cDriverType) {
+        case M5IOE1_I2C_DRIVER_SELF_CREATED:
+        case M5IOE1_I2C_DRIVER_MASTER:
+            return M5IOE1_I2C_MASTER_SEND_WAKE(_i2c_master_bus, _addr) == ESP_OK;
+        case M5IOE1_I2C_DRIVER_BUS:
+            return M5IOE1_I2C_SEND_WAKE(_i2c_device, M5IOE1_REG_HW_REV) == ESP_OK;
+        default:
+            return false;
+    }
+#endif
+}
+
+void M5IOE1::_checkAutoWake() {
+    if (!_autoWakeEnabled || !_i2cConfigValid || _i2cConfig.sleepTime == 0) return;
+
+    uint32_t now = M5IOE1_GET_TIME_MS();
+    uint32_t elapsed = now - _lastCommTime;
+
+    // If more than 1 second since last communication, send wake signal
+    // 如果距离上次通信超过1秒，发送唤醒信号
+    if (elapsed >= 1000) {
+        sendWakeSignal();
+        M5IOE1_DELAY_MS(10);
+    }
+    _lastCommTime = now;
+}
+
+// ============================
 // 状态快照功能
 // State Snapshot Functions
 // ============================
@@ -1553,6 +1605,7 @@ m5ioe1_validation_t M5IOE1::validateConfig(uint8_t pin, m5ioe1_config_type_t con
 // ============================
 
 bool M5IOE1::_writeReg(uint8_t reg, uint8_t value) {
+    _checkAutoWake();
 #ifdef ARDUINO
     return M5IOE1_I2C_WRITE_BYTE(_wire, _addr, reg, value);
 #else
@@ -1569,6 +1622,7 @@ bool M5IOE1::_writeReg(uint8_t reg, uint8_t value) {
 }
 
 bool M5IOE1::_writeReg16(uint8_t reg, uint16_t value) {
+    _checkAutoWake();
 #ifdef ARDUINO
     return M5IOE1_I2C_WRITE_REG16(_wire, _addr, reg, value);
 #else
@@ -1585,6 +1639,7 @@ bool M5IOE1::_writeReg16(uint8_t reg, uint16_t value) {
 }
 
 bool M5IOE1::_readReg(uint8_t reg, uint8_t* value) {
+    _checkAutoWake();
 #ifdef ARDUINO
     return M5IOE1_I2C_READ_BYTE(_wire, _addr, reg, value);
 #else
@@ -1601,6 +1656,7 @@ bool M5IOE1::_readReg(uint8_t reg, uint8_t* value) {
 }
 
 bool M5IOE1::_readReg16(uint8_t reg, uint16_t* value) {
+    _checkAutoWake();
 #ifdef ARDUINO
     return M5IOE1_I2C_READ_REG16(_wire, _addr, reg, value);
 #else
@@ -1617,6 +1673,7 @@ bool M5IOE1::_readReg16(uint8_t reg, uint16_t* value) {
 }
 
 bool M5IOE1::_writeBytes(uint8_t reg, const uint8_t* data, uint8_t len) {
+    _checkAutoWake();
 #ifdef ARDUINO
     return M5IOE1_I2C_WRITE_BYTES(_wire, _addr, reg, len, data);
 #else
@@ -1633,6 +1690,7 @@ bool M5IOE1::_writeBytes(uint8_t reg, const uint8_t* data, uint8_t len) {
 }
 
 bool M5IOE1::_readBytes(uint8_t reg, uint8_t* data, uint8_t len) {
+    _checkAutoWake();
 #ifdef ARDUINO
     return M5IOE1_I2C_READ_BYTES(_wire, _addr, reg, len, data);
 #else

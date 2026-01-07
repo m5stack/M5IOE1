@@ -102,6 +102,17 @@ static inline bool M5IOE1_I2C_WRITE_REG16(TwoWire *wire, uint8_t addr, uint8_t r
 }
 #endif
 
+// 唤醒信号发送 / Wake signal send
+// IOE1 使用 SDA 引脚下降沿触发唤醒中断
+// IOE1 uses SDA pin falling edge to trigger wake interrupt
+#ifndef M5IOE1_I2C_SEND_WAKE
+static inline void M5IOE1_I2C_SEND_WAKE(TwoWire *wire, uint8_t addr) {
+    // Send START signal to generate SDA falling edge for IOE1 wake
+    wire->beginTransmission(addr);
+    wire->endTransmission(false);  // Send START without STOP
+}
+#endif
+
 #else // ESP-IDF
 
 #include <esp_err.h>
@@ -240,6 +251,23 @@ static inline esp_err_t M5IOE1_I2C_MASTER_WRITE_REG16(i2c_master_dev_handle_t de
     buf[1] = (uint8_t)(data & 0xFF);
     buf[2] = (uint8_t)((data >> 8) & 0xFF);
     return i2c_master_transmit(dev, buf, 3, -1);
+}
+#endif
+
+// 唤醒信号发送 (i2c_bus) / Wake signal send (i2c_bus)
+#ifndef M5IOE1_I2C_SEND_WAKE
+static inline esp_err_t M5IOE1_I2C_SEND_WAKE(i2c_bus_device_handle_t dev, uint8_t reg) {
+    // Read any register to generate I2C start signal for wake
+    uint8_t dummy;
+    return i2c_bus_read_byte(dev, reg, &dummy);
+}
+#endif
+
+// 唤醒信号发送 (i2c_master) / Wake signal send (i2c_master)
+#ifndef M5IOE1_I2C_MASTER_SEND_WAKE
+static inline esp_err_t M5IOE1_I2C_MASTER_SEND_WAKE(i2c_master_bus_handle_t bus, uint8_t addr) {
+    // Use i2c_master_probe to generate START signal for wake
+    return i2c_master_probe(bus, addr, 10);
 }
 #endif
 
