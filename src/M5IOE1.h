@@ -12,9 +12,11 @@
 #include <stdbool.h>
 
 #ifdef ARDUINO
-// Arduino：FreeRTOS 头文件通过 Arduino 框架包含 / Arduino: FreeRTOS headers included via Arduino framework
+// Arduino：FreeRTOS 头文件通过 Arduino 框架包含
+// Arduino: FreeRTOS headers included via Arduino framework
 #else
-// ESP-IDF 专用包含文件 / ESP-IDF specific includes
+// ESP-IDF 专用包含文件
+// ESP-IDF specific includes
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -22,7 +24,8 @@
 #endif
 
 // ============================
-// IO 引脚定义 / IO Pin Definitions
+// IO 引脚定义
+// IO Pin Definitions
 // ============================
 typedef enum {
     M5IOE1_PIN_NC = -1,
@@ -43,7 +46,8 @@ typedef enum {
 } m5ioe1_pin_t;
 
 // ============================
-// 设备常量 / Device Constants
+// 设备常量
+// Device Constants
 // ============================
 #define M5IOE1_DEFAULT_ADDR     0x6F
 #define M5IOE1_MAX_GPIO_PINS    14
@@ -53,14 +57,16 @@ typedef enum {
 #define M5IOE1_RTC_RAM_SIZE     32
 
 // ============================
-// I2C 频率常量 / I2C Frequency Constants
+// I2C 频率常量
+// I2C Frequency Constants
 // ============================
 #define M5IOE1_I2C_FREQ_100K    100000
 #define M5IOE1_I2C_FREQ_400K    400000
 #define M5IOE1_I2C_FREQ_DEFAULT M5IOE1_I2C_FREQ_100K
 
 // ============================
-// 寄存器地址 / Register Addresses
+// 寄存器地址
+// Register Addresses
 // ============================
 // System
 #define M5IOE1_REG_UID_L            0x00    // R     [7:0] UID Low Byte
@@ -119,7 +125,8 @@ typedef enum {
 #define M5IOE1_REG_AW8737A_PULSE    0x90    // R/W   [7] REFRESH | [6:5] NUM | [4:0] GPIO
 
 // ============================
-// 位定义 / Bit Definitions
+// 位定义
+// Bit Definitions
 // ============================
 // ADC Control
 #define M5IOE1_ADC_CH_MASK          0x07
@@ -148,7 +155,8 @@ typedef enum {
 #define M5IOE1_AW8737A_REFRESH      (1 << 7)
 
 // ============================
-// ADC 通道定义（支持 ADC 的 IO 引脚）/ ADC Channel Definitions (IO pins that support ADC)
+// ADC 通道定义（支持 ADC 的 IO 引脚）
+// ADC Channel Definitions (IO pins that support ADC)
 // ============================
 #define M5IOE1_ADC_CH1              1   // IO2 (pin index 1)
 #define M5IOE1_ADC_CH2              2   // IO4 (pin index 3)
@@ -156,7 +164,8 @@ typedef enum {
 #define M5IOE1_ADC_CH4              4   // IO7 (pin index 6)
 
 // ============================
-// PWM 通道定义（支持 PWM 的 IO 引脚）/ PWM Channel Definitions (IO pins that support PWM)
+// PWM 通道定义（支持 PWM 的 IO 引脚）
+// PWM Channel Definitions (IO pins that support PWM)
 // ============================
 #define M5IOE1_PWM_CH1              0   // IO9 (pin index 8)
 #define M5IOE1_PWM_CH2              1   // IO8 (pin index 7)
@@ -164,7 +173,8 @@ typedef enum {
 #define M5IOE1_PWM_CH4              3   // IO10 (pin index 9)
 
 // ============================
-// GPIO 模式定义（Arduino 兼容）/ GPIO Mode Definitions (Arduino-compatible)
+// GPIO 模式定义（Arduino 兼容）
+// GPIO Mode Definitions (Arduino-compatible)
 // ============================
 #ifndef INPUT
 #define INPUT           0x00
@@ -180,7 +190,8 @@ typedef enum {
 #endif
 
 // ============================
-// GPIO 电平定义 / GPIO Level Definitions
+// GPIO 电平定义
+// GPIO Level Definitions
 // ============================
 #ifndef LOW
 #define LOW             0
@@ -190,7 +201,8 @@ typedef enum {
 #endif
 
 // ============================
-// 中断模式定义 / Interrupt Mode Definitions
+// 中断模式定义
+// Interrupt Mode Definitions
 // ============================
 #ifndef RISING
 #define RISING          0x01
@@ -200,72 +212,102 @@ typedef enum {
 #endif
 
 // ============================
-// 上拉/下拉模式定义 / Pull Mode Definitions
+// 上拉/下拉模式定义
+// Pull Mode Definitions
 // ============================
 #define M5IOE1_PULL_NONE    0x00
 #define M5IOE1_PULL_UP      0x01
 #define M5IOE1_PULL_DOWN    0x02
 
 // ============================
-// 驱动模式定义 / Drive Mode Definitions
+// 驱动模式定义
+// Drive Mode Definitions
 // ============================
 #define M5IOE1_DRIVE_PUSHPULL   0x00
 #define M5IOE1_DRIVE_OPENDRAIN  0x01
 
 // ============================
-// AW8737A 脉冲刷新类型 / AW8737A PULSE Refresh Types
+// AW8737A 脉冲刷新类型
+// AW8737A PULSE Refresh Types
 // ============================
 typedef enum {
-    M5IOE1_AW8737A_REFRESH_WAIT = 0,    // 不刷新，等待下一次触发 / No refresh, wait for next trigger
-    M5IOE1_AW8737A_REFRESH_NOW = 1      // 刷新并立即执行 / Refresh and execute immediately
+    M5IOE1_AW8737A_REFRESH_WAIT = 0,    // 不刷新，等待下一次触发
+                                        // No refresh, wait for next trigger
+    M5IOE1_AW8737A_REFRESH_NOW = 1      // 刷新并立即执行
+                                        // Refresh and execute immediately
 } m5ioe1_aw8737a_refresh_t;
 
 // ============================
-// AW8737A 脉冲数量类型 / AW8737A PULSE NUM Types
+// AW8737A 脉冲数量类型
+// AW8737A PULSE NUM Types
 // ============================
 typedef enum {
-    M5IOE1_AW8737A_PULSE_NUM_0 = 0,     // 0 个脉冲 / 0 pulse
-    M5IOE1_AW8737A_PULSE_NUM_1 = 1,     // 1 个脉冲 / 1 pulse
-    M5IOE1_AW8737A_PULSE_NUM_2 = 2,     // 2 个脉冲 / 2 pulses
-    M5IOE1_AW8737A_PULSE_NUM_3 = 3      // 3 个脉冲 / 3 pulses
+    M5IOE1_AW8737A_PULSE_NUM_0 = 0,     // 0 个脉冲
+                                        // 0 pulse
+    M5IOE1_AW8737A_PULSE_NUM_1 = 1,     // 1 个脉冲
+                                        // 1 pulse
+    M5IOE1_AW8737A_PULSE_NUM_2 = 2,     // 2 个脉冲
+                                        // 2 pulses
+    M5IOE1_AW8737A_PULSE_NUM_3 = 3      // 3 个脉冲
+                                        // 3 pulses
 } m5ioe1_aw8737a_pulse_num_t;
 
 // ============================
-// 中断处理模式 / Interrupt Handling Mode
+// 中断处理模式
+// Interrupt Handling Mode
 // ============================
 typedef enum {
-    M5IOE1_INT_MODE_DISABLED = 0,   // 中断处理已禁用 / Interrupt handling disabled
-    M5IOE1_INT_MODE_POLLING,        // 轮询模式（默认）/ Polling mode (default)
-    M5IOE1_INT_MODE_HARDWARE        // 硬件中断模式 / Hardware interrupt mode
+    M5IOE1_INT_MODE_DISABLED = 0,   // 中断处理已禁用
+                                    // Interrupt handling disabled
+    M5IOE1_INT_MODE_POLLING,        // 轮询模式（默认）
+                                    // Polling mode (default)
+    M5IOE1_INT_MODE_HARDWARE        // 硬件中断模式
+                                    // Hardware interrupt mode
 } m5ioe1_int_mode_t;
 
 // ============================
-// 日志级别定义 / Log Level Definitions
+// 日志级别定义
+// Log Level Definitions
 // ============================
 typedef enum {
-    M5IOE1_LOG_LEVEL_NONE = 0,      // 无日志输出 / No log output
-    M5IOE1_LOG_LEVEL_ERROR,         // 仅错误消息 / Error messages only
-    M5IOE1_LOG_LEVEL_WARN,          // 警告和错误消息 / Warning and error messages
-    M5IOE1_LOG_LEVEL_INFO,          // 信息、警告和错误消息（默认）/ Info, warning and error messages (default)
-    M5IOE1_LOG_LEVEL_DEBUG,         // 调试、信息、警告和错误消息 / Debug, info, warning and error messages
-    M5IOE1_LOG_LEVEL_VERBOSE        // 所有消息包括详细输出 / All messages including verbose
+    M5IOE1_LOG_LEVEL_NONE = 0,      // 无日志输出
+                                    // No log output
+    M5IOE1_LOG_LEVEL_ERROR,         // 仅错误消息
+                                    // Error messages only
+    M5IOE1_LOG_LEVEL_WARN,          // 警告和错误消息
+                                    // Warning and error messages
+    M5IOE1_LOG_LEVEL_INFO,          // 信息、警告和错误消息（默认）
+                                    // Info, warning and error messages (default)
+    M5IOE1_LOG_LEVEL_DEBUG,         // 调试、信息、警告和错误消息
+                                    // Debug, info, warning and error messages
+    M5IOE1_LOG_LEVEL_VERBOSE        // 所有消息包括详细输出
+                                    // All messages including verbose
 } m5ioe1_log_level_t;
 
 // ============================
-// 用于验证的配置类型 / Configuration Type for Validation
+// 用于验证的配置类型
+// Configuration Type for Validation
 // ============================
 typedef enum {
-    M5IOE1_CONFIG_GPIO_INPUT = 0,   // GPIO 输入模式 / GPIO input mode
-    M5IOE1_CONFIG_GPIO_OUTPUT,      // GPIO 输出模式 / GPIO output mode
-    M5IOE1_CONFIG_GPIO_INTERRUPT,   // GPIO 中断模式 / GPIO interrupt mode
-    M5IOE1_CONFIG_ADC,              // ADC 功能 / ADC function
-    M5IOE1_CONFIG_PWM,              // PWM 功能 / PWM function
-    M5IOE1_CONFIG_NEOPIXEL,         // NeoPixel LED 功能（仅 IO14）/ NeoPixel LED function (IO14 only)
-    M5IOE1_CONFIG_I2C_SLEEP         // I2C 睡眠模式配置 / I2C sleep mode configuration
+    M5IOE1_CONFIG_GPIO_INPUT = 0,   // GPIO 输入模式
+                                    // GPIO input mode
+    M5IOE1_CONFIG_GPIO_OUTPUT,      // GPIO 输出模式
+                                    // GPIO output mode
+    M5IOE1_CONFIG_GPIO_INTERRUPT,   // GPIO 中断模式
+                                    // GPIO interrupt mode
+    M5IOE1_CONFIG_ADC,              // ADC 功能
+                                    // ADC function
+    M5IOE1_CONFIG_PWM,              // PWM 功能
+                                    // PWM function
+    M5IOE1_CONFIG_NEOPIXEL,         // NeoPixel LED 功能（仅 IO14）
+                                    // NeoPixel LED function (IO14 only)
+    M5IOE1_CONFIG_I2C_SLEEP         // I2C 睡眠模式配置
+                                    // I2C sleep mode configuration
 } m5ioe1_config_type_t;
 
 // ============================
-// RGB 颜色结构 / RGB Color Structure
+// RGB 颜色结构
+// RGB Color Structure
 // ============================
 typedef struct {
     uint8_t r;
@@ -274,7 +316,8 @@ typedef struct {
 } m5ioe1_rgb_t;
 
 // ============================
-// 配置验证结果 / Configuration Validation Result
+// 配置验证结果
+// Configuration Validation Result
 // ============================
 typedef struct {
     bool valid;
@@ -283,27 +326,38 @@ typedef struct {
 } m5ioe1_validation_t;
 
 // ============================
-// 快照验证结果 / Snapshot Verification Result
+// 快照验证结果
+// Snapshot Verification Result
 // ============================
 typedef struct {
-    bool consistent;            // 如果所有缓存值与硬件寄存器匹配则为 true / true if all cached values match hardware registers
-    bool gpio_mismatch;         // 如果 GPIO 寄存器与缓存不匹配则为 true / true if GPIO registers don't match cache
-    bool pwm_mismatch;          // 如果 PWM 寄存器与缓存不匹配则为 true / true if PWM registers don't match cache
-    bool adc_mismatch;          // 如果 ADC 寄存器与缓存不匹配则为 true / true if ADC registers don't match cache
-    uint16_t expected_mode;     // 缓存的 GPIO 模式寄存器值 / cached GPIO mode register value
-    uint16_t actual_mode;       // 实际的 GPIO 模式寄存器值 / actual GPIO mode register value
-    uint16_t expected_output;   // 缓存的 GPIO 输出寄存器值 / cached GPIO output register value
-    uint16_t actual_output;     // 实际的 GPIO 输出寄存器值 / actual GPIO output register value
+    bool consistent;            // 如果所有缓存值与硬件寄存器匹配则为 true
+                                // true if all cached values match hardware registers
+    bool gpio_mismatch;         // 如果 GPIO 寄存器与缓存不匹配则为 true
+                                // true if GPIO registers don't match cache
+    bool pwm_mismatch;          // 如果 PWM 寄存器与缓存不匹配则为 true
+                                // true if PWM registers don't match cache
+    bool adc_mismatch;          // 如果 ADC 寄存器与缓存不匹配则为 true
+                                // true if ADC registers don't match cache
+    uint16_t expected_mode;     // 缓存的 GPIO 模式寄存器值
+                                // cached GPIO mode register value
+    uint16_t actual_mode;       // 实际的 GPIO 模式寄存器值
+                                // actual GPIO mode register value
+    uint16_t expected_output;   // 缓存的 GPIO 输出寄存器值
+                                // cached GPIO output register value
+    uint16_t actual_output;     // 实际的 GPIO 输出寄存器值
+                                // actual GPIO output register value
 } m5ioe1_snapshot_verify_t;
 
 // ============================
-// 回调类型 / Callback Types
+// 回调类型
+// Callback Types
 // ============================
 typedef void (*m5ioe1_callback_t)(void);
 typedef void (*m5ioe1_callback_arg_t)(void*);
 
 // ============================
-// M5IOE1 类 / M5IOE1 Class
+// M5IOE1 类
+// M5IOE1 Class
 // ============================
 class M5IOE1 {
 public:
@@ -311,7 +365,8 @@ public:
     ~M5IOE1();
 
     // ========================
-    // 初始化 / Initialization
+    // 初始化
+    // Initialization
     // ========================
 #ifdef ARDUINO
     /**
@@ -476,28 +531,32 @@ public:
     static m5ioe1_log_level_t getLogLevel();
 
     // ========================
-    // 设备信息 / Device Information
+    // 设备信息
+    // Device Information
     // ========================
     bool getUID(uint16_t* uid);
     bool getVersion(uint8_t* version);
     bool getRefVoltage(uint16_t* voltage_mv);
 
     // ========================
-    // GPIO 功能（Arduino 风格）/ GPIO Functions (Arduino-style)
+    // GPIO 功能（Arduino 风格）
+    // GPIO Functions (Arduino-style)
     // ========================
     void pinMode(uint8_t pin, uint8_t mode);
     void digitalWrite(uint8_t pin, uint8_t value);
     int digitalRead(uint8_t pin);
 
     // ========================
-    // 高级 GPIO 功能 / Advanced GPIO Functions
+    // 高级 GPIO 功能
+    // Advanced GPIO Functions
     // ========================
     bool setPullMode(uint8_t pin, uint8_t pullMode);
     bool setDriveMode(uint8_t pin, uint8_t driveMode);
     bool getInputState(uint8_t pin, uint8_t* state);
 
     // ========================
-    // 中断功能 / Interrupt Functions
+    // 中断功能
+    // Interrupt Functions
     // ========================
     void attachInterrupt(uint8_t pin, m5ioe1_callback_t callback, uint8_t mode);
     void attachInterruptArg(uint8_t pin, m5ioe1_callback_arg_t callback, void* arg, uint8_t mode);
@@ -508,7 +567,8 @@ public:
     bool clearInterrupt(uint8_t pin);
 
     // ========================
-    // ADC 功能 / ADC Functions
+    // ADC 功能
+    // ADC Functions
     // ========================
     /**
      * @brief Read ADC value
@@ -521,13 +581,15 @@ public:
     bool disableAdc();
 
     // ========================
-    // 温度传感器 / Temperature Sensor
+    // 温度传感器
+    // Temperature Sensor
     // ========================
     bool readTemperature(uint16_t* temperature);
     bool isTemperatureBusy();
 
     // ========================
-    // PWM 功能 / PWM Functions
+    // PWM 功能
+    // PWM Functions
     // ========================
     /**
      * @brief Set PWM frequency (shared by all channels)
@@ -559,7 +621,8 @@ public:
     bool getPwmDuty(uint8_t channel, uint8_t* duty, bool* polarity, bool* enable);
 
     // ========================
-    // NeoPixel LED 功能 / NeoPixel LED Functions
+    // NeoPixel LED 功能
+    // NeoPixel LED Functions
     // ========================
     bool setLedCount(uint8_t count);
     bool setLedColor(uint8_t index, uint8_t r, uint8_t g, uint8_t b);
@@ -568,7 +631,8 @@ public:
     bool disableLeds();
 
     // ========================
-    // AW8737A 脉冲功能 / AW8737A Pulse Functions
+    // AW8737A 脉冲功能
+    // AW8737A Pulse Functions
     // ========================
     /**
      * @brief Set AW8737A pulse output configuration
@@ -592,26 +656,30 @@ public:
     bool refreshAw8737aPulse();
 
     // ========================
-    // RTC RAM 功能 / RTC RAM Functions
+    // RTC RAM 功能
+    // RTC RAM Functions
     // ========================
     bool writeRtcRAM(uint8_t offset, const uint8_t* data, uint8_t length);
     bool readRtcRAM(uint8_t offset, uint8_t* data, uint8_t length);
 
     // ========================
-    // 系统配置 / System Configuration
+    // 系统配置
+    // System Configuration
     // ========================
     bool setI2cConfig(uint8_t sleepTime, bool speed400k = false, bool wakeRising = false, bool pullOff = false);
     bool factoryReset();
 
     // ========================
-    // 状态快照功能 / State Snapshot Functions
+    // 状态快照功能
+    // State Snapshot Functions
     // ========================
     void setAutoSnapshot(bool enable);
     bool isAutoSnapshotEnabled() const;
     bool updateSnapshot();
 
     // ========================
-    // 调试功能 / Debug Functions
+    // 调试功能
+    // Debug Functions
     // ========================
     bool getModeReg(uint16_t* reg);
     bool getOutputReg(uint16_t* reg);
@@ -621,7 +689,8 @@ public:
     bool getDriveReg(uint16_t* reg);
 
     // ========================
-    // 配置验证 / Configuration Validation
+    // 配置验证
+    // Configuration Validation
     // ========================
     /**
      * @brief Validate pin configuration before applying
@@ -633,7 +702,8 @@ public:
     m5ioe1_validation_t validateConfig(uint8_t pin, m5ioe1_config_type_t configType, bool enable = true);
 
     // ========================
-    // 快照验证 / Snapshot Verification
+    // 快照验证
+    // Snapshot Verification
     // ========================
     /**
      * @brief Verify that cached state matches actual hardware registers
@@ -642,7 +712,8 @@ public:
     m5ioe1_snapshot_verify_t verifySnapshot();
 
     // ========================
-    // 缓存状态查询函数 / Cached State Query Functions
+    // 缓存状态查询函数
+    // Cached State Query Functions
     // ========================
     /**
      * @brief Get cached PWM frequency
@@ -687,49 +758,68 @@ public:
     void enableDefaultInterruptLog(bool enable);
 
 private:
-    // 设备状态 / Device state
+    // 设备状态
+    // Device state
     uint8_t _addr;
     bool _initialized;
     bool _autoSnapshot;
     bool _enableDefaultIsrLog;
-    uint32_t _requestedSpeed;  // 用户请求的 I2C 速度（用于 400K 切换）/ User requested I2C speed (for 400K switch)
+    uint32_t _requestedSpeed;  // 用户请求的 I2C 速度（用于 400K 切换）
+                            // User requested I2C speed (for 400K switch)
 
-    // 中断模式 / Interrupt mode
+    // 中断模式
+    // Interrupt mode
     m5ioe1_int_mode_t _intMode;
     int8_t _intPin;
     uint32_t _pollingInterval;
 
 #ifdef ARDUINO
     TwoWire *_wire;
-    uint8_t _sda;   // SDA 引脚编号，用于 I2C 重新初始化 / SDA pin number for I2C re-initialization
-    uint8_t _scl;   // SCL 引脚编号，用于 I2C 重新初始化 / SCL pin number for I2C re-initialization
+    uint8_t _sda;   // SDA 引脚编号，用于 I2C 重新初始化
+                    // SDA pin number for I2C re-initialization
+    uint8_t _scl;   // SCL 引脚编号，用于 I2C 重新初始化
+                    // SCL pin number for I2C re-initialization
 #else
-    // I2C 驱动类型选择 / I2C driver type selection
+    // I2C 驱动类型选择
+    // I2C driver type selection
     m5ioe1_i2c_driver_t _i2cDriverType;
 
-    // I2C 句柄（根据驱动类型仅使用一对）/ I2C handles (only one pair is used based on driver type)
-    // M5IOE1_I2C_DRIVER_SELF_CREATED: 使用 _i2c_master_bus + _i2c_master_dev / uses _i2c_master_bus + _i2c_master_dev
-    // M5IOE1_I2C_DRIVER_MASTER: 使用 _i2c_master_bus + _i2c_master_dev / uses _i2c_master_bus + _i2c_master_dev
-    // M5IOE1_I2C_DRIVER_BUS: 使用 _i2c_bus + _i2c_device / uses _i2c_bus + _i2c_device
-    i2c_master_bus_handle_t _i2c_master_bus;  // ESP-IDF 原生驱动/自创建 / ESP-IDF native driver / self-created
-    i2c_master_dev_handle_t _i2c_master_dev;  // ESP-IDF 原生驱动/自创建 / ESP-IDF native driver / self-created
-    i2c_bus_handle_t _i2c_bus;                 // esp-idf-lib 组件 / esp-idf-lib component
-    i2c_bus_device_handle_t _i2c_device;       // esp-idf-lib 组件 / esp-idf-lib component
+    // I2C 句柄（根据驱动类型仅使用一对）
+    // I2C handles (only one pair is used based on driver type)
+    // M5IOE1_I2C_DRIVER_SELF_CREATED: 使用 _i2c_master_bus + _i2c_master_dev
+    // uses _i2c_master_bus + _i2c_master_dev
+    // M5IOE1_I2C_DRIVER_MASTER: 使用 _i2c_master_bus + _i2c_master_dev
+    // uses _i2c_master_bus + _i2c_master_dev
+    // M5IOE1_I2C_DRIVER_BUS: 使用 _i2c_bus + _i2c_device
+    // uses _i2c_bus + _i2c_device
+    i2c_master_bus_handle_t _i2c_master_bus;  // ESP-IDF 原生驱动/自创建
+                                            // ESP-IDF native driver / self-created
+    i2c_master_dev_handle_t _i2c_master_dev;  // ESP-IDF 原生驱动/自创建
+                                            // ESP-IDF native driver / self-created
+    i2c_bus_handle_t _i2c_bus;                 // esp-idf-lib 组件
+                                            // esp-idf-lib component
+    i2c_bus_device_handle_t _i2c_device;       // esp-idf-lib 组件
+                                            // esp-idf-lib component
 
-    // I2C 管理标志 / I2C management flags
-    bool _busExternal;  // 如果总线句柄由外部提供则为 true / true if bus handle is provided externally
+    // I2C 管理标志
+    // I2C management flags
+    bool _busExternal;  // 如果总线句柄由外部提供则为 true
+                        // true if bus handle is provided externally
 
-    // 自创建总线的 I2C 引脚（用于频率切换）/ I2C pins for self-created bus (for frequency switching)
+    // 自创建总线的 I2C 引脚（用于频率切换）
+    // I2C pins for self-created bus (for frequency switching)
     int _sda;
     int _scl;
     i2c_port_t _port;
 
-    // 中断处理 / Interrupt handling
+    // 中断处理
+    // Interrupt handling
     TaskHandle_t _pollTask;
     QueueHandle_t _intrQueue;
 #endif
 
-    // 中断回调 / Interrupt callbacks
+    // 中断回调
+    // Interrupt callbacks
     struct {
         m5ioe1_callback_t callback;
         m5ioe1_callback_arg_t callbackArg;
@@ -738,19 +828,23 @@ private:
         bool rising;
     } _callbacks[M5IOE1_MAX_GPIO_PINS];
 
-    // 缓存的引脚状态 / Cached pin states
+    // 缓存的引脚状态
+    // Cached pin states
     struct {
         bool isOutput;
         uint8_t outputLevel;
         uint8_t inputLevel;
-        uint8_t pull;       // 0:无, 1:上拉, 2:下拉 / 0:none, 1:up, 2:down
-        uint8_t drive;      // 0:推挽, 1:开漏 / 0:push-pull, 1:open-drain
+        uint8_t pull;       // 0:无, 1:上拉, 2:下拉
+                            // 0:none, 1:up, 2:down
+        uint8_t drive;      // 0:推挽, 1:开漏
+                            // 0:push-pull, 1:open-drain
         bool intrEnabled;
         bool intrRising;
     } _pinStates[M5IOE1_MAX_GPIO_PINS];
     bool _pinStatesValid;
 
-    // 缓存的 PWM 状态 / Cached PWM states
+    // 缓存的 PWM 状态
+    // Cached PWM states
     struct {
         uint16_t duty12;
         bool enabled;
@@ -759,7 +853,8 @@ private:
     uint16_t _pwmFrequency;
     bool _pwmStatesValid;
 
-    // 缓存的 ADC 状态 / Cached ADC state
+    // 缓存的 ADC 状态
+    // Cached ADC state
     struct {
         uint8_t activeChannel;
         bool busy;
@@ -767,21 +862,28 @@ private:
     } _adcState;
     bool _adcStateValid;
 
-    // 缓存的 I2C 配置状态（用于睡眠模式检测）/ Cached I2C config state (for sleep mode detection)
+    // 缓存的 I2C 配置状态（用于睡眠模式检测）
+    // Cached I2C config state (for sleep mode detection)
     struct {
-        uint8_t sleepTime;      // 0=禁用, 1-15=睡眠时间 / 0=disabled, 1-15=sleep time
-        bool speed400k;         // I2C 速度模式 / I2C speed mode
-        bool wakeRising;        // 唤醒边沿模式 / Wake edge mode
-        bool pullOff;           // 内部上拉关闭 / Internal pull-up off
+        uint8_t sleepTime;      // 0=禁用, 1-15=睡眠时间
+                                // 0=disabled, 1-15=sleep time
+        bool speed400k;         // I2C 速度模式
+                                // I2C speed mode
+        bool wakeRising;        // 唤醒边沿模式
+                                // Wake edge mode
+        bool pullOff;           // 内部上拉关闭
+                                // Internal pull-up off
     } _i2cConfig;
     bool _i2cConfigValid;
 
-    // NeoPixel 状态 / NeoPixel state
+    // NeoPixel 状态
+    // NeoPixel state
     uint8_t _ledCount;
     bool _ledEnabled;
 
     // ========================
-    // 内部辅助函数 / Internal Helper Functions
+    // 内部辅助函数
+    // Internal Helper Functions
     // ========================
     bool _writeReg(uint8_t reg, uint8_t value);
     bool _writeReg16(uint8_t reg, uint16_t value);
@@ -807,15 +909,18 @@ private:
     bool _initDevice();
     void _handleInterrupt();
 
-    // I2C 频率验证和切换 / I2C frequency validation and switching
+    // I2C 频率验证和切换
+    // I2C frequency validation and switching
     bool _isValidI2cFrequency(uint32_t speed);
     bool _switchTo400K();
 
-    // 中断互斥对检查 / Interrupt mutex pairs check
+    // 中断互斥对检查
+    // Interrupt mutex pairs check
     static bool _pinsConflict(uint8_t a, uint8_t b);
     bool _hasConflictingInterrupt(uint8_t pin);
 
-    // 配置验证辅助函数 / Configuration validation helpers
+    // 配置验证辅助函数
+    // Configuration validation helpers
     bool _getInterruptMutexPin(uint8_t pin, uint8_t* mutexPin);
     bool _isNeopixelPin(uint8_t pin);
     bool _hasActiveInterrupt(uint8_t pin);
@@ -824,17 +929,20 @@ private:
     bool _hasI2cSleepEnabled();
     bool _isLedEnabled();
 
-    // I2C 配置快照 / I2C config snapshot
+    // I2C 配置快照
+    // I2C config snapshot
     void _clearI2cConfig();
     bool _snapshotI2cConfig();
 
 #ifdef ARDUINO
-    // Arduino 专用 / Arduino specific
+    // Arduino 专用
+    // Arduino specific
     bool _setupPollingArduino();
     void _cleanupPollingArduino();
     static void _pollTaskArduino(void* arg);
 #else
-    // ESP-IDF 专用 / ESP-IDF specific
+    // ESP-IDF 专用
+    // ESP-IDF specific
     static void _pollTaskFunc(void* arg);
     static void IRAM_ATTR _isrHandler(void* arg);
     bool _setupHardwareInterrupt();
