@@ -1062,6 +1062,23 @@ bool M5IOE1::setPwmDuty(uint8_t channel, uint8_t duty, bool polarity, bool enabl
     return setPwmDuty12bit(channel, duty12, polarity, enable);
 }
 
+bool M5IOE1::getPwmDuty(uint8_t channel, uint8_t* duty, bool* polarity, bool* enable) {
+    if (channel > 3 || duty == nullptr || polarity == nullptr || enable == nullptr || !_initialized) {
+        return false;
+    }
+
+    uint8_t regL = M5IOE1_REG_PWM1_DUTY_L + (channel * 2);
+    uint16_t data = 0;
+    if (!_readReg16(regL, &data)) return false;
+
+    uint16_t duty12 = data & 0x0FFF;
+    *duty = (uint8_t)((duty12 * 100) / 0x0FFF);
+    *polarity = (data & ((uint16_t)M5IOE1_PWM_POLARITY << 8)) != 0;
+    *enable = (data & ((uint16_t)M5IOE1_PWM_ENABLE << 8)) != 0;
+
+    return true;
+}
+
 bool M5IOE1::setPwmDuty12bit(uint8_t channel, uint16_t duty12, bool polarity, bool enable) {
     if (channel > 3 || duty12 > 0x0FFF || !_initialized) return false;
 
@@ -1097,17 +1114,18 @@ bool M5IOE1::setPwmDuty12bit(uint8_t channel, uint16_t duty12, bool polarity, bo
     return true;
 }
 
-bool M5IOE1::getPwmDuty(uint8_t channel, uint8_t* duty, bool* polarity, bool* enable) {
-    if (channel > 3 || duty == nullptr || polarity == nullptr || enable == nullptr || !_initialized) {
+bool M5IOE1::getPwmDuty12bit(uint8_t channel, uint16_t* duty12, bool* polarity, bool* enable) {
+    if (channel > 3 || duty12 == nullptr || polarity == nullptr || enable == nullptr || !_initialized) {
         return false;
     }
 
     uint8_t regL = M5IOE1_REG_PWM1_DUTY_L + (channel * 2);
     uint16_t data = 0;
-    if (!_readReg16(regL, &data)) return false;
+    if (!_readReg16(regL, &data)) {
+        return false;
+    }
 
-    uint16_t duty12 = data & 0x0FFF;
-    *duty = (uint8_t)((duty12 * 100) / 0x0FFF);
+    *duty12 = data & 0x0FFF;
     *polarity = (data & ((uint16_t)M5IOE1_PWM_POLARITY << 8)) != 0;
     *enable = (data & ((uint16_t)M5IOE1_PWM_ENABLE << 8)) != 0;
 

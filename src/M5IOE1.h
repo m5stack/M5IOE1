@@ -608,6 +608,7 @@ public:
      * @return true if successful
      */
     bool setPwmDuty(uint8_t channel, uint8_t duty, bool polarity = false, bool enable = true);
+    bool getPwmDuty(uint8_t channel, uint8_t* duty, bool* polarity, bool* enable);
 
     /**
      * @brief Set PWM duty cycle (12-bit value)
@@ -618,7 +619,7 @@ public:
      * @return true if successful
      */
     bool setPwmDuty12bit(uint8_t channel, uint16_t duty12, bool polarity = false, bool enable = true);
-    bool getPwmDuty(uint8_t channel, uint8_t* duty, bool* polarity, bool* enable);
+    bool getPwmDuty12bit(uint8_t channel, uint16_t* duty12, bool* polarity, bool* enable);
 
     // ========================
     // NeoPixel LED 功能
