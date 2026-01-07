@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2025 M5Stack Technology CO LTD
+ * SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
  *
  * SPDX-License-Identifier: MIT
  */
@@ -35,7 +35,7 @@ M5IOE1 ioe1;
 #define I2C_FREQ 400000
 
 // M5IOE1 I2C address (default 0x6F)
-#define I2C_ADDR 0x6F
+#define I2C_ADDR M5IOE1_DEFAULT_ADDR
 
 // Pin definitions
 #define IOE1_PIN_1 M5IOE1_PIN_1  // IO1 on M5IOE1 (pin index 0)

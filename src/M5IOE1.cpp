@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2025 M5Stack Technology CO LTD
+ * SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
  *
  * SPDX-License-Identifier: MIT
  */
@@ -1190,7 +1190,7 @@ bool M5IOE1::refreshAw8737aPulse() {
 // RTC RAM 功能 / RTC RAM Functions
 // ============================
 
-bool M5IOE1::writeRtcRam(uint8_t offset, const uint8_t* data, uint8_t length) {
+bool M5IOE1::writeRtcRAM(uint8_t offset, const uint8_t* data, uint8_t length) {
     if (data == nullptr || offset >= M5IOE1_RTC_RAM_SIZE ||
         length == 0 || (offset + length) > M5IOE1_RTC_RAM_SIZE || !_initialized) {
         return false;
@@ -1200,7 +1200,7 @@ bool M5IOE1::writeRtcRam(uint8_t offset, const uint8_t* data, uint8_t length) {
     return _writeBytes(regAddr, data, length);
 }
 
-bool M5IOE1::readRtcRam(uint8_t offset, uint8_t* data, uint8_t length) {
+bool M5IOE1::readRtcRAM(uint8_t offset, uint8_t* data, uint8_t length) {
     if (data == nullptr || offset >= M5IOE1_RTC_RAM_SIZE ||
         length == 0 || (offset + length) > M5IOE1_RTC_RAM_SIZE || !_initialized) {
         return false;

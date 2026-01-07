@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2025 M5Stack Technology CO LTD
+ * SPDX-FileCopyrightText: 2026 M5Stack Technology CO LTD
  *
  * SPDX-License-Identifier: MIT
  */
@@ -24,21 +24,23 @@
 // ============================
 // IO 引脚定义 / IO Pin Definitions
 // ============================
-#define M5IOE1_PIN_NC    -1
-#define M5IOE1_PIN_1      0
-#define M5IOE1_PIN_2      1
-#define M5IOE1_PIN_3      2
-#define M5IOE1_PIN_4      3
-#define M5IOE1_PIN_5      4
-#define M5IOE1_PIN_6      5
-#define M5IOE1_PIN_7      6
-#define M5IOE1_PIN_8      7
-#define M5IOE1_PIN_9      8
-#define M5IOE1_PIN_10     9
-#define M5IOE1_PIN_11    10
-#define M5IOE1_PIN_12    11
-#define M5IOE1_PIN_13    12
-#define M5IOE1_PIN_14    13
+typedef enum {
+    M5IOE1_PIN_NC = -1,
+    M5IOE1_PIN_1 = 0,
+    M5IOE1_PIN_2 = 1,
+    M5IOE1_PIN_3 = 2,
+    M5IOE1_PIN_4 = 3,
+    M5IOE1_PIN_5 = 4,
+    M5IOE1_PIN_6 = 5,
+    M5IOE1_PIN_7 = 6,
+    M5IOE1_PIN_8 = 7,
+    M5IOE1_PIN_9 = 8,
+    M5IOE1_PIN_10 = 9,
+    M5IOE1_PIN_11 = 10,
+    M5IOE1_PIN_12 = 11,
+    M5IOE1_PIN_13 = 12,
+    M5IOE1_PIN_14 = 13
+} m5ioe1_pin_t;
 
 // ============================
 // 设备常量 / Device Constants
@@ -592,8 +594,8 @@ public:
     // ========================
     // RTC RAM 功能 / RTC RAM Functions
     // ========================
-    bool writeRtcRam(uint8_t offset, const uint8_t* data, uint8_t length);
-    bool readRtcRam(uint8_t offset, uint8_t* data, uint8_t length);
+    bool writeRtcRAM(uint8_t offset, const uint8_t* data, uint8_t length);
+    bool readRtcRAM(uint8_t offset, uint8_t* data, uint8_t length);
 
     // ========================
     // 系统配置 / System Configuration
