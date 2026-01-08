@@ -140,7 +140,7 @@ typedef enum {
 #define M5IOE1_PWM_ENABLE           (1 << 7)
 // I2C Config
 #define M5IOE1_I2C_SLEEP_MASK       0x0F
-#define M5IOE1_I2C_SPEED_400K       (1 << 4)
+#define M5IOE1_I2C_SPEED_400K_BIT   (1 << 4)
 #define M5IOE1_I2C_WAKE_RISING      (1 << 5)
 #define M5IOE1_I2C_PULL_OFF         (1 << 6)
 // LED Config
@@ -264,6 +264,39 @@ typedef enum {
     M5IOE1_INT_MODE_HARDWARE        // 硬件中断模式
                                     // Hardware interrupt mode
 } m5ioe1_int_mode_t;
+
+// ============================
+// I2C 速度定义
+// I2C Speed Definitions
+// ============================
+typedef enum {
+    M5IOE1_I2C_SPEED_100K = 0,      // 100KHz 标准模式
+                                    // 100KHz standard mode
+    M5IOE1_I2C_SPEED_400K = 1       // 400KHz 快速模式
+                                    // 400KHz fast mode
+} m5ioe1_i2c_speed_t;
+
+// ============================
+// I2C 唤醒边沿定义
+// I2C Wake Edge Definitions
+// ============================
+typedef enum {
+    M5IOE1_WAKE_EDGE_FALLING = 0,   // 下降沿唤醒（默认）
+                                    // Falling edge wake (default)
+    M5IOE1_WAKE_EDGE_RISING = 1     // 上升沿唤醒
+                                    // Rising edge wake
+} m5ioe1_wake_edge_t;
+
+// ============================
+// I2C 内部上拉定义
+// I2C Internal Pull-up Definitions
+// ============================
+typedef enum {
+    M5IOE1_PULL_ENABLED = 0,        // 内部上拉启用（默认）
+                                    // Internal pull-up enabled (default)
+    M5IOE1_PULL_DISABLED = 1        // 内部上拉禁用
+                                    // Internal pull-up disabled
+} m5ioe1_pull_config_t;
 
 // ============================
 // 日志级别定义
@@ -667,7 +700,100 @@ public:
     // 系统配置
     // System Configuration
     // ========================
-    bool setI2cConfig(uint8_t sleepTime, bool speed400k = false, bool wakeRising = false, bool pullOff = false);
+
+    /**
+     * @brief Set all I2C configuration at once / 一次性设置所有 I2C 配置
+     * @param sleepTime Sleep timeout (0=disabled, 1-15=timeout value)
+     * @param sleepTime 休眠超时（0=禁用，1-15=超时值）
+     * @param speed I2C speed (M5IOE1_I2C_SPEED_100K or M5IOE1_I2C_SPEED_400K)
+     * @param speed I2C 速度（M5IOE1_I2C_SPEED_100K 或 M5IOE1_I2C_SPEED_400K）
+     * @param wakeEdge Wake edge (M5IOE1_WAKE_EDGE_FALLING or M5IOE1_WAKE_EDGE_RISING)
+     * @param wakeEdge 唤醒边沿（M5IOE1_WAKE_EDGE_FALLING 或 M5IOE1_WAKE_EDGE_RISING）
+     * @param pullConfig Pull-up config (M5IOE1_PULL_ENABLED or M5IOE1_PULL_DISABLED)
+     * @param pullConfig 上拉配置（M5IOE1_PULL_ENABLED 或 M5IOE1_PULL_DISABLED）
+     * @return true if successful
+     */
+    bool setI2cConfig(uint8_t sleepTime,
+                      m5ioe1_i2c_speed_t speed = M5IOE1_I2C_SPEED_100K,
+                      m5ioe1_wake_edge_t wakeEdge = M5IOE1_WAKE_EDGE_FALLING,
+                      m5ioe1_pull_config_t pullConfig = M5IOE1_PULL_ENABLED);
+
+    /**
+     * @brief Switch I2C communication speed / 切换 I2C 通讯速度
+     * @param speed Target speed (M5IOE1_I2C_SPEED_100K or M5IOE1_I2C_SPEED_400K)
+     * @param speed 目标速度 (M5IOE1_I2C_SPEED_100K 或 M5IOE1_I2C_SPEED_400K)
+     * @return true if successful, false otherwise
+     * @note This function will configure both the device and host I2C bus
+     * @note 此函数会同时配置设备和主机 I2C 总线
+     */
+    bool switchI2cSpeed(m5ioe1_i2c_speed_t speed);
+
+    /**
+     * @brief Get current I2C speed setting / 获取当前 I2C 速度设置
+     * @param speed Pointer to store the speed value / 存储速度值的指针
+     * @return true if successful, false if read failed
+     * @note Reads from device register and updates internal cache
+     * @note 从设备寄存器读取并更新内部缓存
+     */
+    bool getI2cSpeed(m5ioe1_i2c_speed_t* speed);
+
+    /**
+     * @brief Set I2C sleep timeout / 设置 I2C 休眠超时
+     * @param sleepTime Sleep timeout value (0=disabled, 1-15=timeout)
+     * @param sleepTime 休眠超时值（0=禁用，1-15=超时）
+     * @return true if successful
+     * @note Sleep time formula: T = sleepTime * base_time
+     * @note 休眠时间公式：T = sleepTime * 基础时间
+     */
+    bool setI2cSleepTime(uint8_t sleepTime);
+
+    /**
+     * @brief Get current I2C sleep timeout / 获取当前 I2C 休眠超时
+     * @param sleepTime Pointer to store the sleep timeout value / 存储休眠超时值的指针
+     * @return true if successful, false if read failed
+     * @note Reads from device register and updates internal cache
+     * @note 从设备寄存器读取并更新内部缓存
+     */
+    bool getI2cSleepTime(uint8_t* sleepTime);
+
+    /**
+     * @brief Set I2C wake edge / 设置 I2C 唤醒边沿
+     * @param edge Wake edge (M5IOE1_WAKE_EDGE_FALLING or M5IOE1_WAKE_EDGE_RISING)
+     * @param edge 唤醒边沿（M5IOE1_WAKE_EDGE_FALLING 或 M5IOE1_WAKE_EDGE_RISING）
+     * @return true if successful
+     */
+    bool setI2cWakeEdge(m5ioe1_wake_edge_t edge);
+
+    /**
+     * @brief Get current I2C wake edge / 获取当前 I2C 唤醒边沿
+     * @param edge Pointer to store the wake edge setting / 存储唤醒边沿设置的指针
+     * @return true if successful, false if read failed
+     * @note Reads from device register and updates internal cache
+     * @note 从设备寄存器读取并更新内部缓存
+     */
+    bool getI2cWakeEdge(m5ioe1_wake_edge_t* edge);
+
+    /**
+     * @brief Set I2C internal pull-up configuration / 设置 I2C 内部上拉配置
+     * @param config Pull-up config (M5IOE1_PULL_ENABLED or M5IOE1_PULL_DISABLED)
+     * @param config 上拉配置（M5IOE1_PULL_ENABLED 或 M5IOE1_PULL_DISABLED）
+     * @return true if successful
+     */
+    bool setI2cPullConfig(m5ioe1_pull_config_t config);
+
+    /**
+     * @brief Get current I2C internal pull-up configuration / 获取当前 I2C 内部上拉配置
+     * @param config Pointer to store the pull-up configuration / 存储上拉配置的指针
+     * @return true if successful, false if read failed
+     * @note Reads from device register and updates internal cache
+     * @note 从设备寄存器读取并更新内部缓存
+     */
+    bool getI2cPullConfig(m5ioe1_pull_config_t* config);
+
+    /**
+     * @brief Factory reset the device / 恢复出厂设置
+     * @return true if successful
+     */
     bool factoryReset();
 
     // ========================
@@ -954,10 +1080,9 @@ private:
     // Auto wake check
     void _checkAutoWake();
 
-    // I2C 频率验证和切换
-    // I2C frequency validation and switching
+    // I2C 频率验证
+    // I2C frequency validation
     bool _isValidI2cFrequency(uint32_t speed);
-    bool _switchTo400K();
 
     // 中断互斥对检查
     // Interrupt mutex pairs check

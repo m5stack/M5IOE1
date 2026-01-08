@@ -227,44 +227,90 @@ bool M5IOE1::begin(TwoWire *wire, uint8_t addr, uint8_t sda, uint8_t scl, uint32
     // 始终以 100KHz 开始 - M5IOE1 在上电/复位后默认为 100KHz
     // Always start with 100KHz - M5IOE1 defaults to 100KHz after power-on/reset
     M5IOE1_LOG_I(TAG, "Initializing M5IOE1 with 100KHz (device default)");
-    
+
     // 在开始新的 I2C 会话之前结束之前的会话（修复 ESP_ERR_INVALID_STATE）
     // End any previous I2C session before starting new one (fixes ESP_ERR_INVALID_STATE)
+    // 注意：ESP32 Arduino Wire 库需要足够的延时
+    // Note: ESP32 Arduino Wire library needs sufficient delay
     _wire->end();
-    M5IOE1_DELAY_MS(10);
-    
+    M5IOE1_DELAY_MS(50);
+
     // 初始化 I2C 总线并检查返回值
     // Initialize I2C bus and check return value
     if (!_wire->begin(sda, scl, M5IOE1_I2C_FREQ_100K)) {
         M5IOE1_LOG_E(TAG, "Failed to initialize I2C bus (SDA=%d, SCL=%d)", sda, scl);
         return false;
     }
-    
+
     // 给 I2C 总线时间在初始化后稳定
     // Give the I2C bus time to stabilize after initialization
-    M5IOE1_DELAY_MS(50);
+    M5IOE1_DELAY_MS(100);
 
+    // 尝试唤醒设备 - 发送 I2C START 信号
+    // Try to wake up the device - send I2C START signal
+    // M5IOE1 可能处于睡眠状态，需要先唤醒
+    // M5IOE1 may be in sleep mode, need to wake up first
+    M5IOE1_I2C_SEND_WAKE(_wire, _addr);
+    M5IOE1_DELAY_MS(10);
+
+    // 步骤1: 先尝试100K通信
+    // Step 1: Try 100K communication first
     if (!_initDevice()) {
-        M5IOE1_LOG_E(TAG, "Failed to initialize device");
-        return false;
+        // 步骤2: 100K失败，尝试400K
+        // Step 2: 100K failed, try 400K
+        M5IOE1_LOG_W(TAG, "Failed at 100KHz, trying 400KHz...");
+
+        _wire->end();
+        M5IOE1_DELAY_MS(50);
+
+        if (!_wire->begin(sda, scl, M5IOE1_I2C_FREQ_400K)) {
+            M5IOE1_LOG_E(TAG, "Failed to initialize I2C bus at 400KHz");
+            return false;
+        }
+        M5IOE1_DELAY_MS(100);
+
+        M5IOE1_I2C_SEND_WAKE(_wire, _addr);
+        M5IOE1_DELAY_MS(10);
+
+        if (!_initDevice()) {
+            // 步骤3: 都失败，初始化失败
+            // Step 3: Both failed, initialization failed
+            M5IOE1_LOG_E(TAG, "Failed at both 100KHz and 400KHz");
+            return false;
+        }
     }
 
+    // 步骤4: 通信成功，设置为已初始化
+    // Step 4: Communication succeeded, set as initialized
     _initialized = true;
 
-    // 获取初始快照
-    // Take initial snapshot
+    // 步骤5: 强制配置I2C（用户请求的频率 + 关闭休眠）
+    // Step 5: Force configure I2C (user requested speed + disable sleep)
+    m5ioe1_i2c_speed_t targetSpeed = (_requestedSpeed == M5IOE1_I2C_FREQ_400K)
+        ? M5IOE1_I2C_SPEED_400K : M5IOE1_I2C_SPEED_100K;
+
+    // 使用setI2cConfig一次性配置：sleepTime=0, 用户速度, 默认唤醒边沿, 默认上拉
+    // Use setI2cConfig to configure at once: sleepTime=0, user speed, default wake edge, default pull
+    if (!setI2cConfig(0, targetSpeed, M5IOE1_WAKE_EDGE_FALLING, M5IOE1_PULL_ENABLED)) {
+        M5IOE1_LOG_W(TAG, "Failed to set I2C config");
+    }
+
+    // 步骤6: 切换主机I2C总线到用户请求的速度
+    // Step 6: Switch host I2C bus to user requested speed
+    _wire->end();
+    M5IOE1_DELAY_MS(10);
+    if (!_wire->begin(sda, scl, _requestedSpeed)) {
+        M5IOE1_LOG_E(TAG, "Failed to switch host to %lu Hz", _requestedSpeed);
+        return false;
+    }
+    M5IOE1_DELAY_MS(50);
+
+    // 步骤7: 快照
+    // Step 7: Snapshot
     _snapshotPinStates();
     _snapshotPwmStates();
     _snapshotAdcState();
     _snapshotI2cConfig();
-
-    // 如果用户请求 400KHz，切换到高速模式
-    // If user requested 400KHz, switch to high-speed mode
-    if (_requestedSpeed == M5IOE1_I2C_FREQ_400K) {
-        if (!_switchTo400K()) {
-            M5IOE1_LOG_W(TAG, "Failed to switch to 400KHz, remaining at 100KHz");
-        }
-    }
 
     M5IOE1_LOG_I(TAG, "M5IOE1 initialized at address 0x%02X (I2C: %lu Hz)", _addr, _requestedSpeed);
 
@@ -358,31 +404,102 @@ bool M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint32_t spe
         return false;
     }
 
+    // 尝试唤醒设备 - 发送 I2C START 信号
+    // Try to wake up the device - send I2C START signal
+    // M5IOE1 可能处于睡眠状态，需要先唤醒
+    // M5IOE1 may be in sleep mode, need to wake up first
+    M5IOE1_I2C_MASTER_SEND_WAKE(_i2c_master_bus, _addr);
+    M5IOE1_DELAY_MS(10);
+
+    // 步骤1: 先尝试100K通信
+    // Step 1: Try 100K communication first
     if (!_initDevice()) {
-        M5IOE1_LOG_E(TAG, "Failed to initialize device");
+        // 步骤2: 100K失败，尝试400K
+        // Step 2: 100K failed, try 400K
+        M5IOE1_LOG_W(TAG, "Failed at 100KHz, trying 400KHz...");
+
+        // 删除当前100K设备句柄
+        // Remove current 100K device handle
         i2c_master_bus_rm_device(_i2c_master_dev);
-        i2c_del_master_bus(_i2c_master_bus);
         _i2c_master_dev = nullptr;
+
+        // 以400K重新创建设备句柄
+        // Recreate device handle at 400K
+        i2c_device_config_t dev_config_400k = {
+            .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+            .device_address = _addr,
+            .scl_speed_hz = M5IOE1_I2C_FREQ_400K,
+            .scl_wait_us = 0,
+            .flags = {
+                .disable_ack_check = false,
+            },
+        };
+
+        ret = i2c_master_bus_add_device(_i2c_master_bus, &dev_config_400k, &_i2c_master_dev);
+        if (ret != ESP_OK) {
+            M5IOE1_LOG_E(TAG, "Failed to add I2C device at 400KHz: %s", esp_err_to_name(ret));
+            i2c_del_master_bus(_i2c_master_bus);
+            _i2c_master_bus = nullptr;
+            return false;
+        }
+
+        M5IOE1_I2C_MASTER_SEND_WAKE(_i2c_master_bus, _addr);
+        M5IOE1_DELAY_MS(10);
+
+        if (!_initDevice()) {
+            // 步骤3: 都失败，初始化失败
+            // Step 3: Both failed, initialization failed
+            M5IOE1_LOG_E(TAG, "Failed at both 100KHz and 400KHz");
+            i2c_master_bus_rm_device(_i2c_master_dev);
+            i2c_del_master_bus(_i2c_master_bus);
+            _i2c_master_dev = nullptr;
+            _i2c_master_bus = nullptr;
+            return false;
+        }
+    }
+
+    // 步骤4: 通信成功，设置为已初始化
+    // Step 4: Communication succeeded, set as initialized
+    _initialized = true;
+
+    // 步骤5: 强制配置I2C（用户请求的频率 + 关闭休眠）
+    // Step 5: Force configure I2C (user requested speed + disable sleep)
+    m5ioe1_i2c_speed_t targetSpeed = (_requestedSpeed == M5IOE1_I2C_FREQ_400K)
+        ? M5IOE1_I2C_SPEED_400K : M5IOE1_I2C_SPEED_100K;
+
+    if (!setI2cConfig(0, targetSpeed, M5IOE1_WAKE_EDGE_FALLING, M5IOE1_PULL_ENABLED)) {
+        M5IOE1_LOG_W(TAG, "Failed to set I2C config");
+    }
+
+    // 步骤6: 切换设备句柄到用户请求的速度
+    // Step 6: Switch device handle to user requested speed
+    i2c_master_bus_rm_device(_i2c_master_dev);
+    _i2c_master_dev = nullptr;
+
+    i2c_device_config_t dev_config_target = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = _addr,
+        .scl_speed_hz = _requestedSpeed,
+        .scl_wait_us = 0,
+        .flags = {
+            .disable_ack_check = false,
+        },
+    };
+
+    ret = i2c_master_bus_add_device(_i2c_master_bus, &dev_config_target, &_i2c_master_dev);
+    if (ret != ESP_OK) {
+        M5IOE1_LOG_E(TAG, "Failed to switch device to %lu Hz: %s", _requestedSpeed, esp_err_to_name(ret));
+        i2c_del_master_bus(_i2c_master_bus);
         _i2c_master_bus = nullptr;
         return false;
     }
 
-    _initialized = true;
-
-    // 获取初始快照
-    // Take initial snapshot
+    // 步骤7: 快照
+    // Step 7: Snapshot
     _snapshotPinStates();
     _snapshotPwmStates();
     _snapshotAdcState();
     _snapshotI2cConfig();
-
-    // 如果用户请求 400KHz，切换到高速模式
-    // If user requested 400KHz, switch to high-speed mode
-    if (_requestedSpeed == M5IOE1_I2C_FREQ_400K) {
-        if (!_switchTo400K()) {
-            M5IOE1_LOG_W(TAG, "Failed to switch to 400KHz, remaining at 100KHz");
-        }
-    }
 
     M5IOE1_LOG_I(TAG, "M5IOE1 initialized at address 0x%02X (I2C: %lu Hz)", _addr, _requestedSpeed);
 
@@ -454,29 +571,96 @@ bool M5IOE1::begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t speed, m5
         return false;
     }
 
+    // 尝试唤醒设备 - 发送 I2C START 信号
+    // Try to wake up the device - send I2C START signal
+    // M5IOE1 可能处于睡眠状态，需要先唤醒
+    // M5IOE1 may be in sleep mode, need to wake up first
+    M5IOE1_I2C_MASTER_SEND_WAKE(_i2c_master_bus, _addr);
+    M5IOE1_DELAY_MS(10);
+
+    // 步骤1: 先尝试100K通信
+    // Step 1: Try 100K communication first
     if (!_initDevice()) {
-        M5IOE1_LOG_E(TAG, "Failed to initialize device");
+        // 步骤2: 100K失败，尝试400K
+        // Step 2: 100K failed, try 400K
+        M5IOE1_LOG_W(TAG, "Failed at 100KHz, trying 400KHz...");
+
+        // 删除当前100K设备句柄
+        // Remove current 100K device handle
         i2c_master_bus_rm_device(_i2c_master_dev);
         _i2c_master_dev = nullptr;
+
+        // 以400K重新创建设备句柄
+        // Recreate device handle at 400K
+        i2c_device_config_t dev_config_400k = {
+            .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+            .device_address = _addr,
+            .scl_speed_hz = M5IOE1_I2C_FREQ_400K,
+            .scl_wait_us = 0,
+            .flags = {
+                .disable_ack_check = false,
+            },
+        };
+
+        ret = i2c_master_bus_add_device(_i2c_master_bus, &dev_config_400k, &_i2c_master_dev);
+        if (ret != ESP_OK) {
+            M5IOE1_LOG_E(TAG, "Failed to add I2C device at 400KHz: %s", esp_err_to_name(ret));
+            return false;
+        }
+
+        M5IOE1_I2C_MASTER_SEND_WAKE(_i2c_master_bus, _addr);
+        M5IOE1_DELAY_MS(10);
+
+        if (!_initDevice()) {
+            // 步骤3: 都失败，初始化失败
+            // Step 3: Both failed, initialization failed
+            M5IOE1_LOG_E(TAG, "Failed at both 100KHz and 400KHz");
+            i2c_master_bus_rm_device(_i2c_master_dev);
+            _i2c_master_dev = nullptr;
+            return false;
+        }
+    }
+
+    // 步骤4: 通信成功，设置为已初始化
+    // Step 4: Communication succeeded, set as initialized
+    _initialized = true;
+
+    // 步骤5: 强制配置I2C（用户请求的频率 + 关闭休眠）
+    // Step 5: Force configure I2C (user requested speed + disable sleep)
+    m5ioe1_i2c_speed_t targetSpeed = (_requestedSpeed == M5IOE1_I2C_FREQ_400K)
+        ? M5IOE1_I2C_SPEED_400K : M5IOE1_I2C_SPEED_100K;
+
+    if (!setI2cConfig(0, targetSpeed, M5IOE1_WAKE_EDGE_FALLING, M5IOE1_PULL_ENABLED)) {
+        M5IOE1_LOG_W(TAG, "Failed to set I2C config");
+    }
+
+    // 步骤6: 切换设备句柄到用户请求的速度
+    // Step 6: Switch device handle to user requested speed
+    i2c_master_bus_rm_device(_i2c_master_dev);
+    _i2c_master_dev = nullptr;
+
+    i2c_device_config_t dev_config_target = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = _addr,
+        .scl_speed_hz = _requestedSpeed,
+        .scl_wait_us = 0,
+        .flags = {
+            .disable_ack_check = false,
+        },
+    };
+
+    ret = i2c_master_bus_add_device(_i2c_master_bus, &dev_config_target, &_i2c_master_dev);
+    if (ret != ESP_OK) {
+        M5IOE1_LOG_E(TAG, "Failed to switch device to %lu Hz: %s", _requestedSpeed, esp_err_to_name(ret));
         return false;
     }
 
-    _initialized = true;
-
-    // 获取初始快照
-    // Take initial snapshot
+    // 步骤7: 快照
+    // Step 7: Snapshot
     _snapshotPinStates();
     _snapshotPwmStates();
     _snapshotAdcState();
     _snapshotI2cConfig();
-
-    // 如果用户请求 400KHz，切换到高速模式
-    // If user requested 400KHz, switch to high-speed mode
-    if (_requestedSpeed == M5IOE1_I2C_FREQ_400K) {
-        if (!_switchTo400K()) {
-            M5IOE1_LOG_W(TAG, "Failed to switch to 400KHz, remaining at 100KHz");
-        }
-    }
 
     M5IOE1_LOG_I(TAG, "M5IOE1 initialized at address 0x%02X (I2C: %lu Hz)", _addr, _requestedSpeed);
 
@@ -534,29 +718,76 @@ bool M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, m5ioe1_in
         return false;
     }
 
+    // 尝试唤醒设备 - 发送 I2C START 信号
+    // Try to wake up the device - send I2C START signal
+    // M5IOE1 可能处于睡眠状态，需要先唤醒
+    // M5IOE1 may be in sleep mode, need to wake up first
+    M5IOE1_I2C_SEND_WAKE(_i2c_device, M5IOE1_REG_HW_REV);
+    M5IOE1_DELAY_MS(10);
+
+    // 步骤1: 先尝试100K通信
+    // Step 1: Try 100K communication first
     if (!_initDevice()) {
-        M5IOE1_LOG_E(TAG, "Failed to initialize device");
+        // 步骤2: 100K失败，尝试400K
+        // Step 2: 100K failed, try 400K
+        M5IOE1_LOG_W(TAG, "Failed at 100KHz, trying 400KHz...");
+
+        // 删除当前100K设备句柄
+        // Remove current 100K device handle
         i2c_bus_device_delete(&_i2c_device);
         _i2c_device = nullptr;
+
+        // 以400K重新创建设备句柄
+        // Recreate device handle at 400K
+        _i2c_device = i2c_bus_device_create(_i2c_bus, _addr, M5IOE1_I2C_FREQ_400K);
+        if (_i2c_device == nullptr) {
+            M5IOE1_LOG_E(TAG, "Failed to create I2C device at 400KHz");
+            return false;
+        }
+
+        M5IOE1_I2C_SEND_WAKE(_i2c_device, M5IOE1_REG_HW_REV);
+        M5IOE1_DELAY_MS(10);
+
+        if (!_initDevice()) {
+            // 步骤3: 都失败，初始化失败
+            // Step 3: Both failed, initialization failed
+            M5IOE1_LOG_E(TAG, "Failed at both 100KHz and 400KHz");
+            i2c_bus_device_delete(&_i2c_device);
+            _i2c_device = nullptr;
+            return false;
+        }
+    }
+
+    // 步骤4: 通信成功，设置为已初始化
+    // Step 4: Communication succeeded, set as initialized
+    _initialized = true;
+
+    // 步骤5: 强制配置I2C（用户请求的频率 + 关闭休眠）
+    // Step 5: Force configure I2C (user requested speed + disable sleep)
+    m5ioe1_i2c_speed_t targetSpeed = (_requestedSpeed == M5IOE1_I2C_FREQ_400K)
+        ? M5IOE1_I2C_SPEED_400K : M5IOE1_I2C_SPEED_100K;
+
+    if (!setI2cConfig(0, targetSpeed, M5IOE1_WAKE_EDGE_FALLING, M5IOE1_PULL_ENABLED)) {
+        M5IOE1_LOG_W(TAG, "Failed to set I2C config");
+    }
+
+    // 步骤6: 切换设备句柄到用户请求的速度
+    // Step 6: Switch device handle to user requested speed
+    i2c_bus_device_delete(&_i2c_device);
+    _i2c_device = nullptr;
+
+    _i2c_device = i2c_bus_device_create(_i2c_bus, _addr, _requestedSpeed);
+    if (_i2c_device == nullptr) {
+        M5IOE1_LOG_E(TAG, "Failed to switch device to %lu Hz", _requestedSpeed);
         return false;
     }
 
-    _initialized = true;
-
-    // 获取初始快照
-    // Take initial snapshot
+    // 步骤7: 快照
+    // Step 7: Snapshot
     _snapshotPinStates();
     _snapshotPwmStates();
     _snapshotAdcState();
     _snapshotI2cConfig();
-
-    // 如果用户请求 400KHz，切换到高速模式
-    // If user requested 400KHz, switch to high-speed mode
-    if (_requestedSpeed == M5IOE1_I2C_FREQ_400K) {
-        if (!_switchTo400K()) {
-            M5IOE1_LOG_W(TAG, "Failed to switch to 400KHz, remaining at 100KHz");
-        }
-    }
 
     M5IOE1_LOG_I(TAG, "M5IOE1 initialized at address 0x%02X (I2C: %lu Hz)", _addr, _requestedSpeed);
 
@@ -1054,7 +1285,14 @@ bool M5IOE1::setPwmFrequency(uint16_t frequency) {
 
 bool M5IOE1::getPwmFrequency(uint16_t* frequency) {
     if (frequency == nullptr || !_initialized) return false;
-    return _readReg16(M5IOE1_REG_PWM_FREQ_L, frequency);
+
+    if (!_readReg16(M5IOE1_REG_PWM_FREQ_L, frequency)) return false;
+
+    // 更新缓存
+    // Update cache
+    _pwmFrequency = *frequency;
+
+    return true;
 }
 
 bool M5IOE1::setPwmDuty(uint8_t channel, uint8_t duty, bool polarity, bool enable) {
@@ -1079,6 +1317,12 @@ bool M5IOE1::getPwmDuty(uint8_t channel, uint8_t* duty, bool* polarity, bool* en
     *duty = (uint8_t)((duty12 * 100) / 0x0FFF);
     *polarity = (data & ((uint16_t)M5IOE1_PWM_POLARITY << 8)) != 0;
     *enable = (data & ((uint16_t)M5IOE1_PWM_ENABLE << 8)) != 0;
+
+    // 更新缓存
+    // Update cache
+    _pwmStates[channel].duty12 = duty12;
+    _pwmStates[channel].polarity = *polarity;
+    _pwmStates[channel].enabled = *enable;
 
     return true;
 }
@@ -1132,6 +1376,12 @@ bool M5IOE1::getPwmDuty12bit(uint8_t channel, uint16_t* duty12, bool* polarity, 
     *duty12 = data & 0x0FFF;
     *polarity = (data & ((uint16_t)M5IOE1_PWM_POLARITY << 8)) != 0;
     *enable = (data & ((uint16_t)M5IOE1_PWM_ENABLE << 8)) != 0;
+
+    // 更新缓存
+    // Update cache
+    _pwmStates[channel].duty12 = *duty12;
+    _pwmStates[channel].polarity = *polarity;
+    _pwmStates[channel].enabled = *enable;
 
     return true;
 }
@@ -1311,23 +1561,147 @@ bool M5IOE1::readRtcRAM(uint8_t offset, uint8_t* data, uint8_t length) {
 // System Configuration
 // ============================
 
-bool M5IOE1::setI2cConfig(uint8_t sleepTime, bool speed400k, bool wakeRising, bool pullOff) {
+bool M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed,
+                          m5ioe1_wake_edge_t wakeEdge, m5ioe1_pull_config_t pullConfig) {
     if (sleepTime > 15 || !_initialized) return false;
 
     uint8_t cfg = (sleepTime & M5IOE1_I2C_SLEEP_MASK);
-    if (speed400k) cfg |= M5IOE1_I2C_SPEED_400K;
-    if (wakeRising) cfg |= M5IOE1_I2C_WAKE_RISING;
-    if (pullOff) cfg |= M5IOE1_I2C_PULL_OFF;
+    if (speed == M5IOE1_I2C_SPEED_400K) cfg |= M5IOE1_I2C_SPEED_400K_BIT;
+    if (wakeEdge == M5IOE1_WAKE_EDGE_RISING) cfg |= M5IOE1_I2C_WAKE_RISING;
+    if (pullConfig == M5IOE1_PULL_DISABLED) cfg |= M5IOE1_I2C_PULL_OFF;
 
     bool ok = _writeReg(M5IOE1_REG_I2C_CFG, cfg);
     if (ok) {
         _i2cConfig.sleepTime = sleepTime;
-        _i2cConfig.speed400k = speed400k;
-        _i2cConfig.wakeRising = wakeRising;
-        _i2cConfig.pullOff = pullOff;
+        _i2cConfig.speed400k = (speed == M5IOE1_I2C_SPEED_400K);
+        _i2cConfig.wakeRising = (wakeEdge == M5IOE1_WAKE_EDGE_RISING);
+        _i2cConfig.pullOff = (pullConfig == M5IOE1_PULL_DISABLED);
         _i2cConfigValid = true;
+
+        // 若配置了休眠时间，自动启用 autoWake 防止数据丢失
+        // If sleep time is configured, auto-enable autoWake to prevent data loss
+        if (sleepTime > 0 && !_autoWakeEnabled) {
+            setAutoWakeEnable(true);
+            M5IOE1_LOG_W(TAG, "I2C sleep enabled (sleepTime=%d), auto-wake automatically enabled", sleepTime);
+        }
     }
     return ok;
+}
+
+bool M5IOE1::setI2cSleepTime(uint8_t sleepTime) {
+    if (sleepTime > 15 || !_initialized) return false;
+
+    uint8_t cfg = 0;
+    if (!_readReg(M5IOE1_REG_I2C_CFG, &cfg)) return false;
+
+    // 清除 SLEEP 位 [3:0]，设置新值
+    // Clear SLEEP bits [3:0], set new value
+    cfg = (cfg & ~M5IOE1_I2C_SLEEP_MASK) | (sleepTime & M5IOE1_I2C_SLEEP_MASK);
+
+    bool ok = _writeReg(M5IOE1_REG_I2C_CFG, cfg);
+    if (ok) {
+        _i2cConfig.sleepTime = sleepTime;
+        M5IOE1_LOG_I(TAG, "I2C sleep time set to %d", sleepTime);
+
+        // 若配置了休眠时间，自动启用 autoWake 防止数据丢失
+        // If sleep time is configured, auto-enable autoWake to prevent data loss
+        if (sleepTime > 0 && !_autoWakeEnabled) {
+            setAutoWakeEnable(true);
+            M5IOE1_LOG_W(TAG, "I2C sleep enabled, auto-wake automatically enabled");
+        }
+    }
+    return ok;
+}
+
+bool M5IOE1::getI2cSleepTime(uint8_t* sleepTime) {
+    if (sleepTime == nullptr || !_initialized) return false;
+
+    uint8_t cfg = 0;
+    if (!_readReg(M5IOE1_REG_I2C_CFG, &cfg)) return false;
+
+    // 更新缓存
+    // Update cache
+    _i2cConfig.sleepTime = cfg & M5IOE1_I2C_SLEEP_MASK;
+    _i2cConfigValid = true;
+
+    *sleepTime = _i2cConfig.sleepTime;
+    return true;
+}
+
+bool M5IOE1::setI2cWakeEdge(m5ioe1_wake_edge_t edge) {
+    if (!_initialized) return false;
+
+    uint8_t cfg = 0;
+    if (!_readReg(M5IOE1_REG_I2C_CFG, &cfg)) return false;
+
+    // 设置或清除 WAKE 位 [5]
+    // Set or clear WAKE bit [5]
+    if (edge == M5IOE1_WAKE_EDGE_RISING) {
+        cfg |= M5IOE1_I2C_WAKE_RISING;
+    } else {
+        cfg &= ~M5IOE1_I2C_WAKE_RISING;
+    }
+
+    bool ok = _writeReg(M5IOE1_REG_I2C_CFG, cfg);
+    if (ok) {
+        _i2cConfig.wakeRising = (edge == M5IOE1_WAKE_EDGE_RISING);
+        M5IOE1_LOG_I(TAG, "I2C wake edge set to %s",
+                     edge == M5IOE1_WAKE_EDGE_RISING ? "rising" : "falling");
+    }
+    return ok;
+}
+
+bool M5IOE1::getI2cWakeEdge(m5ioe1_wake_edge_t* edge) {
+    if (edge == nullptr || !_initialized) return false;
+
+    uint8_t cfg = 0;
+    if (!_readReg(M5IOE1_REG_I2C_CFG, &cfg)) return false;
+
+    // 更新缓存
+    // Update cache
+    _i2cConfig.wakeRising = (cfg & M5IOE1_I2C_WAKE_RISING) != 0;
+    _i2cConfigValid = true;
+
+    *edge = _i2cConfig.wakeRising ? M5IOE1_WAKE_EDGE_RISING : M5IOE1_WAKE_EDGE_FALLING;
+    return true;
+}
+
+bool M5IOE1::setI2cPullConfig(m5ioe1_pull_config_t config) {
+    if (!_initialized) return false;
+
+    uint8_t cfg = 0;
+    if (!_readReg(M5IOE1_REG_I2C_CFG, &cfg)) return false;
+
+    // 设置或清除 INT_PU/PD 位 [6]
+    // Set or clear INT_PU/PD bit [6]
+    if (config == M5IOE1_PULL_DISABLED) {
+        cfg |= M5IOE1_I2C_PULL_OFF;
+    } else {
+        cfg &= ~M5IOE1_I2C_PULL_OFF;
+    }
+
+    bool ok = _writeReg(M5IOE1_REG_I2C_CFG, cfg);
+    if (ok) {
+        _i2cConfig.pullOff = (config == M5IOE1_PULL_DISABLED);
+        M5IOE1_LOG_I(TAG, "I2C internal pull-up %s",
+                     config == M5IOE1_PULL_DISABLED ? "disabled" : "enabled");
+    }
+    return ok;
+}
+
+bool M5IOE1::getI2cPullConfig(m5ioe1_pull_config_t* config) {
+    if (config == nullptr || !_initialized) return false;
+
+    uint8_t cfg = 0;
+    if (!_readReg(M5IOE1_REG_I2C_CFG, &cfg)) return false;
+
+    // 更新缓存
+    // Update cache
+    _i2cConfig.pullOff = (cfg & M5IOE1_I2C_PULL_OFF) != 0;
+    _i2cConfigValid = true;
+
+    *config = _i2cConfig.pullOff ? M5IOE1_PULL_DISABLED : M5IOE1_PULL_ENABLED;
+    return true;
 }
 
 bool M5IOE1::factoryReset() {
@@ -1358,6 +1732,7 @@ void M5IOE1::setAutoWakeEnable(bool enable) {
     if (enable) {
         _lastCommTime = M5IOE1_GET_TIME_MS();
     }
+    M5IOE1_LOG_I(TAG, "Auto wake %s", enable ? "enabled" : "disabled");
 }
 
 bool M5IOE1::isAutoWakeEnabled() const {
@@ -1836,10 +2211,34 @@ bool M5IOE1::_isValidI2cFrequency(uint32_t speed) {
     return (speed == M5IOE1_I2C_FREQ_100K || speed == M5IOE1_I2C_FREQ_400K);
 }
 
-bool M5IOE1::_switchTo400K() {
+bool M5IOE1::getI2cSpeed(m5ioe1_i2c_speed_t* speed) {
+    if (speed == nullptr || !_initialized) return false;
+
+    uint8_t cfg = 0;
+    if (!_readReg(M5IOE1_REG_I2C_CFG, &cfg)) return false;
+
+    // 更新缓存
+    // Update cache
+    _i2cConfig.speed400k = (cfg & M5IOE1_I2C_SPEED_400K_BIT) != 0;
+    _i2cConfigValid = true;
+
+    *speed = _i2cConfig.speed400k ? M5IOE1_I2C_SPEED_400K : M5IOE1_I2C_SPEED_100K;
+    return true;
+}
+
+bool M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed) {
     if (!_initialized) {
-        M5IOE1_LOG_E(TAG, "Cannot switch to 400KHz: device not initialized");
+        M5IOE1_LOG_E(TAG, "Cannot switch I2C speed: device not initialized");
         return false;
+    }
+
+    uint32_t targetFreq = (speed == M5IOE1_I2C_SPEED_400K) ? M5IOE1_I2C_FREQ_400K : M5IOE1_I2C_FREQ_100K;
+    
+    // 如果目标速度与当前速度相同，直接返回成功
+    // If target speed is same as current, return success directly
+    if (targetFreq == _requestedSpeed) {
+        M5IOE1_LOG_I(TAG, "I2C speed already at %lu Hz, no change needed", targetFreq);
+        return true;
     }
 
     // 步骤 1：读取当前 I2C 配置
@@ -1850,44 +2249,51 @@ bool M5IOE1::_switchTo400K() {
         return false;
     }
 
-    // 步骤 2：在设备中设置 400KHz 模式位
-    // Step 2: Set 400KHz mode bit in device
-    i2cCfg |= M5IOE1_I2C_SPEED_400K;
+    // 步骤 2：根据目标速度设置或清除 400KHz 模式位
+    // Step 2: Set or clear 400KHz mode bit based on target speed
+    if (speed == M5IOE1_I2C_SPEED_400K) {
+        i2cCfg |= M5IOE1_I2C_SPEED_400K_BIT;
+    } else {
+        i2cCfg &= ~M5IOE1_I2C_SPEED_400K_BIT;
+    }
+    
     if (!_writeReg(M5IOE1_REG_I2C_CFG, i2cCfg)) {
-        M5IOE1_LOG_E(TAG, "Failed to write I2C config register for 400KHz mode");
+        M5IOE1_LOG_E(TAG, "Failed to write I2C config register");
         return false;
     }
 
-    M5IOE1_LOG_I(TAG, "M5IOE1 I2C config set to 400KHz mode");
+    M5IOE1_LOG_I(TAG, "M5IOE1 I2C config set to %lu Hz mode", targetFreq);
 
     // 步骤 3：短暂延迟以允许设备处理配置更改
     // Step 3: Small delay to allow device to process the configuration change
     M5IOE1_DELAY_MS(5);
 
-    // 步骤 4：将主机 I2C 总线切换到 400KHz
-    // Step 4: Switch host I2C bus to 400KHz
+    // 步骤 4：将主机 I2C 总线切换到目标速度
+    // Step 4: Switch host I2C bus to target speed
 #ifdef ARDUINO
     if (_wire != nullptr) {
         // 必须使用 Wire.end() + Wire.begin() 在 ESP32 上正确切换 I2C 频率
-        // 仅使用 setClock() 会在较新的 ESP32 Arduino 核心上导致 ESP_ERR_INVALID_STATE
         // Must use Wire.end() + Wire.begin() to properly switch I2C frequency on ESP32
-        // Using only setClock() causes ESP_ERR_INVALID_STATE on newer ESP32 Arduino cores
         _wire->end();
-        M5IOE1_DELAY_MS(10);  // 允许 I2C 总线稳定
-                            // Allow I2C bus to settle
-        if (!_wire->begin(_sda, _scl, M5IOE1_I2C_FREQ_400K)) {
-            M5IOE1_LOG_E(TAG, "Failed to re-initialize I2C bus at 400KHz");
-            // Try to recover with 100KHz
-            _wire->begin(_sda, _scl, M5IOE1_I2C_FREQ_100K);
-            _requestedSpeed = M5IOE1_I2C_FREQ_100K;
+        M5IOE1_DELAY_MS(10);
+        if (!_wire->begin(_sda, _scl, targetFreq)) {
+            M5IOE1_LOG_E(TAG, "Failed to re-initialize I2C bus at %lu Hz", targetFreq);
+            // 尝试恢复到原来的速度
+            // Try to recover with original speed
+            uint32_t originalFreq = (speed == M5IOE1_I2C_SPEED_400K) ? M5IOE1_I2C_FREQ_100K : M5IOE1_I2C_FREQ_400K;
+            _wire->begin(_sda, _scl, originalFreq);
             // 恢复设备配置
             // Revert device config
-            i2cCfg &= ~M5IOE1_I2C_SPEED_400K;
+            if (speed == M5IOE1_I2C_SPEED_400K) {
+                i2cCfg &= ~M5IOE1_I2C_SPEED_400K_BIT;
+            } else {
+                i2cCfg |= M5IOE1_I2C_SPEED_400K_BIT;
+            }
             _writeReg(M5IOE1_REG_I2C_CFG, i2cCfg);
             return false;
         }
-        M5IOE1_DELAY_MS(10);  // Allow I2C bus to stabilize
-        M5IOE1_LOG_I(TAG, "Host I2C bus switched to 400KHz");
+        M5IOE1_DELAY_MS(10);
+        M5IOE1_LOG_I(TAG, "Host I2C bus switched to %lu Hz", targetFreq);
     }
 #else
     // ESP-IDF：处理不同的驱动类型
@@ -1907,12 +2313,12 @@ bool M5IOE1::_switchTo400K() {
                 }
                 _i2c_master_dev = nullptr;
 
-                // 以 400KHz 重新创建设备句柄
-                // Recreate device handle with 400KHz
+                // 以目标速度重新创建设备句柄
+                // Recreate device handle with target speed
                 i2c_device_config_t dev_config = {
                     .dev_addr_length = I2C_ADDR_BIT_LEN_7,
                     .device_address = _addr,
-                    .scl_speed_hz = M5IOE1_I2C_FREQ_400K,
+                    .scl_speed_hz = targetFreq,
                     .scl_wait_us = 0,
                     .flags = {
                         .disable_ack_check = false,
@@ -1921,15 +2327,15 @@ bool M5IOE1::_switchTo400K() {
                 
                 ret = i2c_master_bus_add_device(_i2c_master_bus, &dev_config, &_i2c_master_dev);
                 if (ret != ESP_OK) {
-                    M5IOE1_LOG_E(TAG, "Failed to add I2C device at 400KHz: %s", esp_err_to_name(ret));
-                    // 尝试以 100KHz 恢复
-                    // Try to recover with 100KHz
-                    dev_config.scl_speed_hz = M5IOE1_I2C_FREQ_100K;
+                    M5IOE1_LOG_E(TAG, "Failed to add I2C device at %lu Hz: %s", targetFreq, esp_err_to_name(ret));
+                    // 尝试恢复到原来的速度
+                    // Try to recover with original speed
+                    uint32_t originalFreq = (speed == M5IOE1_I2C_SPEED_400K) ? M5IOE1_I2C_FREQ_100K : M5IOE1_I2C_FREQ_400K;
+                    dev_config.scl_speed_hz = originalFreq;
                     i2c_master_bus_add_device(_i2c_master_bus, &dev_config, &_i2c_master_dev);
-                    _requestedSpeed = M5IOE1_I2C_FREQ_100K;
                     return false;
                 }
-                M5IOE1_LOG_I(TAG, "I2C master device recreated at 400KHz");
+                M5IOE1_LOG_I(TAG, "I2C master device recreated at %lu Hz", targetFreq);
             }
             break;
             
@@ -1943,18 +2349,18 @@ bool M5IOE1::_switchTo400K() {
                     return false;
                 }
 
-                // 以 400KHz 重新创建设备句柄
-                // Recreate device handle with 400KHz
-                _i2c_device = i2c_bus_device_create(_i2c_bus, _addr, M5IOE1_I2C_FREQ_400K);
+                // 以目标速度重新创建设备句柄
+                // Recreate device handle with target speed
+                _i2c_device = i2c_bus_device_create(_i2c_bus, _addr, targetFreq);
                 if (_i2c_device == nullptr) {
-                    M5IOE1_LOG_E(TAG, "Failed to create I2C device at 400KHz");
-                    // 尝试以 100KHz 恢复
-                    // Try to recover with 100KHz
-                    _i2c_device = i2c_bus_device_create(_i2c_bus, _addr, M5IOE1_I2C_FREQ_100K);
-                    _requestedSpeed = M5IOE1_I2C_FREQ_100K;
+                    M5IOE1_LOG_E(TAG, "Failed to create I2C device at %lu Hz", targetFreq);
+                    // 尝试恢复到原来的速度
+                    // Try to recover with original speed
+                    uint32_t originalFreq = (speed == M5IOE1_I2C_SPEED_400K) ? M5IOE1_I2C_FREQ_100K : M5IOE1_I2C_FREQ_400K;
+                    _i2c_device = i2c_bus_device_create(_i2c_bus, _addr, originalFreq);
                     return false;
                 }
-                M5IOE1_LOG_I(TAG, "I2C bus device recreated at 400KHz");
+                M5IOE1_LOG_I(TAG, "I2C bus device recreated at %lu Hz", targetFreq);
             }
             break;
             
@@ -1968,23 +2374,25 @@ bool M5IOE1::_switchTo400K() {
     // Step 5: Verify communication still works
     uint16_t uid = 0;
     if (!_readReg16(M5IOE1_REG_UID_L, &uid)) {
-        M5IOE1_LOG_E(TAG, "Communication failed after switching to 400KHz, reverting to 100KHz");
+        M5IOE1_LOG_E(TAG, "Communication failed after switching to %lu Hz, reverting", targetFreq);
 
         // 恢复设备配置
         // Revert device config
-        i2cCfg &= ~M5IOE1_I2C_SPEED_400K;
+        if (speed == M5IOE1_I2C_SPEED_400K) {
+            i2cCfg &= ~M5IOE1_I2C_SPEED_400K_BIT;
+        } else {
+            i2cCfg |= M5IOE1_I2C_SPEED_400K_BIT;
+        }
+        uint32_t originalFreq = (speed == M5IOE1_I2C_SPEED_400K) ? M5IOE1_I2C_FREQ_100K : M5IOE1_I2C_FREQ_400K;
+        
 #ifdef ARDUINO
         if (_wire != nullptr) {
-            // 以 100KHz 重新初始化 I2C 总线
-            // Re-initialize I2C bus at 100KHz
             _wire->end();
             M5IOE1_DELAY_MS(10);
-            _wire->begin(_sda, _scl, M5IOE1_I2C_FREQ_100K);
+            _wire->begin(_sda, _scl, originalFreq);
             M5IOE1_DELAY_MS(10);
         }
 #else
-        // 根据驱动类型恢复
-        // Revert based on driver type
         switch (_i2cDriverType) {
             case M5IOE1_I2C_DRIVER_SELF_CREATED:
             case M5IOE1_I2C_DRIVER_MASTER:
@@ -1993,7 +2401,7 @@ bool M5IOE1::_switchTo400K() {
                     i2c_device_config_t dev_config = {
                         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
                         .device_address = _addr,
-                        .scl_speed_hz = M5IOE1_I2C_FREQ_100K,
+                        .scl_speed_hz = originalFreq,
                         .scl_wait_us = 0,
                         .flags = { .disable_ack_check = false },
                     };
@@ -2003,7 +2411,7 @@ bool M5IOE1::_switchTo400K() {
             case M5IOE1_I2C_DRIVER_BUS:
                 if (_i2c_device != nullptr) {
                     i2c_bus_device_delete(&_i2c_device);
-                    _i2c_device = i2c_bus_device_create(_i2c_bus, _addr, M5IOE1_I2C_FREQ_100K);
+                    _i2c_device = i2c_bus_device_create(_i2c_bus, _addr, originalFreq);
                 }
                 break;
             default:
@@ -2011,16 +2419,15 @@ bool M5IOE1::_switchTo400K() {
         }
 #endif
         _writeReg(M5IOE1_REG_I2C_CFG, i2cCfg);
-        _requestedSpeed = M5IOE1_I2C_FREQ_100K;
         return false;
     }
 
-    // 更新 I2C 配置缓存
-    // Update I2C config cache
-    _i2cConfig.speed400k = true;
-    _requestedSpeed = M5IOE1_I2C_FREQ_400K;
+    // 更新 I2C 配置缓存和请求速度
+    // Update I2C config cache and requested speed
+    _i2cConfig.speed400k = (speed == M5IOE1_I2C_SPEED_400K);
+    _requestedSpeed = targetFreq;
 
-    M5IOE1_LOG_I(TAG, "Successfully switched to 400KHz I2C mode");
+    M5IOE1_LOG_I(TAG, "Successfully switched to %lu Hz I2C mode", targetFreq);
     return true;
 }
 
@@ -2182,7 +2589,7 @@ bool M5IOE1::_snapshotI2cConfig() {
     if (!_readReg(M5IOE1_REG_I2C_CFG, &cfg)) return false;
 
     _i2cConfig.sleepTime = cfg & M5IOE1_I2C_SLEEP_MASK;
-    _i2cConfig.speed400k = (cfg & M5IOE1_I2C_SPEED_400K) != 0;
+    _i2cConfig.speed400k = (cfg & M5IOE1_I2C_SPEED_400K_BIT) != 0;
     _i2cConfig.wakeRising = (cfg & M5IOE1_I2C_WAKE_RISING) != 0;
     _i2cConfig.pullOff = (cfg & M5IOE1_I2C_PULL_OFF) != 0;
     _i2cConfigValid = true;
