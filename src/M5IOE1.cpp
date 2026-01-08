@@ -2509,7 +2509,7 @@ bool M5IOE1::_initDevice() {
         return false;
     }
 
-    M5IOE1_LOG_I(TAG, "Device UID: 0x%04X, FW Version: %d", uid, version);
+    M5IOE1_LOG_I(TAG, "Device UID: 0x%04X, FW Version: %02X", uid, version);
     return true;
 }
 
@@ -2851,7 +2851,6 @@ void M5IOE1::_pollTaskFunc(void* arg) {
     M5IOE1* self = static_cast<M5IOE1*>(arg);
 
     while (true) {
-        ESP_LOGI(TAG, "Polling...");
         uint16_t status = self->getInterruptStatus();
         if (status != 0) {
             self->_handleInterrupt();
