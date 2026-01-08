@@ -722,7 +722,7 @@ bool M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, m5ioe1_in
     // Try to wake up the device - send I2C START signal
     // M5IOE1 可能处于睡眠状态，需要先唤醒
     // M5IOE1 may be in sleep mode, need to wake up first
-    M5IOE1_I2C_SEND_WAKE(_i2c_device, M5IOE1_REG_HW_REV);
+    M5IOE1_I2C_SEND_WAKE(_i2c_device, M5IOE1_REG_REV);
     M5IOE1_DELAY_MS(10);
 
     // 步骤1: 先尝试100K通信
@@ -745,7 +745,7 @@ bool M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, m5ioe1_in
             return false;
         }
 
-        M5IOE1_I2C_SEND_WAKE(_i2c_device, M5IOE1_REG_HW_REV);
+        M5IOE1_I2C_SEND_WAKE(_i2c_device, M5IOE1_REG_REV);
         M5IOE1_DELAY_MS(10);
 
         if (!_initDevice()) {
@@ -1811,7 +1811,7 @@ bool M5IOE1::sendWakeSignal() {
         case M5IOE1_I2C_DRIVER_MASTER:
             return M5IOE1_I2C_MASTER_SEND_WAKE(_i2c_master_bus, _addr) == ESP_OK;
         case M5IOE1_I2C_DRIVER_BUS:
-            return M5IOE1_I2C_SEND_WAKE(_i2c_device, M5IOE1_REG_HW_REV) == ESP_OK;
+            return M5IOE1_I2C_SEND_WAKE(_i2c_device, M5IOE1_REG_REV) == ESP_OK;
         default:
             return false;
     }
