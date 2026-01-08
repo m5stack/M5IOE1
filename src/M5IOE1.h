@@ -173,42 +173,75 @@ typedef enum {
 #define M5IOE1_PWM_CH4              3   // IO10 (pin index 9)
 
 // ============================
-// GPIO 模式定义（Arduino 兼容）
-// GPIO Mode Definitions (Arduino-compatible)
-// ============================
-#ifndef INPUT
-#define INPUT           0x00
-#endif
-#ifndef OUTPUT
-#define OUTPUT          0x01
-#endif
-#ifndef INPUT_PULLUP
-#define INPUT_PULLUP    0x02
-#endif
-#ifndef INPUT_PULLDOWN
-#define INPUT_PULLDOWN  0x03
-#endif
-
-// ============================
 // GPIO 电平定义
 // GPIO Level Definitions
 // ============================
 #ifndef LOW
-#define LOW             0
+#define LOW             0x0
 #endif
 #ifndef HIGH
-#define HIGH            1
+#define HIGH            0x1
+#endif
+
+// ============================
+// GPIO 模式定义（Arduino 兼容）
+// GPIO Mode Definitions (Arduino-compatible)
+// ============================
+#ifndef INPUT
+#define INPUT             0x01
+#endif
+#ifndef OUTPUT
+#define OUTPUT            0x03
+#endif
+#ifndef PULLUP
+#define PULLUP            0x04
+#endif
+#ifndef INPUT_PULLUP
+#define INPUT_PULLUP      0x05
+#endif
+#ifndef PULLDOWN
+#define PULLDOWN          0x08
+#endif
+#ifndef INPUT_PULLDOWN
+#define INPUT_PULLDOWN    0x09
+#endif
+#ifndef OPEN_DRAIN
+#define OPEN_DRAIN        0x10
+#endif
+#ifndef OUTPUT_OPEN_DRAIN
+#define OUTPUT_OPEN_DRAIN 0x13
+#endif
+#ifndef ANALOG
+#define ANALOG            0xC0
 #endif
 
 // ============================
 // 中断模式定义
 // Interrupt Mode Definitions
 // ============================
+#ifndef DISABLED
+#define DISABLED  0x00
+#endif
 #ifndef RISING
-#define RISING          0x01
+#define RISING    0x01
 #endif
 #ifndef FALLING
-#define FALLING         0x02
+#define FALLING   0x02
+#endif
+#ifndef CHANGE
+#define CHANGE    0x03
+#endif
+#ifndef ONLOW
+#define ONLOW     0x04
+#endif
+#ifndef ONHIGH
+#define ONHIGH    0x05
+#endif
+#ifndef ONLOW_WE
+#define ONLOW_WE  0x0C
+#endif
+#ifndef ONHIGH_WE
+#define ONHIGH_WE 0x0D
 #endif
 
 // ============================
@@ -653,6 +686,23 @@ public:
      */
     bool setPwmDuty12bit(uint8_t channel, uint16_t duty12, bool polarity = false, bool enable = true);
     bool getPwmDuty12bit(uint8_t channel, uint16_t* duty12, bool* polarity, bool* enable);
+
+    /**
+     * @brief Arduino-compatible analogWrite function (PWM output)
+     *        Arduino 兼容的 analogWrite 函数（PWM 输出）
+     * @param channel PWM channel (0-3): M5IOE1_PWM_CH1/CH2/CH3/CH4
+     *               PWM 通道（0-3）：M5IOE1_PWM_CH1/CH2/CH3/CH4
+     *               CH1=IO9, CH2=IO8, CH3=IO11, CH4=IO10
+     * @param value PWM duty cycle (0-255, 8-bit Arduino standard)
+     *              PWM 占空比（0-255，8-bit Arduino 标准）
+     *              0 = 0% duty, 127 = 50% duty, 255 = 100% duty
+     * @return true if successful
+     * @note This function scales 8-bit value to 12-bit internally
+     *       此函数内部将 8-bit 值缩放到 12-bit
+     * @note Value 0 turns off PWM output
+     *       值为 0 时关闭 PWM 输出
+     */
+    bool analogWrite(uint8_t channel, uint8_t value);
 
     // ========================
     // NeoPixel LED 功能

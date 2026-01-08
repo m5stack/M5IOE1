@@ -910,28 +910,30 @@ void M5IOE1::pinMode(uint8_t pin, uint8_t mode) {
     if (!_readReg16(M5IOE1_REG_GPIO_DRV_L, &drvReg)) return;
 
     switch (mode) {
-        case INPUT:
+        case INPUT:  // 0x01
             modeReg &= ~(1 << pin);
             puReg &= ~(1 << pin);
             pdReg &= ~(1 << pin);
             _pinStates[pin].isOutput = false;
             _pinStates[pin].pull = 0;
             break;
-        case INPUT_PULLUP:
+        case PULLUP:  // 0x04 - 仅上拉
+        case INPUT_PULLUP:  // 0x05
             modeReg &= ~(1 << pin);
             puReg |= (1 << pin);
             pdReg &= ~(1 << pin);
             _pinStates[pin].isOutput = false;
             _pinStates[pin].pull = 1;
             break;
-        case INPUT_PULLDOWN:
+        case PULLDOWN:  // 0x08 - 仅下拉
+        case INPUT_PULLDOWN:  // 0x09
             modeReg &= ~(1 << pin);
             puReg &= ~(1 << pin);
             pdReg |= (1 << pin);
             _pinStates[pin].isOutput = false;
             _pinStates[pin].pull = 2;
             break;
-        case OUTPUT:
+        case OUTPUT:  // 0x03
             // 如果此引脚上启用了 PWM 则禁用
             // Disable PWM if enabled on this pin
             if (_isPwmPin(pin)) {
@@ -952,6 +954,38 @@ void M5IOE1::pinMode(uint8_t pin, uint8_t mode) {
                                 // Push-pull
             _pinStates[pin].isOutput = true;
             _pinStates[pin].drive = 0;
+            break;
+        case OPEN_DRAIN:  // 0x10
+        case OUTPUT_OPEN_DRAIN:  // 0x13
+            // 如果此引脚上启用了 PWM 则禁用
+            // Disable PWM if enabled on this pin
+            if (_isPwmPin(pin)) {
+                uint8_t ch = _getPwmChannel(pin);
+                uint8_t regL = M5IOE1_REG_PWM1_DUTY_L + ch * 2;
+                uint16_t pwmData = 0;
+                if (_readReg16(regL, &pwmData)) {
+                    if (pwmData & ((uint16_t)M5IOE1_PWM_ENABLE << 8)) {
+                        pwmData &= ~((uint16_t)M5IOE1_PWM_ENABLE << 8);
+                        _writeReg16(regL, pwmData);
+                    }
+                }
+            }
+            modeReg |= (1 << pin);
+            puReg &= ~(1 << pin);
+            pdReg &= ~(1 << pin);
+            drvReg |= (1 << pin);  // 开漏
+                                // Open-drain
+            _pinStates[pin].isOutput = true;
+            _pinStates[pin].drive = 1;
+            break;
+        case ANALOG:  // 0xC0
+            // 模拟模式 - 设置为输入，无上拉下拉
+            // Analog mode - set as input, no pull-up/down
+            modeReg &= ~(1 << pin);
+            puReg &= ~(1 << pin);
+            pdReg &= ~(1 << pin);
+            _pinStates[pin].isOutput = false;
+            _pinStates[pin].pull = 0;
             break;
         default:
             M5IOE1_LOG_E(TAG, "Invalid mode: %d", mode);
@@ -1384,6 +1418,34 @@ bool M5IOE1::getPwmDuty12bit(uint8_t channel, uint16_t* duty12, bool* polarity, 
     _pwmStates[channel].enabled = *enable;
 
     return true;
+}
+
+// ============================
+// Arduino 兼容 analogWrite
+// Arduino-compatible analogWrite
+// ============================
+
+bool M5IOE1::analogWrite(uint8_t channel, uint8_t value) {
+    if (channel > 3 || !_initialized) {
+        M5IOE1_LOG_E(TAG, "Invalid channel or not initialized: ch=%d", channel);
+        return false;
+    }
+
+    // 值为 0 时关闭 PWM 输出
+    // Turn off PWM when value is 0
+    if (value == 0) {
+        return setPwmDuty12bit(channel, 0, false, false);
+    }
+
+    // 将 8-bit 值 (0-255) 缩放到 12-bit (0-4095)
+    // Scale 8-bit value (0-255) to 12-bit (0-4095)
+    // 公式：duty12 = (value * 4095) / 255 = value * 16 + value / 16
+    // Formula: duty12 = (value * 4095) / 255 = value * 16 + value / 16
+    uint16_t duty12 = (uint16_t)value * 16 + (uint16_t)value / 16;
+
+    // 设置 PWM，默认启用输出，正常极性
+    // Set PWM with output enabled, normal polarity
+    return setPwmDuty12bit(channel, duty12, false, true);
 }
 
 // ============================
