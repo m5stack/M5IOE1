@@ -436,24 +436,9 @@ public:
     // ========================
 #ifdef ARDUINO
     /**
-     * @brief Initialize the device without hardware interrupt pin (Arduino)
-     * @note Without intPin: Only POLLING and DISABLED modes are supported
-     * @note POLLING mode: Periodically reads GPIO_IS registers (0x11-0x12). Non-zero indicates one or more pins triggered
-     * @param wire Pointer to TwoWire instance
-     * @param addr I2C address (default 0x6F)
-     * @param sda SDA pin (default -1, uses default I2C pins)
-     * @param scl SCL pin (default -1, uses default I2C pins)
-     * @param speed I2C speed in Hz (default 100000)
-     * @param mode Interrupt mode: M5IOE1_INT_MODE_POLLING or M5IOE1_INT_MODE_DISABLED
-     * @return true if successful
-     */
-    bool begin(TwoWire *wire, uint8_t addr = M5IOE1_DEFAULT_ADDR,
-               uint8_t sda = -1, uint8_t scl = -1, uint32_t speed = 100000,
-               m5ioe1_int_mode_t mode = M5IOE1_INT_MODE_POLLING);
-
-    /**
-     * @brief Initialize with hardware interrupt pin (Arduino)
-     * @note With intPin: Supports HARDWARE, POLLING, and DISABLED modes
+     * @brief Initialize the M5IOE1 device (Arduino)
+     * @note Without intPin (or intPin=-1): Only POLLING and DISABLED modes are supported
+     * @note With intPin >= 0: Supports HARDWARE, POLLING, and DISABLED modes
      * @note HARDWARE mode: Configures intPin as input without internal pull-up. Waits for falling edge, then reads GPIO_IS registers (0x11-0x12)
      * @note POLLING mode: Periodically reads GPIO_IS registers (0x11-0x12). Non-zero indicates one or more pins triggered
      * @note DISABLED mode: No interrupt handling
@@ -462,13 +447,13 @@ public:
      * @param sda SDA pin (default -1, uses default I2C pins)
      * @param scl SCL pin (default -1, uses default I2C pins)
      * @param speed I2C speed in Hz (default 100000)
-     * @param intPin Hardware interrupt pin. Must be valid GPIO for HARDWARE mode
-     * @param mode Interrupt mode: M5IOE1_INT_MODE_HARDWARE (default), M5IOE1_INT_MODE_POLLING, or M5IOE1_INT_MODE_DISABLED
+     * @param intPin Hardware interrupt pin (-1 = no hardware interrupt, default -1)
+     * @param intMode Interrupt mode (default M5IOE1_INT_MODE_POLLING)
      * @return true if successful
      */
     bool begin(TwoWire *wire, uint8_t addr = M5IOE1_DEFAULT_ADDR,
-                uint8_t sda = -1, uint8_t scl = -1, uint32_t speed = 100000,
-                int8_t intPin = -1, m5ioe1_int_mode_t mode = M5IOE1_INT_MODE_HARDWARE);
+               uint8_t sda = -1, uint8_t scl = -1, uint32_t speed = 100000,
+               int8_t intPin = -1, m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_POLLING);
 #else // ESP-IDF
     // =====================================================
     // Type 1A: Self-created I2C bus, no hardware interrupt
@@ -480,12 +465,12 @@ public:
      * @param sda SDA pin (default 21)
      * @param scl SCL pin (default 22)
      * @param speed I2C speed in Hz (only 100000 or 400000 supported)
-     * @param mode Interrupt mode: M5IOE1_INT_MODE_POLLING or M5IOE1_INT_MODE_DISABLED
+     * @param intMode Interrupt mode: M5IOE1_INT_MODE_POLLING or M5IOE1_INT_MODE_DISABLED
      * @return true if successful
      */
     bool begin(i2c_port_t port = I2C_NUM_0, uint8_t addr = M5IOE1_DEFAULT_ADDR,
                int sda = 21, int scl = 22, uint32_t speed = M5IOE1_I2C_FREQ_100K,
-               m5ioe1_int_mode_t mode = M5IOE1_INT_MODE_POLLING);
+               m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_POLLING);
 
     // =====================================================
     // Type 1B: Self-created I2C bus, with hardware interrupt
@@ -498,11 +483,11 @@ public:
      * @param scl SCL pin
      * @param speed I2C speed in Hz
      * @param intPin Hardware interrupt GPIO pin
-     * @param mode Interrupt mode: M5IOE1_INT_MODE_HARDWARE, POLLING, or DISABLED
+     * @param intMode Interrupt mode: M5IOE1_INT_MODE_HARDWARE, POLLING, or DISABLED
      * @return true if successful
      */
     bool begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint32_t speed,
-               int intPin, m5ioe1_int_mode_t mode = M5IOE1_INT_MODE_HARDWARE);
+               int intPin, m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_HARDWARE);
 
     // =====================================================
     // Type 2A: Existing i2c_master_bus_handle_t, no hardware interrupt
@@ -512,12 +497,12 @@ public:
      * @param bus Existing i2c_master_bus_handle_t
      * @param addr I2C address (default 0x6F)
      * @param speed I2C speed in Hz (for device handle creation)
-     * @param mode Interrupt mode: M5IOE1_INT_MODE_POLLING or M5IOE1_INT_MODE_DISABLED
+     * @param intMode Interrupt mode: M5IOE1_INT_MODE_POLLING or M5IOE1_INT_MODE_DISABLED
      * @return true if successful
      */
     bool begin(i2c_master_bus_handle_t bus, uint8_t addr = M5IOE1_DEFAULT_ADDR,
                uint32_t speed = M5IOE1_I2C_FREQ_100K,
-               m5ioe1_int_mode_t mode = M5IOE1_INT_MODE_POLLING);
+               m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_POLLING);
 
     // =====================================================
     // Type 2B: Existing i2c_master_bus_handle_t, with hardware interrupt
@@ -528,11 +513,11 @@ public:
      * @param addr I2C address
      * @param speed I2C speed in Hz
      * @param intPin Hardware interrupt GPIO pin
-     * @param mode Interrupt mode
+     * @param intMode Interrupt mode
      * @return true if successful
      */
     bool begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t speed,
-               int intPin, m5ioe1_int_mode_t mode = M5IOE1_INT_MODE_HARDWARE);
+               int intPin, m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_HARDWARE);
 
     // =====================================================
     // Type 3A: Existing i2c_bus_handle_t, no hardware interrupt
@@ -542,12 +527,12 @@ public:
      * @param bus Existing i2c_bus_handle_t
      * @param addr I2C address (default 0x6F)
      * @param speed I2C speed in Hz (for device handle creation)
-     * @param mode Interrupt mode: M5IOE1_INT_MODE_POLLING or M5IOE1_INT_MODE_DISABLED
+     * @param intMode Interrupt mode: M5IOE1_INT_MODE_POLLING or M5IOE1_INT_MODE_DISABLED
      * @return true if successful
      */
     bool begin(i2c_bus_handle_t bus, uint8_t addr = M5IOE1_DEFAULT_ADDR,
                uint32_t speed = M5IOE1_I2C_FREQ_100K,
-               m5ioe1_int_mode_t mode = M5IOE1_INT_MODE_POLLING);
+               m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_POLLING);
 
     // =====================================================
     // Type 3B: Existing i2c_bus_handle_t, with hardware interrupt
@@ -558,20 +543,20 @@ public:
      * @param addr I2C address
      * @param speed I2C speed in Hz
      * @param intPin Hardware interrupt GPIO pin
-     * @param mode Interrupt mode
+     * @param intMode Interrupt mode
      * @return true if successful
      */
     bool begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed,
-               int intPin, m5ioe1_int_mode_t mode = M5IOE1_INT_MODE_HARDWARE);
+               int intPin, m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_HARDWARE);
 #endif
 
     /**
      * @brief Set interrupt handling mode
-     * @param mode Interrupt mode (DISABLED, POLLING, HARDWARE)
+     * @param intMode Interrupt mode (DISABLED, POLLING, HARDWARE)
      * @param pollingIntervalMs Polling interval in ms (for polling mode, default 5000ms)
      * @return true if successful
      */
-    bool setInterruptMode(m5ioe1_int_mode_t mode, uint32_t pollingIntervalMs = 5000);
+    bool setInterruptMode(m5ioe1_int_mode_t intMode, uint32_t pollingIntervalMs = 5000);
 
     /**
      * @brief Set polling interval for POLLING mode

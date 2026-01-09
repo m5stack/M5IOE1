@@ -208,12 +208,12 @@ M5IOE1::~M5IOE1() {
 
 #ifdef ARDUINO
 
-bool M5IOE1::begin(TwoWire *wire, uint8_t addr, uint8_t sda, uint8_t scl, uint32_t speed, m5ioe1_int_mode_t mode) {
+bool M5IOE1::begin(TwoWire *wire, uint8_t addr, uint8_t sda, uint8_t scl, uint32_t speed, int8_t intPin, m5ioe1_int_mode_t intMode) {
     _wire = wire;
     _addr = addr;
     _sda = sda;   // 保存 SDA 引脚用于 I2C 重新初始化
     _scl = scl;   // 保存 SCL 引脚用于 I2C 重新初始化
-    _intPin = -1;
+    _intPin = intPin;
 
     // 验证 I2C 频率 - M5IOE1 仅支持 100KHz 或 400KHz
     // Validate I2C frequency - M5IOE1 only supports 100KHz or 400KHz
@@ -306,22 +306,12 @@ bool M5IOE1::begin(TwoWire *wire, uint8_t addr, uint8_t sda, uint8_t scl, uint32
 
     M5IOE1_LOG_I(TAG, "M5IOE1 initialized at address 0x%02X (I2C: %lu Hz)", _addr, _requestedSpeed);
 
-    // 如果未禁用，设置中断模式
-    // Set interrupt mode if not disabled
-    if (mode != M5IOE1_INT_MODE_DISABLED) {
-        setInterruptMode(mode);
+    // 步骤7: 设置中断模式
+    // Step 7: Set interrupt mode
+    if (intMode != M5IOE1_INT_MODE_DISABLED) {
+        setInterruptMode(intMode);
     }
 
-    return true;
-}
-
-bool M5IOE1::begin(TwoWire *wire, uint8_t addr, uint8_t sda, uint8_t scl, uint32_t speed, int8_t intPin, m5ioe1_int_mode_t mode) {
-    if (!begin(wire, addr, sda, scl, speed, M5IOE1_INT_MODE_DISABLED)) return false;
-    
-    _intPin = intPin;
-    if (_intPin >= 0) {
-        return setInterruptMode(mode);
-    }
     return true;
 }
 
@@ -330,7 +320,7 @@ bool M5IOE1::begin(TwoWire *wire, uint8_t addr, uint8_t sda, uint8_t scl, uint32
 // =====================================================
 // Type 1A: Self-created I2C bus, no hardware interrupt
 // =====================================================
-bool M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint32_t speed, m5ioe1_int_mode_t mode) {
+bool M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint32_t speed, m5ioe1_int_mode_t intMode) {
     _addr = addr;
     _busExternal = false;
     _i2cDriverType = M5IOE1_I2C_DRIVER_SELF_CREATED;
@@ -476,8 +466,8 @@ bool M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint32_t spe
 
     // 如果未禁用，设置中断模式
     // Set interrupt mode if not disabled
-    if (mode != M5IOE1_INT_MODE_DISABLED) {
-        setInterruptMode(mode);
+    if (intMode != M5IOE1_INT_MODE_DISABLED) {
+        setInterruptMode(intMode);
     }
 
     return true;
@@ -486,14 +476,14 @@ bool M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint32_t spe
 // =====================================================
 // Type 1B: Self-created I2C bus, with hardware interrupt
 // =====================================================
-bool M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint32_t speed, int intPin, m5ioe1_int_mode_t mode) {
+bool M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint32_t speed, int intPin, m5ioe1_int_mode_t intMode) {
     if (!begin(port, addr, sda, scl, speed, M5IOE1_INT_MODE_DISABLED)) {
         return false;
     }
-    
+
     _intPin = intPin;
     if (_intPin >= 0) {
-        return setInterruptMode(mode);
+        return setInterruptMode(intMode);
     }
     return true;
 }
@@ -501,7 +491,7 @@ bool M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint32_t spe
 // =====================================================
 // Type 2A: Existing i2c_master_bus_handle_t, no hardware interrupt
 // =====================================================
-bool M5IOE1::begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t speed, m5ioe1_int_mode_t mode) {
+bool M5IOE1::begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t speed, m5ioe1_int_mode_t intMode) {
     _addr = addr;
     _busExternal = true;
     _i2cDriverType = M5IOE1_I2C_DRIVER_MASTER;
@@ -616,8 +606,8 @@ bool M5IOE1::begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t speed, m5
 
     M5IOE1_LOG_I(TAG, "M5IOE1 initialized at address 0x%02X (I2C: %lu Hz)", _addr, _requestedSpeed);
 
-    if (mode != M5IOE1_INT_MODE_DISABLED) {
-        setInterruptMode(mode);
+    if (intMode != M5IOE1_INT_MODE_DISABLED) {
+        setInterruptMode(intMode);
     }
 
     return true;
@@ -626,14 +616,14 @@ bool M5IOE1::begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t speed, m5
 // =====================================================
 // Type 2B: Existing i2c_master_bus_handle_t, with hardware interrupt
 // =====================================================
-bool M5IOE1::begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t speed, int intPin, m5ioe1_int_mode_t mode) {
+bool M5IOE1::begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t speed, int intPin, m5ioe1_int_mode_t intMode) {
     if (!begin(bus, addr, speed, M5IOE1_INT_MODE_DISABLED)) {
         return false;
     }
-    
+
     _intPin = intPin;
     if (_intPin >= 0) {
-        return setInterruptMode(mode);
+        return setInterruptMode(intMode);
     }
     return true;
 }
@@ -641,7 +631,7 @@ bool M5IOE1::begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t speed, in
 // =====================================================
 // Type 3A: Existing i2c_bus_handle_t, no hardware interrupt
 // =====================================================
-bool M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, m5ioe1_int_mode_t mode) {
+bool M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, m5ioe1_int_mode_t intMode) {
     _addr = addr;
     _busExternal = true;
     _i2cDriverType = M5IOE1_I2C_DRIVER_BUS;
@@ -734,8 +724,8 @@ bool M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, m5ioe1_in
 
     M5IOE1_LOG_I(TAG, "M5IOE1 initialized at address 0x%02X (I2C: %lu Hz)", _addr, _requestedSpeed);
 
-    if (mode != M5IOE1_INT_MODE_DISABLED) {
-        setInterruptMode(mode);
+    if (intMode != M5IOE1_INT_MODE_DISABLED) {
+        setInterruptMode(intMode);
     }
 
     return true;
@@ -744,28 +734,28 @@ bool M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, m5ioe1_in
 // =====================================================
 // Type 3B: Existing i2c_bus_handle_t, with hardware interrupt
 // =====================================================
-bool M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, int intPin, m5ioe1_int_mode_t mode) {
+bool M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, int intPin, m5ioe1_int_mode_t intMode) {
     if (!begin(bus, addr, speed, M5IOE1_INT_MODE_DISABLED)) {
         return false;
     }
-    
+
     _intPin = intPin;
     if (_intPin >= 0) {
-        return setInterruptMode(mode);
+        return setInterruptMode(intMode);
     }
     return true;
 }
 
 #endif
 
-bool M5IOE1::setInterruptMode(m5ioe1_int_mode_t mode, uint32_t pollingIntervalMs) {
-    _intMode = mode;
+bool M5IOE1::setInterruptMode(m5ioe1_int_mode_t intMode, uint32_t pollingIntervalMs) {
+    _intMode = intMode;
     _pollingInterval = pollingIntervalMs;
 
 #ifdef ARDUINO
     _cleanupPollingArduino();
 
-    if (mode == M5IOE1_INT_MODE_POLLING) {
+    if (intMode == M5IOE1_INT_MODE_POLLING) {
         return _setupPollingArduino();
     }
     // Arduino 上的硬件中断模式需要 attachInterrupt
@@ -775,9 +765,9 @@ bool M5IOE1::setInterruptMode(m5ioe1_int_mode_t mode, uint32_t pollingIntervalMs
 #else
     _cleanupInterrupt();
 
-    if (mode == M5IOE1_INT_MODE_POLLING) {
+    if (intMode == M5IOE1_INT_MODE_POLLING) {
         return _setupPolling();
-    } else if (mode == M5IOE1_INT_MODE_HARDWARE) {
+    } else if (intMode == M5IOE1_INT_MODE_HARDWARE) {
         if (_intPin < 0) {
             M5IOE1_LOG_E(TAG, "Hardware interrupt mode requires interrupt pin");
             return false;
