@@ -46,6 +46,30 @@ typedef enum {
 } m5ioe1_pin_t;
 
 // ============================
+// 错误码
+// Error Codes
+// ============================
+typedef enum {
+    M5IOE1_OK = 0,                  // 成功
+                                    // Success
+    M5IOE1_FAIL = -1,               // 一般失败
+                                    // General failure
+    M5IOE1_ERR_I2C_CONFIG = -2,     // I2C 配置错误 (如频率不支持)
+                                    // I2C configuration error
+    M5IOE1_ERR_RULE_VIOLATION = -3, // 条件规则错误 (如引脚冲突，互斥功能)
+                                    // Condition rule violation
+    M5IOE1_ERR_INVALID_ARG = -4,    // 无效参数
+                                    // Invalid argument
+    M5IOE1_ERR_TIMEOUT = -5,        // 超时
+                                    // Timeout
+    M5IOE1_ERR_NOT_SUPPORTED = -6,  // 不支持的功能
+                                    // Function not supported
+    M5IOE1_ERR_I2C_COMM = -7,       // I2C 通信错误
+                                    // I2C communication error
+} m5ioe1_err_t;
+
+
+// ============================
 // 设备常量
 // Device Constants
 // ============================
@@ -598,12 +622,12 @@ public:
     int digitalRead(uint8_t pin);
 
     // ========================
-    // 高级 GPIO 功能
-    // Advanced GPIO Functions
+    // GPIO 功能（Arduino 风格 - 带返回值）
+    // GPIO Functions (Arduino-style - WithRes)
     // ========================
-    bool setPullMode(uint8_t pin, uint8_t pullMode);
-    bool setDriveMode(uint8_t pin, uint8_t driveMode);
-    bool getInputState(uint8_t pin, uint8_t* state);
+    void pinModeWithRes(uint8_t pin, uint8_t mode, bool* res);
+    void digitalWriteWithRes(uint8_t pin, uint8_t value, bool* res);
+    int digitalReadWithRes(uint8_t pin, bool* res);
 
     // ========================
     // 中断功能
@@ -616,6 +640,14 @@ public:
     void disableInterrupt(uint8_t pin);
     uint16_t getInterruptStatus();
     bool clearInterrupt(uint8_t pin);
+
+    // ========================
+    // 高级 GPIO 功能
+    // Advanced GPIO Functions
+    // ========================
+    bool setPullMode(uint8_t pin, uint8_t pullMode);
+    bool setDriveMode(uint8_t pin, uint8_t driveMode);
+    bool getInputState(uint8_t pin, uint8_t* state);
 
     // ========================
     // ADC 功能

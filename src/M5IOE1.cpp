@@ -269,27 +269,37 @@ bool M5IOE1::begin(TwoWire *wire, uint8_t addr, uint8_t sda, uint8_t scl, uint32
     // 步骤 1: 先尝试100K通信
     // Step 1: Try 100K communication first
     if (!_initDevice()) {
-        // 步骤 2: 100K失败，尝试400K
-        // Step 2: 100K failed, try 400K
-        M5IOE1_LOG_W(TAG, "Failed at 100KHz, trying 400KHz...");
-
-        _wire->end();
-        M5IOE1_DELAY_MS(50);
-
-        if (!_wire->begin(sda, scl, M5IOE1_I2C_FREQ_400K)) {
-            M5IOE1_LOG_E(TAG, "Failed to initialize I2C bus at 400KHz");
-            return false;
-        }
-        M5IOE1_DELAY_MS(100);
+        // 步骤 2: 100K失败，等待800ms后再尝试一次100K
+        // Step 2: 100K failed, wait 800ms and retry 100K
+        M5IOE1_LOG_W(TAG, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
+        M5IOE1_DELAY_MS(800);
 
         M5IOE1_I2C_SEND_WAKE(_wire, _addr);
         M5IOE1_DELAY_MS(10);
 
         if (!_initDevice()) {
-            // 步骤 3: 都失败，初始化失败
-            // Step 3: Both failed, initialization failed
-            M5IOE1_LOG_E(TAG, "Failed at both 100KHz and 400KHz");
-            return false;
+            // 步骤 3: 100K第二次失败，尝试400K
+            // Step 3: 100K failed again, try 400K
+            M5IOE1_LOG_W(TAG, "Failed at 100KHz (retry), trying 400KHz...");
+
+            _wire->end();
+            M5IOE1_DELAY_MS(50);
+
+            if (!_wire->begin(sda, scl, M5IOE1_I2C_FREQ_400K)) {
+                M5IOE1_LOG_E(TAG, "Failed to initialize I2C bus at 400KHz");
+                return false;
+            }
+            M5IOE1_DELAY_MS(100);
+
+            M5IOE1_I2C_SEND_WAKE(_wire, _addr);
+            M5IOE1_DELAY_MS(10);
+
+            if (!_initDevice()) {
+                // 步骤 4: 都失败，初始化失败
+                // Step 4: All attempts failed, initialization failed
+                M5IOE1_LOG_E(TAG, "Failed at 100KHz (twice) and 400KHz");
+                return false;
+            }
         }
     }
 
@@ -433,55 +443,65 @@ bool M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint32_t spe
     // 步骤 1: 先尝试100K通信
     // Step 1: Try 100K communication first
     if (!_initDevice()) {
-        // 步骤 2: 100K失败，尝试400K
-        // Step 2: 100K failed, try 400K
-        M5IOE1_LOG_W(TAG, "Failed at 100KHz, trying 400KHz...");
-
-        // 删除当前100K设备句柄
-        // Remove current 100K device handle
-        i2c_master_bus_rm_device(_i2c_master_dev);
-        _i2c_master_dev = nullptr;
-
-        // 以400K重新创建设备句柄
-        // Recreate device handle at 400K
-        i2c_device_config_t dev_config_400k = {
-            .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-            .device_address = _addr,
-            .scl_speed_hz = M5IOE1_I2C_FREQ_400K,
-            .scl_wait_us = 0,
-            .flags = {
-                .disable_ack_check = false,
-            },
-        };
-
-        ret = i2c_master_bus_add_device(_i2c_master_bus, &dev_config_400k, &_i2c_master_dev);
-        if (ret != ESP_OK) {
-            M5IOE1_LOG_E(TAG, "Failed to add I2C device at 400KHz: %s", esp_err_to_name(ret));
-            i2c_del_master_bus(_i2c_master_bus);
-            _i2c_master_bus = nullptr;
-            return false;
-        }
+        // 步骤 2: 100K失败，等待800ms后再尝试一次100K
+        // Step 2: 100K failed, wait 800ms and retry 100K
+        M5IOE1_LOG_W(TAG, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
+        M5IOE1_DELAY_MS(800);
 
         M5IOE1_I2C_MASTER_SEND_WAKE(_i2c_master_bus, _addr);
         M5IOE1_DELAY_MS(10);
 
         if (!_initDevice()) {
-            // 步骤 3: 都失败，初始化失败
-            // Step 3: Both failed, initialization failed
-            M5IOE1_LOG_E(TAG, "Failed at both 100KHz and 400KHz");
+            // 步骤 3: 100K第二次失败，尝试400K
+            // Step 3: 100K failed again, try 400K
+            M5IOE1_LOG_W(TAG, "Failed at 100KHz (retry), trying 400KHz...");
+
+            // 删除当前100K设备句柄
+            // Remove current 100K device handle
             i2c_master_bus_rm_device(_i2c_master_dev);
-            i2c_del_master_bus(_i2c_master_bus);
             _i2c_master_dev = nullptr;
-            _i2c_master_bus = nullptr;
-            return false;
+
+            // 以400K重新创建设备句柄
+            // Recreate device handle at 400K
+            i2c_device_config_t dev_config_400k = {
+                .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+                .device_address = _addr,
+                .scl_speed_hz = M5IOE1_I2C_FREQ_400K,
+                .scl_wait_us = 0,
+                .flags = {
+                    .disable_ack_check = false,
+                },
+            };
+
+            ret = i2c_master_bus_add_device(_i2c_master_bus, &dev_config_400k, &_i2c_master_dev);
+            if (ret != ESP_OK) {
+                M5IOE1_LOG_E(TAG, "Failed to add I2C device at 400KHz: %s", esp_err_to_name(ret));
+                i2c_del_master_bus(_i2c_master_bus);
+                _i2c_master_bus = nullptr;
+                return false;
+            }
+
+            M5IOE1_I2C_MASTER_SEND_WAKE(_i2c_master_bus, _addr);
+            M5IOE1_DELAY_MS(10);
+
+            if (!_initDevice()) {
+                // 步骤 4: 都失败，初始化失败
+                // Step 4: All attempts failed, initialization failed
+                M5IOE1_LOG_E(TAG, "Failed at 100KHz (twice) and 400KHz");
+                i2c_master_bus_rm_device(_i2c_master_dev);
+                i2c_del_master_bus(_i2c_master_bus);
+                _i2c_master_dev = nullptr;
+                _i2c_master_bus = nullptr;
+                return false;
+            }
         }
     }
 
-    // 步骤 4: 通信成功，设置为已初始化
-    // Step 4: Communication succeeded, set as initialized
+    // 步骤 5: 通信成功，设置为已初始化
+    // Step 5: Communication succeeded, set as initialized
     _initialized = true;
 
-    // 步骤 5: 强制配置I2C（用户请求的频率 + 关闭休眠）
+    // 步骤 6: 强制配置I2C（用户请求的频率 + 关闭休眠）
     // 注意：setI2cConfig 内部会自动切换主机 I2C 总线速度
     // Step 5: Force configure I2C (user requested speed + disable sleep)
     // Note: setI2cConfig will automatically switch host I2C bus speed internally
@@ -610,51 +630,61 @@ bool M5IOE1::begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t speed, m5
     // 步骤 1: 先尝试100K通信
     // Step 1: Try 100K communication first
     if (!_initDevice()) {
-        // 步骤 2: 100K失败，尝试400K
-        // Step 2: 100K failed, try 400K
-        M5IOE1_LOG_W(TAG, "Failed at 100KHz, trying 400KHz...");
-
-        // 删除当前100K设备句柄
-        // Remove current 100K device handle
-        i2c_master_bus_rm_device(_i2c_master_dev);
-        _i2c_master_dev = nullptr;
-
-        // 以400K重新创建设备句柄
-        // Recreate device handle at 400K
-        i2c_device_config_t dev_config_400k = {
-            .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-            .device_address = _addr,
-            .scl_speed_hz = M5IOE1_I2C_FREQ_400K,
-            .scl_wait_us = 0,
-            .flags = {
-                .disable_ack_check = false,
-            },
-        };
-
-        ret = i2c_master_bus_add_device(_i2c_master_bus, &dev_config_400k, &_i2c_master_dev);
-        if (ret != ESP_OK) {
-            M5IOE1_LOG_E(TAG, "Failed to add I2C device at 400KHz: %s", esp_err_to_name(ret));
-            return false;
-        }
+        // 步骤 2: 100K失败，等待800ms后再尝试一次100K
+        // Step 2: 100K failed, wait 800ms and retry 100K
+        M5IOE1_LOG_W(TAG, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
+        M5IOE1_DELAY_MS(800);
 
         M5IOE1_I2C_MASTER_SEND_WAKE(_i2c_master_bus, _addr);
         M5IOE1_DELAY_MS(10);
 
         if (!_initDevice()) {
-            // 步骤 3: 都失败，初始化失败
-            // Step 3: Both failed, initialization failed
-            M5IOE1_LOG_E(TAG, "Failed at both 100KHz and 400KHz");
+            // 步骤 3: 100K第二次失败，尝试400K
+            // Step 3: 100K failed again, try 400K
+            M5IOE1_LOG_W(TAG, "Failed at 100KHz (retry), trying 400KHz...");
+
+            // 删除当前100K设备句柄
+            // Remove current 100K device handle
             i2c_master_bus_rm_device(_i2c_master_dev);
             _i2c_master_dev = nullptr;
-            return false;
+
+            // 以400K重新创建设备句柄
+            // Recreate device handle at 400K
+            i2c_device_config_t dev_config_400k = {
+                .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+                .device_address = _addr,
+                .scl_speed_hz = M5IOE1_I2C_FREQ_400K,
+                .scl_wait_us = 0,
+                .flags = {
+                    .disable_ack_check = false,
+                },
+            };
+
+            ret = i2c_master_bus_add_device(_i2c_master_bus, &dev_config_400k, &_i2c_master_dev);
+            if (ret != ESP_OK) {
+                M5IOE1_LOG_E(TAG, "Failed to add I2C device at 400KHz: %s", esp_err_to_name(ret));
+                return false;
+            }
+
+            M5IOE1_I2C_MASTER_SEND_WAKE(_i2c_master_bus, _addr);
+            M5IOE1_DELAY_MS(10);
+
+            if (!_initDevice()) {
+                // 步骤 4: 都失败，初始化失败
+                // Step 4: All attempts failed, initialization failed
+                M5IOE1_LOG_E(TAG, "Failed at 100KHz (twice) and 400KHz");
+                i2c_master_bus_rm_device(_i2c_master_dev);
+                _i2c_master_dev = nullptr;
+                return false;
+            }
         }
     }
 
-    // 步骤 4: 通信成功，设置为已初始化
-    // Step 4: Communication succeeded, set as initialized
+    // 步骤 5: 通信成功，设置为已初始化
+    // Step 5: Communication succeeded, set as initialized
     _initialized = true;
 
-    // 步骤 5: 强制配置I2C（用户请求的频率 + 关闭休眠）
+    // 步骤 6: 强制配置I2C（用户请求的频率 + 关闭休眠）
     // 注意：setI2cConfig 内部会自动切换主机 I2C 总线速度
     // Step 5: Force configure I2C (user requested speed + disable sleep)
     // Note: setI2cConfig will automatically switch host I2C bus speed internally
@@ -769,41 +799,51 @@ bool M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, m5ioe1_in
     // 步骤 1: 先尝试100K通信
     // Step 1: Try 100K communication first
     if (!_initDevice()) {
-        // 步骤 2: 100K失败，尝试400K
-        // Step 2: 100K failed, try 400K
-        M5IOE1_LOG_W(TAG, "Failed at 100KHz, trying 400KHz...");
-
-        // 删除当前100K设备句柄
-        // Remove current 100K device handle
-        i2c_bus_device_delete(&_i2c_device);
-        _i2c_device = nullptr;
-
-        // 以400K重新创建设备句柄
-        // Recreate device handle at 400K
-        _i2c_device = i2c_bus_device_create(_i2c_bus, _addr, M5IOE1_I2C_FREQ_400K);
-        if (_i2c_device == nullptr) {
-            M5IOE1_LOG_E(TAG, "Failed to create I2C device at 400KHz");
-            return false;
-        }
+        // 步骤 2: 100K失败，等待800ms后再尝试一次100K
+        // Step 2: 100K failed, wait 800ms and retry 100K
+        M5IOE1_LOG_W(TAG, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
+        M5IOE1_DELAY_MS(800);
 
         M5IOE1_I2C_SEND_WAKE(_i2c_device, M5IOE1_REG_REV);
         M5IOE1_DELAY_MS(10);
 
         if (!_initDevice()) {
-            // 步骤 3: 都失败，初始化失败
-            // Step 3: Both failed, initialization failed
-            M5IOE1_LOG_E(TAG, "Failed at both 100KHz and 400KHz");
+            // 步骤 3: 100K第二次失败，尝试400K
+            // Step 3: 100K failed again, try 400K
+            M5IOE1_LOG_W(TAG, "Failed at 100KHz (retry), trying 400KHz...");
+
+            // 删除当前100K设备句柄
+            // Remove current 100K device handle
             i2c_bus_device_delete(&_i2c_device);
             _i2c_device = nullptr;
-            return false;
+
+            // 以400K重新创建设备句柄
+            // Recreate device handle at 400K
+            _i2c_device = i2c_bus_device_create(_i2c_bus, _addr, M5IOE1_I2C_FREQ_400K);
+            if (_i2c_device == nullptr) {
+                M5IOE1_LOG_E(TAG, "Failed to create I2C device at 400KHz");
+                return false;
+            }
+
+            M5IOE1_I2C_SEND_WAKE(_i2c_device, M5IOE1_REG_REV);
+            M5IOE1_DELAY_MS(10);
+
+            if (!_initDevice()) {
+                // 步骤 4: 都失败，初始化失败
+                // Step 4: All attempts failed, initialization failed
+                M5IOE1_LOG_E(TAG, "Failed at 100KHz (twice) and 400KHz");
+                i2c_bus_device_delete(&_i2c_device);
+                _i2c_device = nullptr;
+                return false;
+            }
         }
     }
 
-    // 步骤 4: 通信成功，设置为已初始化
-    // Step 4: Communication succeeded, set as initialized
+    // 步骤 5: 通信成功，设置为已初始化
+    // Step 5: Communication succeeded, set as initialized
     _initialized = true;
 
-    // 步骤 5: 强制配置I2C（用户请求的频率 + 关闭休眠）
+    // 步骤 6: 强制配置I2C（用户请求的频率 + 关闭休眠）
     // 注意：setI2cConfig 内部会自动切换主机 I2C 总线速度
     // Step 5: Force configure I2C (user requested speed + disable sleep)
     // Note: setI2cConfig will automatically switch host I2C bus speed internally
@@ -2089,8 +2129,8 @@ bool M5IOE1::setLeds(const m5ioe1_rgb_t* colors, uint8_t count, uint8_t arraySiz
         return false;
     }
 
-    // 步骤 3: 写入所有 LED 颜色数据
-    // Step 3: Write all LED color data
+    // 步骤 3: 写入所有 LED 颜色数据并回读验证
+    // Step 3: Write all LED color data and read-back verification
     for (uint8_t i = 0; i < count; i++) {
         // 转换为 RGB565
         // Convert to RGB565
@@ -2104,6 +2144,20 @@ bool M5IOE1::setLeds(const m5ioe1_rgb_t* colors, uint8_t count, uint8_t arraySiz
 
         if (!_writeBytes(regAddr, data, 2)) {
             M5IOE1_LOG_E(TAG, "Failed to write LED_RAM for index %d", i);
+            return false;
+        }
+
+        // 回读验证颜色数据
+        // Read-back verification for color data
+        uint8_t actualData[2];
+        if (!_readBytes(regAddr, actualData, 2)) {
+            M5IOE1_LOG_E(TAG, "Failed to read back LED_RAM for index %d", i);
+            return false;
+        }
+        uint16_t actualRgb565 = ((uint16_t)actualData[0] << 8) | actualData[1];
+        if (actualRgb565 != rgb565) {
+            M5IOE1_LOG_E(TAG, "LED color verification failed for index %d: expected=0x%04X, actual=0x%04X",
+                         i, rgb565, actualRgb565);
             return false;
         }
     }
