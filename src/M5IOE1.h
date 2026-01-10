@@ -439,7 +439,7 @@ public:
      * @brief Initialize the M5IOE1 device (Arduino)
      * @note Without intPin (or intPin=-1): Only POLLING and DISABLED modes are supported
      * @note With intPin >= 0: Supports HARDWARE, POLLING, and DISABLED modes
-     * @note HARDWARE mode: Configures intPin as input without internal pull-up. Waits for falling edge, then reads GPIO_IS registers (0x11-0x12)
+     * @note HARDWARE mode: Configures intPin as input with internal pull-up. Uses FALLING edge, then reads GPIO_IS registers (0x11-0x12)
      * @note POLLING mode: Periodically reads GPIO_IS registers (0x11-0x12). Non-zero indicates one or more pins triggered
      * @note DISABLED mode: No interrupt handling
      * @param wire Pointer to TwoWire instance
@@ -693,6 +693,38 @@ public:
     // NeoPixel LED 功能
     // NeoPixel LED Functions
     // ========================
+    /**
+     * @brief Configure and set all NeoPixel LEDs at once / 一次性配置并设置所有 NeoPixel LED
+     * @param colors Array of RGB colors / RGB 颜色数组
+     * @param arraySize Size of the colors array (for bounds checking) / 颜色数组的大小（用于边界检查）
+     * @param count Number of LEDs to set (1-32) / 要设置的 LED 数量（1-32）
+     * @param autoRefresh If true, automatically refresh LEDs after setting (default: true)
+     *                    如果为 true，设置后自动刷新 LED（默认：true）
+     * @return true if successful, false if parameters invalid or I2C error
+     * @note This function will:
+     *       1. Validate parameters (count <= arraySize, count <= 32)
+     *       2. Set LED count register
+     *       3. Write all RGB data to LED RAM
+     *       4. Optionally trigger refresh
+     *       此函数将：
+     *       1. 验证参数（count <= arraySize，count <= 32）
+     *       2. 设置 LED 数量寄存器
+     *       3. 将所有 RGB 数据写入 LED RAM
+     *       4. 可选触发刷新
+     * @example
+     *   m5ioe1_rgb_t leds[8] = {
+     *       {255, 0, 0},    // Red
+     *       {0, 255, 0},    // Green
+     *       {0, 0, 255},    // Blue
+     *       {255, 255, 0},  // Yellow
+     *       {255, 0, 255},  // Magenta
+     *       {0, 255, 255},  // Cyan
+     *       {255, 255, 255},// White
+     *       {128, 128, 128} // Gray
+     *   };
+     *   ioe1.setLeds(leds, sizeof(leds)/sizeof(leds[0]), 8, true);
+     */
+    bool setLeds(const m5ioe1_rgb_t* colors, uint8_t arraySize, uint8_t count, bool autoRefresh = true);
     bool setLedCount(uint8_t count);
     bool setLedColor(uint8_t index, uint8_t r, uint8_t g, uint8_t b);
     bool setLedColor(uint8_t index, m5ioe1_rgb_t color);
@@ -1115,6 +1147,10 @@ private:
     // Auto wake check
     void _checkAutoWake();
 
+    // I2C 休眠与轮询任务联动
+    // I2C sleep and polling task linkage
+    void _updatePollingForI2cSleep(uint8_t sleepTime);
+
     // I2C 频率验证
     // I2C frequency validation
     bool _isValidI2cFrequency(uint32_t speed);
@@ -1145,6 +1181,9 @@ private:
     bool _setupPollingArduino();
     void _cleanupPollingArduino();
     static void _pollTaskArduino(void* arg);
+    bool _setupHardwareInterruptArduino();
+    void _cleanupHardwareInterruptArduino();
+    static void _intrTaskArduino(void* arg);
 #else
     // ESP-IDF 专用
     // ESP-IDF specific
@@ -1152,7 +1191,8 @@ private:
     static void IRAM_ATTR _isrHandler(void* arg);
     bool _setupHardwareInterrupt();
     bool _setupPolling();
-    void _cleanupInterrupt();
+    void _cleanupPolling();
+    void _cleanupHardwareInterrupt();
 #endif
 };
 

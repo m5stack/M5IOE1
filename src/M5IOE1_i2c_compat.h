@@ -107,9 +107,9 @@ static inline bool M5IOE1_I2C_WRITE_REG16(TwoWire *wire, uint8_t addr, uint8_t r
 // IOE1 uses SDA pin falling edge to trigger wake interrupt
 #ifndef M5IOE1_I2C_SEND_WAKE
 static inline void M5IOE1_I2C_SEND_WAKE(TwoWire *wire, uint8_t addr) {
-    // Send START signal to generate SDA falling edge for IOE1 wake
+    // Send START then STOP to avoid leaving the bus in a busy state
     wire->beginTransmission(addr);
-    wire->endTransmission(false);  // Send START without STOP
+    wire->endTransmission();  // Send START with STOP
 }
 #endif
 
