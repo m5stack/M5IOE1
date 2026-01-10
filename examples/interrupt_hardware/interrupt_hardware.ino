@@ -111,8 +111,8 @@ void setup() {
     Serial.println("  I2C: SDA=" + String(I2C_SDA_PIN) + ", SCL=" + String(I2C_SCL_PIN));
     Serial.println("  INT: GPIO " + String(INT_PIN) + "\n");
 
-    if (!ioe1.begin(&Wire, I2C_ADDR, I2C_SDA_PIN, I2C_SCL_PIN, I2C_FREQ,
-                    INT_PIN, M5IOE1_INT_MODE_HARDWARE)) {
+    if (ioe1.begin(&Wire, I2C_ADDR, I2C_SDA_PIN, I2C_SCL_PIN, I2C_FREQ,
+                   INT_PIN, M5IOE1_INT_MODE_HARDWARE) != M5IOE1_OK) {
         Serial.println("ERROR: Failed to initialize M5IOE1!");
         Serial.println("Please check:");
         Serial.println("  - I2C connections (SDA=" + String(I2C_SDA_PIN) + ", SCL=" + String(I2C_SCL_PIN) + ")");
@@ -129,16 +129,16 @@ void setup() {
     uint16_t uid;
     uint8_t version;
 
-    if (ioe1.getUID(&uid)) {
+    if (ioe1.getUID(&uid) == M5IOE1_OK) {
         Serial.println("Device UID: 0x" + String(uid, HEX));
     }
 
-    if (ioe1.getVersion(&version)) {
+    if (ioe1.getVersion(&version) == M5IOE1_OK) {
         Serial.println("Firmware Version: " + String(version));
     }
 
     uint16_t refVoltage;
-    if (ioe1.getRefVoltage(&refVoltage)) {
+    if (ioe1.getRefVoltage(&refVoltage) == M5IOE1_OK) {
         Serial.println("Reference Voltage: " + String(refVoltage) + " mV");
     }
 
@@ -199,7 +199,8 @@ void loop() {
 
         // 读取并显示中断状态寄存器
         // Read and display interrupt status register
-        uint16_t status = ioe1.getInterruptStatus();
+        uint16_t status = 0;
+        ioe1.getInterruptStatus(&status);
         Serial.println("    INT status: 0b" + String(status, BIN));
 
         // 清除此引脚的中断
@@ -225,7 +226,8 @@ void loop() {
 
         // 读取并显示中断状态寄存器
         // Read and display interrupt status register
-        uint16_t status = ioe1.getInterruptStatus();
+        uint16_t status = 0;
+        ioe1.getInterruptStatus(&status);
         Serial.println("    INT status: 0b" + String(status, BIN));
 
         // 清除此引脚的中断
@@ -262,7 +264,8 @@ void loop() {
                 {
                     // 显示中断状态
                     // Show interrupt status
-                    uint16_t status = ioe1.getInterruptStatus();
+                    uint16_t status = 0;
+                    ioe1.getInterruptStatus(&status);
                     Serial.println("Interrupt Status:");
                     Serial.println("  Register: 0b" + String(status, BIN));
                     Serial.println("  IO1 count: " + String(pin1Counter));

@@ -66,6 +66,10 @@ typedef enum {
                                     // Function not supported
     M5IOE1_ERR_I2C_COMM = -7,       // I2C 通信错误
                                     // I2C communication error
+    M5IOE1_ERR_NOT_INIT = -8,       // 设备未初始化
+                                    // Device not initialized
+    M5IOE1_ERR_INTERNAL = -9,       // 内部错误
+                                    // Internal error
 } m5ioe1_err_t;
 
 
@@ -79,6 +83,7 @@ typedef enum {
 #define M5IOE1_MAX_PWM_CHANNELS 4
 #define M5IOE1_MAX_LED_COUNT    32
 #define M5IOE1_RTC_RAM_SIZE     32
+#define M5IOE1_I2C_RETRY_COUNT  2
 
 // ============================
 // I2C 频率常量
@@ -473,9 +478,9 @@ public:
      * @param speed I2C speed in Hz (default 100000)
      * @param intPin Hardware interrupt pin (-1 = no hardware interrupt, default -1)
      * @param intMode Interrupt mode (default M5IOE1_INT_MODE_POLLING)
-     * @return true if successful
+     * @return M5IOE1_OK if successful, error code otherwise
      */
-    bool begin(TwoWire *wire, uint8_t addr = M5IOE1_DEFAULT_ADDR,
+    m5ioe1_err_t begin(TwoWire *wire, uint8_t addr = M5IOE1_DEFAULT_ADDR,
                uint8_t sda = -1, uint8_t scl = -1, uint32_t speed = 100000,
                int8_t intPin = -1, m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_POLLING);
 #else // ESP-IDF
@@ -490,9 +495,9 @@ public:
      * @param scl SCL pin (default 22)
      * @param speed I2C speed in Hz (only 100000 or 400000 supported)
      * @param intMode Interrupt mode: M5IOE1_INT_MODE_POLLING or M5IOE1_INT_MODE_DISABLED
-     * @return true if successful
+     * @return M5IOE1_OK if successful, error code otherwise
      */
-    bool begin(i2c_port_t port = I2C_NUM_0, uint8_t addr = M5IOE1_DEFAULT_ADDR,
+    m5ioe1_err_t begin(i2c_port_t port = I2C_NUM_0, uint8_t addr = M5IOE1_DEFAULT_ADDR,
                int sda = 21, int scl = 22, uint32_t speed = M5IOE1_I2C_FREQ_100K,
                m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_POLLING);
 
@@ -508,9 +513,9 @@ public:
      * @param speed I2C speed in Hz
      * @param intPin Hardware interrupt GPIO pin
      * @param intMode Interrupt mode: M5IOE1_INT_MODE_HARDWARE, POLLING, or DISABLED
-     * @return true if successful
+     * @return M5IOE1_OK if successful, error code otherwise
      */
-    bool begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint32_t speed,
+    m5ioe1_err_t begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint32_t speed,
                int intPin, m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_HARDWARE);
 
     // =====================================================
@@ -522,9 +527,9 @@ public:
      * @param addr I2C address (default 0x6F)
      * @param speed I2C speed in Hz (for device handle creation)
      * @param intMode Interrupt mode: M5IOE1_INT_MODE_POLLING or M5IOE1_INT_MODE_DISABLED
-     * @return true if successful
+     * @return M5IOE1_OK if successful, error code otherwise
      */
-    bool begin(i2c_master_bus_handle_t bus, uint8_t addr = M5IOE1_DEFAULT_ADDR,
+    m5ioe1_err_t begin(i2c_master_bus_handle_t bus, uint8_t addr = M5IOE1_DEFAULT_ADDR,
                uint32_t speed = M5IOE1_I2C_FREQ_100K,
                m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_POLLING);
 
@@ -538,9 +543,9 @@ public:
      * @param speed I2C speed in Hz
      * @param intPin Hardware interrupt GPIO pin
      * @param intMode Interrupt mode
-     * @return true if successful
+     * @return M5IOE1_OK if successful, error code otherwise
      */
-    bool begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t speed,
+    m5ioe1_err_t begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t speed,
                int intPin, m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_HARDWARE);
 
     // =====================================================
@@ -552,9 +557,9 @@ public:
      * @param addr I2C address (default 0x6F)
      * @param speed I2C speed in Hz (for device handle creation)
      * @param intMode Interrupt mode: M5IOE1_INT_MODE_POLLING or M5IOE1_INT_MODE_DISABLED
-     * @return true if successful
+     * @return M5IOE1_OK if successful, error code otherwise
      */
-    bool begin(i2c_bus_handle_t bus, uint8_t addr = M5IOE1_DEFAULT_ADDR,
+    m5ioe1_err_t begin(i2c_bus_handle_t bus, uint8_t addr = M5IOE1_DEFAULT_ADDR,
                uint32_t speed = M5IOE1_I2C_FREQ_100K,
                m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_POLLING);
 
@@ -568,9 +573,9 @@ public:
      * @param speed I2C speed in Hz
      * @param intPin Hardware interrupt GPIO pin
      * @param intMode Interrupt mode
-     * @return true if successful
+     * @return M5IOE1_OK if successful, error code otherwise
      */
-    bool begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed,
+    m5ioe1_err_t begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed,
                int intPin, m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_HARDWARE);
 #endif
 
@@ -578,17 +583,17 @@ public:
      * @brief Set interrupt handling mode
      * @param intMode Interrupt mode (DISABLED, POLLING, HARDWARE)
      * @param pollingIntervalMs Polling interval in ms (for polling mode, default 5000ms)
-     * @return true if successful
+     * @return M5IOE1_OK if successful, error code otherwise
      */
-    bool setInterruptMode(m5ioe1_int_mode_t intMode, uint32_t pollingIntervalMs = 5000);
+    m5ioe1_err_t setInterruptMode(m5ioe1_int_mode_t intMode, uint32_t pollingIntervalMs = 5000);
 
     /**
      * @brief Set polling interval for POLLING mode
      * @param seconds Polling interval in seconds (range: 0.001 to 3600, supports float)
-     * @return true if successful, false if out of range
+     * @return M5IOE1_OK if successful, M5IOE1_ERR_INVALID_ARG if out of range
      * @note If already in POLLING mode, the task will be restarted with new interval
      */
-    bool setPollingInterval(float seconds);
+    m5ioe1_err_t setPollingInterval(float seconds);
 
     /**
      * @brief Set global log level for M5IOE1 library
@@ -609,9 +614,9 @@ public:
     // 设备信息
     // Device Information
     // ========================
-    bool getUID(uint16_t* uid);
-    bool getVersion(uint8_t* version);
-    bool getRefVoltage(uint16_t* voltage_mv);
+    m5ioe1_err_t getUID(uint16_t* uid);
+    m5ioe1_err_t getVersion(uint8_t* version);
+    m5ioe1_err_t getRefVoltage(uint16_t* voltage_mv);
 
     // ========================
     // GPIO 功能（Arduino 风格）
@@ -622,12 +627,12 @@ public:
     int digitalRead(uint8_t pin);
 
     // ========================
-    // GPIO 功能（Arduino 风格 - 带返回值）
-    // GPIO Functions (Arduino-style - WithRes)
+    // GPIO 功能（Arduino 风格 - 带错误码）
+    // GPIO Functions (Arduino-style - with error code)
     // ========================
-    void pinModeWithRes(uint8_t pin, uint8_t mode, bool* res);
-    void digitalWriteWithRes(uint8_t pin, uint8_t value, bool* res);
-    int digitalReadWithRes(uint8_t pin, bool* res);
+    void pinModeWithRes(uint8_t pin, uint8_t mode, m5ioe1_err_t* err);
+    void digitalWriteWithRes(uint8_t pin, uint8_t value, m5ioe1_err_t* err);
+    int digitalReadWithRes(uint8_t pin, m5ioe1_err_t* err);
 
     // ========================
     // 中断功能
@@ -638,16 +643,16 @@ public:
     void detachInterrupt(uint8_t pin);
     void enableInterrupt(uint8_t pin);
     void disableInterrupt(uint8_t pin);
-    uint16_t getInterruptStatus();
-    bool clearInterrupt(uint8_t pin);
+    m5ioe1_err_t getInterruptStatus(uint16_t* status);
+    m5ioe1_err_t clearInterrupt(uint8_t pin);
 
     // ========================
     // 高级 GPIO 功能
     // Advanced GPIO Functions
     // ========================
-    bool setPullMode(uint8_t pin, uint8_t pullMode);
-    bool setDriveMode(uint8_t pin, uint8_t driveMode);
-    bool getInputState(uint8_t pin, uint8_t* state);
+    m5ioe1_err_t setPullMode(uint8_t pin, uint8_t pullMode);
+    m5ioe1_err_t setDriveMode(uint8_t pin, uint8_t driveMode);
+    m5ioe1_err_t getInputState(uint8_t pin, uint8_t* state);
 
     // ========================
     // ADC 功能
@@ -657,18 +662,18 @@ public:
      * @brief Read ADC value
      * @param channel ADC channel (1-4)
      * @param result Pointer to store 12-bit result
-     * @return true if successful
+     * @return M5IOE1_OK if successful, error code otherwise
      */
-    bool analogRead(uint8_t channel, uint16_t* result);
-    bool isAdcBusy();
-    bool disableAdc();
+    m5ioe1_err_t analogRead(uint8_t channel, uint16_t* result);
+    m5ioe1_err_t isAdcBusy(bool* busy);
+    m5ioe1_err_t disableAdc();
 
     // ========================
     // 温度传感器
     // Temperature Sensor
     // ========================
-    bool readTemperature(uint16_t* temperature);
-    bool isTemperatureBusy();
+    m5ioe1_err_t readTemperature(uint16_t* temperature);
+    m5ioe1_err_t isTemperatureBusy(bool* busy);
 
     // ========================
     // PWM 功能
@@ -677,10 +682,10 @@ public:
     /**
      * @brief Set PWM frequency (shared by all channels)
      * @param frequency Frequency in Hz
-     * @return true if successful
+     * @return M5IOE1_OK if successful, error code otherwise
      */
-    bool setPwmFrequency(uint16_t frequency);
-    bool getPwmFrequency(uint16_t* frequency);
+    m5ioe1_err_t setPwmFrequency(uint16_t frequency);
+    m5ioe1_err_t getPwmFrequency(uint16_t* frequency);
 
     /**
      * @brief Set PWM duty cycle (percentage)
@@ -688,10 +693,10 @@ public:
      * @param duty Duty cycle percentage (0-100)
      * @param polarity PWM polarity (false=normal, true=inverted)
      * @param enable Enable PWM output
-     * @return true if successful
+     * @return M5IOE1_OK if successful, error code otherwise
      */
-    bool setPwmDuty(uint8_t channel, uint8_t duty, bool polarity = false, bool enable = true);
-    bool getPwmDuty(uint8_t channel, uint8_t* duty, bool* polarity, bool* enable);
+    m5ioe1_err_t setPwmDuty(uint8_t channel, uint8_t duty, bool polarity = false, bool enable = true);
+    m5ioe1_err_t getPwmDuty(uint8_t channel, uint8_t* duty, bool* polarity, bool* enable);
 
     /**
      * @brief Set PWM duty cycle (12-bit value)
@@ -699,10 +704,10 @@ public:
      * @param duty12 12-bit duty value (0-4095)
      * @param polarity PWM polarity
      * @param enable Enable PWM output
-     * @return true if successful
+     * @return M5IOE1_OK if successful, error code otherwise
      */
-    bool setPwmDuty12bit(uint8_t channel, uint16_t duty12, bool polarity = false, bool enable = true);
-    bool getPwmDuty12bit(uint8_t channel, uint16_t* duty12, bool* polarity, bool* enable);
+    m5ioe1_err_t setPwmDuty12bit(uint8_t channel, uint16_t duty12, bool polarity = false, bool enable = true);
+    m5ioe1_err_t getPwmDuty12bit(uint8_t channel, uint16_t* duty12, bool* polarity, bool* enable);
 
     /**
      * @brief Arduino-compatible analogWrite function (PWM output)
@@ -713,13 +718,13 @@ public:
      * @param value PWM duty cycle (0-255, 8-bit Arduino standard)
      *              PWM 占空比（0-255，8-bit Arduino 标准）
      *              0 = 0% duty, 127 = 50% duty, 255 = 100% duty
-     * @return true if successful
+     * @return M5IOE1_OK if successful, error code otherwise
      * @note This function scales 8-bit value to 12-bit internally
      *       此函数内部将 8-bit 值缩放到 12-bit
      * @note Value 0 turns off PWM output
      *       值为 0 时关闭 PWM 输出
      */
-    bool analogWrite(uint8_t channel, uint8_t value);
+    m5ioe1_err_t analogWrite(uint8_t channel, uint8_t value);
 
     // ========================
     // NeoPixel LED 功能
@@ -732,7 +737,7 @@ public:
      * @param count Number of LEDs to set (1-32) / 要设置的 LED 数量（1-32）
      * @param autoRefresh If true, automatically refresh LEDs after setting (default: true)
      *                    如果为 true，设置后自动刷新 LED（默认：true）
-     * @return true if successful, false if parameters invalid or I2C error
+     * @return M5IOE1_OK if successful, error code otherwise
      * @note This function will:
      *       1. Validate parameters (count <= arraySize, count <= 32)
      *       2. Set LED count register
@@ -756,12 +761,12 @@ public:
      *   };
      *   ioe1.setLeds(leds, sizeof(leds)/sizeof(leds[0]), 8, true);
      */
-    bool setLeds(const m5ioe1_rgb_t* colors, uint8_t arraySize, uint8_t count, bool autoRefresh = true);
-    bool setLedCount(uint8_t count);
-    bool setLedColor(uint8_t index, uint8_t r, uint8_t g, uint8_t b);
-    bool setLedColor(uint8_t index, m5ioe1_rgb_t color);
-    bool refreshLeds();
-    bool disableLeds();
+    m5ioe1_err_t setLeds(const m5ioe1_rgb_t* colors, uint8_t arraySize, uint8_t count, bool autoRefresh = true);
+    m5ioe1_err_t setLedCount(uint8_t count);
+    m5ioe1_err_t setLedColor(uint8_t index, uint8_t r, uint8_t g, uint8_t b);
+    m5ioe1_err_t setLedColor(uint8_t index, m5ioe1_rgb_t color);
+    m5ioe1_err_t refreshLeds();
+    m5ioe1_err_t disableLeds();
 
     // ========================
     // AW8737A 脉冲功能
@@ -772,28 +777,28 @@ public:
      * @param pin GPIO pin number (0-13)
      * @param pulseNum Number of pulses (0-3)
      * @param refresh Refresh control (WAIT or NOW)
-     * @return true if successful
+     * @return M5IOE1_OK if successful, error code otherwise
      * @note This will automatically configure the pin as output
      * @note If using open-drain output, external pull-up is required
      * @note When refresh=NOW, there will be a 20ms delay after execution
      */
-    bool setAw8737aPulse(uint8_t pin, m5ioe1_aw8737a_pulse_num_t pulseNum, 
+    m5ioe1_err_t setAw8737aPulse(uint8_t pin, m5ioe1_aw8737a_pulse_num_t pulseNum,
                          m5ioe1_aw8737a_refresh_t refresh = M5IOE1_AW8737A_REFRESH_NOW);
-    
+
     /**
      * @brief Trigger AW8737A pulse refresh
-     * @return true if successful
+     * @return M5IOE1_OK if successful, error code otherwise
      * @note Call setAw8737aPulse with refresh=WAIT first, then call this to trigger
      * @note There will be a 20ms delay after execution
      */
-    bool refreshAw8737aPulse();
+    m5ioe1_err_t refreshAw8737aPulse();
 
     // ========================
     // RTC RAM 功能
     // RTC RAM Functions
     // ========================
-    bool writeRtcRAM(uint8_t offset, const uint8_t* data, uint8_t length);
-    bool readRtcRAM(uint8_t offset, uint8_t* data, uint8_t length);
+    m5ioe1_err_t writeRtcRAM(uint8_t offset, const uint8_t* data, uint8_t length);
+    m5ioe1_err_t readRtcRAM(uint8_t offset, uint8_t* data, uint8_t length);
 
     // ========================
     // 系统配置
@@ -810,9 +815,9 @@ public:
      * @param wakeEdge 唤醒边沿（M5IOE1_WAKE_EDGE_FALLING 或 M5IOE1_WAKE_EDGE_RISING）
      * @param pullConfig Pull-up config (M5IOE1_PULL_ENABLED or M5IOE1_PULL_DISABLED)
      * @param pullConfig 上拉配置（M5IOE1_PULL_ENABLED 或 M5IOE1_PULL_DISABLED）
-     * @return true if successful
+     * @return M5IOE1_OK if successful, error code otherwise
      */
-    bool setI2cConfig(uint8_t sleepTime,
+    m5ioe1_err_t setI2cConfig(uint8_t sleepTime,
                       m5ioe1_i2c_speed_t speed = M5IOE1_I2C_SPEED_100K,
                       m5ioe1_wake_edge_t wakeEdge = M5IOE1_WAKE_EDGE_FALLING,
                       m5ioe1_pull_config_t pullConfig = M5IOE1_PULL_ENABLED);
@@ -821,79 +826,79 @@ public:
      * @brief Switch I2C communication speed / 切换 I2C 通讯速度
      * @param speed Target speed (M5IOE1_I2C_SPEED_100K or M5IOE1_I2C_SPEED_400K)
      * @param speed 目标速度 (M5IOE1_I2C_SPEED_100K 或 M5IOE1_I2C_SPEED_400K)
-     * @return true if successful, false otherwise
+     * @return M5IOE1_OK if successful, error code otherwise
      * @note This function will configure both the device and host I2C bus
      * @note 此函数会同时配置设备和主机 I2C 总线
      */
-    bool switchI2cSpeed(m5ioe1_i2c_speed_t speed);
+    m5ioe1_err_t switchI2cSpeed(m5ioe1_i2c_speed_t speed);
 
     /**
      * @brief Get current I2C speed setting / 获取当前 I2C 速度设置
      * @param speed Pointer to store the speed value / 存储速度值的指针
-     * @return true if successful, false if read failed
+     * @return M5IOE1_OK if successful, error code otherwise
      * @note Reads from device register and updates internal cache
      * @note 从设备寄存器读取并更新内部缓存
      */
-    bool getI2cSpeed(m5ioe1_i2c_speed_t* speed);
+    m5ioe1_err_t getI2cSpeed(m5ioe1_i2c_speed_t* speed);
 
     /**
      * @brief Set I2C sleep timeout / 设置 I2C 休眠超时
      * @param sleepTime Sleep timeout value (0=disabled, 1-15=timeout)
      * @param sleepTime 休眠超时值（0=禁用，1-15=超时）
-     * @return true if successful
+     * @return M5IOE1_OK if successful, error code otherwise
      * @note Sleep time formula: T = sleepTime * base_time
      * @note 休眠时间公式：T = sleepTime * 基础时间
      */
-    bool setI2cSleepTime(uint8_t sleepTime);
+    m5ioe1_err_t setI2cSleepTime(uint8_t sleepTime);
 
     /**
      * @brief Get current I2C sleep timeout / 获取当前 I2C 休眠超时
      * @param sleepTime Pointer to store the sleep timeout value / 存储休眠超时值的指针
-     * @return true if successful, false if read failed
+     * @return M5IOE1_OK if successful, error code otherwise
      * @note Reads from device register and updates internal cache
      * @note 从设备寄存器读取并更新内部缓存
      */
-    bool getI2cSleepTime(uint8_t* sleepTime);
+    m5ioe1_err_t getI2cSleepTime(uint8_t* sleepTime);
 
     /**
      * @brief Set I2C wake edge / 设置 I2C 唤醒边沿
      * @param edge Wake edge (M5IOE1_WAKE_EDGE_FALLING or M5IOE1_WAKE_EDGE_RISING)
      * @param edge 唤醒边沿（M5IOE1_WAKE_EDGE_FALLING 或 M5IOE1_WAKE_EDGE_RISING）
-     * @return true if successful
+     * @return M5IOE1_OK if successful, error code otherwise
      */
-    bool setI2cWakeEdge(m5ioe1_wake_edge_t edge);
+    m5ioe1_err_t setI2cWakeEdge(m5ioe1_wake_edge_t edge);
 
     /**
      * @brief Get current I2C wake edge / 获取当前 I2C 唤醒边沿
      * @param edge Pointer to store the wake edge setting / 存储唤醒边沿设置的指针
-     * @return true if successful, false if read failed
+     * @return M5IOE1_OK if successful, error code otherwise
      * @note Reads from device register and updates internal cache
      * @note 从设备寄存器读取并更新内部缓存
      */
-    bool getI2cWakeEdge(m5ioe1_wake_edge_t* edge);
+    m5ioe1_err_t getI2cWakeEdge(m5ioe1_wake_edge_t* edge);
 
     /**
      * @brief Set I2C internal pull-up configuration / 设置 I2C 内部上拉配置
      * @param config Pull-up config (M5IOE1_PULL_ENABLED or M5IOE1_PULL_DISABLED)
      * @param config 上拉配置（M5IOE1_PULL_ENABLED 或 M5IOE1_PULL_DISABLED）
-     * @return true if successful
+     * @return M5IOE1_OK if successful, error code otherwise
      */
-    bool setI2cPullConfig(m5ioe1_pull_config_t config);
+    m5ioe1_err_t setI2cPullConfig(m5ioe1_pull_config_t config);
 
     /**
      * @brief Get current I2C internal pull-up configuration / 获取当前 I2C 内部上拉配置
      * @param config Pointer to store the pull-up configuration / 存储上拉配置的指针
-     * @return true if successful, false if read failed
+     * @return M5IOE1_OK if successful, error code otherwise
      * @note Reads from device register and updates internal cache
      * @note 从设备寄存器读取并更新内部缓存
      */
-    bool getI2cPullConfig(m5ioe1_pull_config_t* config);
+    m5ioe1_err_t getI2cPullConfig(m5ioe1_pull_config_t* config);
 
     /**
      * @brief Factory reset the device / 恢复出厂设置
-     * @return true if successful
+     * @return M5IOE1_OK if successful, error code otherwise
      */
-    bool factoryReset();
+    m5ioe1_err_t factoryReset();
 
     // ========================
     // 自动唤醒功能
@@ -924,9 +929,9 @@ public:
 
     /**
      * @brief Manually send wake signal to IOE1 / 手动发送唤醒信号到 IOE1
-     * @return true if successful
+     * @return M5IOE1_OK if successful, error code otherwise
      */
-    bool sendWakeSignal();
+    m5ioe1_err_t sendWakeSignal();
 
     // ========================
     // 状态快照功能
@@ -934,18 +939,18 @@ public:
     // ========================
     void setAutoSnapshot(bool enable);
     bool isAutoSnapshotEnabled() const;
-    bool updateSnapshot();
+    m5ioe1_err_t updateSnapshot();
 
     // ========================
     // 调试功能
     // Debug Functions
     // ========================
-    bool getModeReg(uint16_t* reg);
-    bool getOutputReg(uint16_t* reg);
-    bool getInputReg(uint16_t* reg);
-    bool getPullUpReg(uint16_t* reg);
-    bool getPullDownReg(uint16_t* reg);
-    bool getDriveReg(uint16_t* reg);
+    m5ioe1_err_t getModeReg(uint16_t* reg);
+    m5ioe1_err_t getOutputReg(uint16_t* reg);
+    m5ioe1_err_t getInputReg(uint16_t* reg);
+    m5ioe1_err_t getPullUpReg(uint16_t* reg);
+    m5ioe1_err_t getPullDownReg(uint16_t* reg);
+    m5ioe1_err_t getDriveReg(uint16_t* reg);
 
     // ========================
     // 配置验证
@@ -977,9 +982,9 @@ public:
     /**
      * @brief Get cached PWM frequency
      * @param frequency Output: PWM frequency in Hz
-     * @return true if cache is valid
+     * @return M5IOE1_OK if cache is valid, M5IOE1_FAIL if cache invalid
      */
-    bool getCachedPwmFrequency(uint16_t* frequency);
+    m5ioe1_err_t getCachedPwmFrequency(uint16_t* frequency);
 
     /**
      * @brief Get cached PWM channel state
@@ -987,18 +992,18 @@ public:
      * @param duty12 Output: 12-bit duty value
      * @param polarity Output: polarity setting
      * @param enabled Output: enable state
-     * @return true if cache is valid
+     * @return M5IOE1_OK if cache is valid, M5IOE1_FAIL if cache invalid
      */
-    bool getCachedPwmState(uint8_t channel, uint16_t* duty12, bool* polarity, bool* enabled);
+    m5ioe1_err_t getCachedPwmState(uint8_t channel, uint16_t* duty12, bool* polarity, bool* enabled);
 
     /**
      * @brief Get cached ADC state
      * @param activeChannel Output: current ADC channel (0=disabled, 1-4=channel)
      * @param busy Output: conversion status
      * @param lastValue Output: last conversion result
-     * @return true if cache is valid
+     * @return M5IOE1_OK if cache is valid, M5IOE1_FAIL if cache invalid
      */
-    bool getCachedAdcState(uint8_t* activeChannel, bool* busy, uint16_t* lastValue);
+    m5ioe1_err_t getCachedAdcState(uint8_t* activeChannel, bool* busy, uint16_t* lastValue);
 
     /**
      * @brief Get cached GPIO pin state
@@ -1006,9 +1011,9 @@ public:
      * @param isOutput Output: true if pin is output
      * @param level Output: current level (output or input)
      * @param pull Output: pull mode (0=none, 1=up, 2=down)
-     * @return true if cache is valid
+     * @return M5IOE1_OK if cache is valid, M5IOE1_FAIL if cache invalid
      */
-    bool getCachedPinState(uint8_t pin, bool* isOutput, uint8_t* level, uint8_t* pull);
+    m5ioe1_err_t getCachedPinState(uint8_t pin, bool* isOutput, uint8_t* level, uint8_t* pull);
 
     /**
      * @brief Enable or disable default interrupt logging when no callback is registered
@@ -1151,6 +1156,10 @@ private:
     // 内部辅助函数
     // Internal Helper Functions
     // ========================
+    m5ioe1_err_t _pinModeWithErr(uint8_t pin, uint8_t mode);
+    m5ioe1_err_t _digitalWriteWithErr(uint8_t pin, uint8_t value);
+    m5ioe1_err_t _digitalReadWithErr(uint8_t pin, int* value);
+
     bool _writeReg(uint8_t reg, uint8_t value);
     bool _writeReg16(uint8_t reg, uint16_t value);
     bool _readReg(uint8_t reg, uint8_t* value);

@@ -76,7 +76,7 @@ void setup() {
     // When intPin is not provided (or set to -1), only POLLING and DISABLED modes are supported
     Serial.println("Initializing M5IOE1 in polling mode...");
 
-    if (!ioe1.begin(&Wire, I2C_ADDR, I2C_SDA_PIN, I2C_SCL_PIN, I2C_FREQ, M5IOE1_INT_MODE_POLLING)) {
+    if (ioe1.begin(&Wire, I2C_ADDR, I2C_SDA_PIN, I2C_SCL_PIN, I2C_FREQ, M5IOE1_INT_MODE_POLLING) != M5IOE1_OK) {
         Serial.println("ERROR: Failed to initialize M5IOE1!");
         Serial.println("Please check:");
         Serial.println("  - I2C connections (SDA=" + String(I2C_SDA_PIN) + ", SCL=" + String(I2C_SCL_PIN) + ")");
@@ -92,16 +92,16 @@ void setup() {
     uint16_t uid;
     uint8_t version;
 
-    if (ioe1.getUID(&uid)) {
+    if (ioe1.getUID(&uid) == M5IOE1_OK) {
         Serial.println("Device UID: 0x" + String(uid, HEX));
     }
 
-    if (ioe1.getVersion(&version)) {
+    if (ioe1.getVersion(&version) == M5IOE1_OK) {
         Serial.println("Firmware Version: " + String(version));
     }
 
     uint16_t refVoltage;
-    if (ioe1.getRefVoltage(&refVoltage)) {
+    if (ioe1.getRefVoltage(&refVoltage) == M5IOE1_OK) {
         Serial.println("Reference Voltage: " + String(refVoltage) + " mV");
     }
 
@@ -127,7 +127,7 @@ void setup() {
     // 默认为 5000ms。更短的间隔 = 更快的响应，但 CPU 使用率更高。
     // Default is 5000ms. Shorter intervals = faster response but more CPU usage.
     Serial.println("Setting polling interval to 1.0 second...");
-    if (ioe1.setPollingInterval(1.0f)) {
+    if (ioe1.setPollingInterval(1.0f) == M5IOE1_OK) {
         Serial.println("Polling interval configured successfully!\n");
     } else {
         Serial.println("WARNING: Failed to set polling interval\n");
@@ -162,7 +162,8 @@ void loop() {
 
         // 读取并显示中断状态寄存器
         // Read and display interrupt status register
-        uint16_t status = ioe1.getInterruptStatus();
+        uint16_t status = 0;
+        ioe1.getInterruptStatus(&status);
         Serial.println("    Interrupt status register: 0b" + String(status, BIN) + "\n");
 
         // 清除此引脚的中断

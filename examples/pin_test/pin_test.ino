@@ -157,7 +157,7 @@ void testAnalogRead() {
     while (millis() - startTime < 8000) {
         uint16_t adcValue;
 
-        if (ioe1.analogRead(1, &adcValue)) {
+        if (ioe1.analogRead(1, &adcValue) == M5IOE1_OK) {
             if (millis() - lastPrint > 500) {
                 float voltage = (adcValue * 3300.0f) / 4095.0f;
 
@@ -189,13 +189,16 @@ void testAnalogWrite() {
 
     Serial.println("PWM breathing on IO9 (Channel 0)...\n");
 
-    ioe1.setPwmFrequency(5000);
-    Serial.println("PWM frequency: 5000 Hz\n");
+    if (ioe1.setPwmFrequency(5000) == M5IOE1_OK) {
+        Serial.println("PWM frequency: 5000 Hz\n");
+    } else {
+        Serial.println("WARNING: Failed to set PWM frequency\n");
+    }
 
     unsigned long startTime = millis();
 
     while (millis() - startTime < 8000) {
-        if (ioe1.analogWrite(0, pwmValue)) {
+        if (ioe1.analogWrite(0, pwmValue) == M5IOE1_OK) {
             if (pwmValue % 25 == 0) {
                 float duty = (pwmValue * 100.0f) / 255.0f;
                 Serial.print("PWM value: ");
@@ -219,7 +222,9 @@ void testAnalogWrite() {
         delay(20);
     }
 
-    ioe1.analogWrite(0, 0);
+    if (ioe1.analogWrite(0, 0) != M5IOE1_OK) {
+        Serial.println("WARNING: Failed to stop PWM output\n");
+    }
     Serial.println("\nPWM turned off.\n");
 
     Serial.println("analogWrite() test completed!\n");
@@ -273,7 +278,7 @@ void setup() {
 
     // 初始化 M5IOE1 / Initialize M5IOE1
     Serial.println("Initializing M5IOE1...");
-    if (!ioe1.begin(&Wire, I2C_ADDR, I2C_SDA_PIN, I2C_SCL_PIN, I2C_FREQ)) {
+    if (ioe1.begin(&Wire, I2C_ADDR, I2C_SDA_PIN, I2C_SCL_PIN, I2C_FREQ) != M5IOE1_OK) {
         Serial.println("ERROR: Failed to initialize M5IOE1!");
         Serial.println("Please check I2C connections and power supply.");
         while (1) { delay(1000); }
@@ -283,10 +288,10 @@ void setup() {
     // 读取设备信息 / Read device info
     uint16_t uid;
     uint8_t version;
-    if (ioe1.getUID(&uid)) {
+    if (ioe1.getUID(&uid) == M5IOE1_OK) {
         Serial.println("Device UID: 0x" + String(uid, HEX));
     }
-    if (ioe1.getVersion(&version)) {
+    if (ioe1.getVersion(&version) == M5IOE1_OK) {
         Serial.println("Firmware Version: " + String(version));
     }
     Serial.println();
