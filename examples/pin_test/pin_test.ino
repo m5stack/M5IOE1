@@ -26,8 +26,8 @@
 // ============================
 #define I2C_SDA_PIN 38
 #define I2C_SCL_PIN 39
-#define I2C_FREQ 400000
-#define I2C_ADDR M5IOE1_DEFAULT_ADDR
+#define I2C_FREQ    400000
+#define I2C_ADDR    M5IOE1_DEFAULT_ADDR
 
 // ============================
 // 引脚定义 / Pin Definitions
@@ -35,11 +35,11 @@
 // IO1 (Pin 0) - 数字输入，按钮 / Digital input, button
 #define PIN_BUTTON M5IOE1_PIN_1  // IO1
 // IO3 (Pin 2) - 数字输出，LED / Digital output, LED
-#define PIN_LED M5IOE1_PIN_3     // IO3
+#define PIN_LED M5IOE1_PIN_3  // IO3
 // IO2 (Pin 1) - ADC 输入，电位器 / ADC input, potentiometer (ADC Channel 1)
-#define PIN_ADC M5IOE1_PIN_2     // IO2 -> ADC_CH1
+#define PIN_ADC M5IOE1_PIN_2  // IO2 -> ADC_CH1
 // IO9 (Pin 8) - PWM 输出，LED / PWM output, LED (PWM Channel 0)
-#define PIN_PWM M5IOE1_PIN_9     // IO9 -> PWM_CH1
+#define PIN_PWM M5IOE1_PIN_9  // IO9 -> PWM_CH1
 
 // ============================
 // 全局变量 / Global Variables
@@ -47,26 +47,29 @@
 M5IOE1 ioe1;
 
 volatile int buttonPressCount = 0;
-uint8_t pwmValue = 0;
-int pwmDirection = 1;
+uint8_t pwmValue              = 0;
+int pwmDirection              = 1;
 
 // ============================
 // 中断回调函数 / Interrupt Callback
 // ============================
-void IRAM_ATTR buttonPressed() {
+void IRAM_ATTR buttonPressed()
+{
     buttonPressCount++;
 }
 
 // ============================
 // 辅助函数 / Helper Functions
 // ============================
-void printSeparator(const char* title) {
+void printSeparator(const char* title)
+{
     Serial.println("\n========================================");
     Serial.println(title);
     Serial.println("========================================\n");
 }
 
-void testDigitalWrite() {
+void testDigitalWrite()
+{
     printSeparator("测试 digitalWrite() / Testing digitalWrite()");
 
     Serial.println("Blinking LED on IO3 (3 cycles)...\n");
@@ -84,14 +87,15 @@ void testDigitalWrite() {
     Serial.println("digitalWrite() test completed!\n");
 }
 
-void testDigitalRead() {
+void testDigitalRead()
+{
     printSeparator("测试 digitalRead() / Testing digitalRead()");
 
     Serial.println("Reading button on IO1 (active LOW) for 8 seconds...");
     Serial.println("Press the button to test!\n");
 
     unsigned long startTime = millis();
-    int lastState = -1;
+    int lastState           = -1;
 
     while (millis() - startTime < 8000) {
         int currentState = ioe1.digitalRead(PIN_BUTTON);
@@ -107,7 +111,8 @@ void testDigitalRead() {
     Serial.println("\ndigitalRead() test completed!\n");
 }
 
-void testPinMode() {
+void testPinMode()
+{
     printSeparator("测试 pinMode() / Testing pinMode()");
 
     Serial.println("Testing pin modes on IO3:\n");
@@ -145,7 +150,8 @@ void testPinMode() {
     Serial.println("pinMode() test completed!\n");
 }
 
-void testAnalogRead() {
+void testAnalogRead()
+{
     printSeparator("测试 analogRead() / Testing analogRead()");
 
     Serial.println("Reading ADC Channel 1 (IO2) for 8 seconds...");
@@ -184,7 +190,8 @@ void testAnalogRead() {
     Serial.println("analogRead() test completed!\n");
 }
 
-void testAnalogWrite() {
+void testAnalogWrite()
+{
     printSeparator("测试 analogWrite() / Testing analogWrite()");
 
     Serial.println("PWM breathing on IO9 (Channel 0)...\n");
@@ -212,10 +219,10 @@ void testAnalogWrite() {
         // 呼吸效果 / Breathing effect
         pwmValue += pwmDirection * 5;
         if (pwmValue >= 255) {
-            pwmValue = 255;
+            pwmValue     = 255;
             pwmDirection = -1;
         } else if (pwmValue <= 0) {
-            pwmValue = 0;
+            pwmValue     = 0;
             pwmDirection = 1;
         }
 
@@ -230,7 +237,8 @@ void testAnalogWrite() {
     Serial.println("analogWrite() test completed!\n");
 }
 
-void testAttachInterrupt() {
+void testAttachInterrupt()
+{
     printSeparator("测试 attachInterrupt() / Testing attachInterrupt()");
 
     Serial.println("Configuring button with interrupt (FALLING edge)...\n");
@@ -242,7 +250,7 @@ void testAttachInterrupt() {
     Serial.println("Interrupt attached! Press button for 8 seconds...\n");
 
     unsigned long startTime = millis();
-    int lastCount = 0;
+    int lastCount           = 0;
 
     while (millis() - startTime < 8000) {
         if (buttonPressCount != lastCount) {
@@ -265,7 +273,8 @@ void testAttachInterrupt() {
 // ============================
 // Arduino setup() / loop()
 // ============================
-void setup() {
+void setup()
+{
     Serial.begin(115200);
     delay(1000);
 
@@ -281,7 +290,9 @@ void setup() {
     if (ioe1.begin(&Wire, I2C_ADDR, I2C_SDA_PIN, I2C_SCL_PIN, I2C_FREQ) != M5IOE1_OK) {
         Serial.println("ERROR: Failed to initialize M5IOE1!");
         Serial.println("Please check I2C connections and power supply.");
-        while (1) { delay(1000); }
+        while (1) {
+            delay(1000);
+        }
     }
     Serial.println("M5IOE1 initialized successfully!\n");
 
@@ -306,7 +317,8 @@ void setup() {
     delay(2000);
 }
 
-void loop() {
+void loop()
+{
     static int testStep = 0;
 
     switch (testStep) {

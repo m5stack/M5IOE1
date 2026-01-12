@@ -38,7 +38,7 @@ M5IOE1 ioe1;
 // I2C configuration
 #define I2C_SDA_PIN 38
 #define I2C_SCL_PIN 39
-#define I2C_FREQ 400000
+#define I2C_FREQ    400000
 
 // M5IOE1 I2C 地址 (默认 0x6F)
 // M5IOE1 I2C address (default 0x6F)
@@ -54,11 +54,13 @@ volatile int interruptCounter = 0;
 
 // 引脚 1 下降沿中断的回调函数
 // Callback function for pin 1 falling edge interrupt
-void IRAM_ATTR pin1FallingCallback() {
+void IRAM_ATTR pin1FallingCallback()
+{
     interruptCounter++;
 }
 
-void setup() {
+void setup()
+{
     Serial.begin(115200);
     delay(1000);
 
@@ -82,7 +84,9 @@ void setup() {
         Serial.println("  - I2C connections (SDA=" + String(I2C_SDA_PIN) + ", SCL=" + String(I2C_SCL_PIN) + ")");
         Serial.println("  - M5IOE1 I2C address (0x" + String(I2C_ADDR, HEX) + ")");
         Serial.println("  - Power supply to M5IOE1");
-        while (1) { delay(1000); }
+        while (1) {
+            delay(1000);
+        }
     }
 
     Serial.println("M5IOE1 initialized successfully!\n");
@@ -144,7 +148,8 @@ void setup() {
     Serial.println("  - Watch for interrupt events in the serial monitor\n");
 }
 
-void loop() {
+void loop()
+{
     // 存储当前计数器值以检测变化
     // Store current counter value to detect changes
     static int lastCounter = 0;

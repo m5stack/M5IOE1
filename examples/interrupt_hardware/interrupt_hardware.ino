@@ -39,7 +39,7 @@ M5IOE1 ioe1;
 // I2C configuration
 #define I2C_SDA_PIN 38
 #define I2C_SCL_PIN 39
-#define I2C_FREQ 400000
+#define I2C_FREQ    400000
 
 // 主机 MCU 上的物理中断引脚 (默认为 GPIO1)
 // Physical interrupt pin on host MCU (GPIO1 as default)
@@ -74,13 +74,15 @@ ButtonData button2Data = {"Button 2", &pin2Counter, IOE1_PIN_2};
 
 // 引脚 1 的简单回调 (无参数)
 // Simple callback for pin 1 (without argument)
-void IRAM_ATTR pin1Callback() {
+void IRAM_ATTR pin1Callback()
+{
     pin1Counter++;
 }
 
 // 引脚 2 的带自定义数据参数的回调
 // Callback with custom data argument for pin 2
-void IRAM_ATTR pin2CallbackWithArg(void* arg) {
+void IRAM_ATTR pin2CallbackWithArg(void* arg)
+{
     ButtonData* data = static_cast<ButtonData*>(arg);
     if (data) {
         (*(data->counter))++;
@@ -91,7 +93,8 @@ void IRAM_ATTR pin2CallbackWithArg(void* arg) {
     }
 }
 
-void setup() {
+void setup()
+{
     Serial.begin(115200);
     delay(1000);
 
@@ -111,15 +114,17 @@ void setup() {
     Serial.println("  I2C: SDA=" + String(I2C_SDA_PIN) + ", SCL=" + String(I2C_SCL_PIN));
     Serial.println("  INT: GPIO " + String(INT_PIN) + "\n");
 
-    if (ioe1.begin(&Wire, I2C_ADDR, I2C_SDA_PIN, I2C_SCL_PIN, I2C_FREQ,
-                   INT_PIN, M5IOE1_INT_MODE_HARDWARE) != M5IOE1_OK) {
+    if (ioe1.begin(&Wire, I2C_ADDR, I2C_SDA_PIN, I2C_SCL_PIN, I2C_FREQ, INT_PIN, M5IOE1_INT_MODE_HARDWARE) !=
+        M5IOE1_OK) {
         Serial.println("ERROR: Failed to initialize M5IOE1!");
         Serial.println("Please check:");
         Serial.println("  - I2C connections (SDA=" + String(I2C_SDA_PIN) + ", SCL=" + String(I2C_SCL_PIN) + ")");
         Serial.println("  - INT pin connection (M5IOE1 INT -> GPIO " + String(INT_PIN) + ")");
         Serial.println("  - M5IOE1 I2C address (0x" + String(I2C_ADDR, HEX) + ")");
         Serial.println("  - Power supply to M5IOE1");
-        while (1) { delay(1000); }
+        while (1) {
+            delay(1000);
+        }
     }
 
     Serial.println("M5IOE1 initialized successfully!\n");
@@ -179,7 +184,8 @@ void setup() {
     Serial.println("  'c' - Clear interrupt status\n");
 }
 
-void loop() {
+void loop()
+{
     // 存储当前计数器值以检测变化
     // Store current counter values to detect changes
     static int lastPin1Counter = 0;
@@ -260,20 +266,18 @@ void loop() {
                 Serial.println("IO1 interrupts disabled\n");
                 break;
 
-            case 's':
-                {
-                    // 显示中断状态
-                    // Show interrupt status
-                    uint16_t status = 0;
-                    ioe1.getInterruptStatus(&status);
-                    Serial.println("Interrupt Status:");
-                    Serial.println("  Register: 0b" + String(status, BIN));
-                    Serial.println("  IO1 count: " + String(pin1Counter));
-                    Serial.println("  IO2 count: " + String(pin2Counter));
-                    Serial.println("  IO1 state: " + String(ioe1.digitalRead(IOE1_PIN_1) == LOW ? "LOW" : "HIGH"));
-                    Serial.println("  IO2 state: " + String(ioe1.digitalRead(IOE1_PIN_2) == LOW ? "LOW" : "HIGH") + "\n");
-                }
-                break;
+            case 's': {
+                // 显示中断状态
+                // Show interrupt status
+                uint16_t status = 0;
+                ioe1.getInterruptStatus(&status);
+                Serial.println("Interrupt Status:");
+                Serial.println("  Register: 0b" + String(status, BIN));
+                Serial.println("  IO1 count: " + String(pin1Counter));
+                Serial.println("  IO2 count: " + String(pin2Counter));
+                Serial.println("  IO1 state: " + String(ioe1.digitalRead(IOE1_PIN_1) == LOW ? "LOW" : "HIGH"));
+                Serial.println("  IO2 state: " + String(ioe1.digitalRead(IOE1_PIN_2) == LOW ? "LOW" : "HIGH") + "\n");
+            } break;
 
             case 'c':
                 // 清除所有中断标志

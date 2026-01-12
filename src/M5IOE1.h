@@ -29,15 +29,15 @@
 // ============================
 typedef enum {
     M5IOE1_PIN_NC = -1,
-    M5IOE1_PIN_1 = 0,
-    M5IOE1_PIN_2 = 1,
-    M5IOE1_PIN_3 = 2,
-    M5IOE1_PIN_4 = 3,
-    M5IOE1_PIN_5 = 4,
-    M5IOE1_PIN_6 = 5,
-    M5IOE1_PIN_7 = 6,
-    M5IOE1_PIN_8 = 7,
-    M5IOE1_PIN_9 = 8,
+    M5IOE1_PIN_1  = 0,
+    M5IOE1_PIN_2  = 1,
+    M5IOE1_PIN_3  = 2,
+    M5IOE1_PIN_4  = 3,
+    M5IOE1_PIN_5  = 4,
+    M5IOE1_PIN_6  = 5,
+    M5IOE1_PIN_7  = 6,
+    M5IOE1_PIN_8  = 7,
+    M5IOE1_PIN_9  = 8,
     M5IOE1_PIN_10 = 9,
     M5IOE1_PIN_11 = 10,
     M5IOE1_PIN_12 = 11,
@@ -50,28 +50,27 @@ typedef enum {
 // Error Codes
 // ============================
 typedef enum {
-    M5IOE1_OK = 0,                  // 成功
-                                    // Success
-    M5IOE1_FAIL = -1,               // 一般失败
-                                    // General failure
-    M5IOE1_ERR_I2C_CONFIG = -2,     // I2C 配置错误 (如频率不支持)
-                                    // I2C configuration error
-    M5IOE1_ERR_RULE_VIOLATION = -3, // 条件规则错误 (如引脚冲突，互斥功能)
-                                    // Condition rule violation
-    M5IOE1_ERR_INVALID_ARG = -4,    // 无效参数
-                                    // Invalid argument
-    M5IOE1_ERR_TIMEOUT = -5,        // 超时
-                                    // Timeout
-    M5IOE1_ERR_NOT_SUPPORTED = -6,  // 不支持的功能
-                                    // Function not supported
-    M5IOE1_ERR_I2C_COMM = -7,       // I2C 通信错误
-                                    // I2C communication error
-    M5IOE1_ERR_NOT_INIT = -8,       // 设备未初始化
-                                    // Device not initialized
-    M5IOE1_ERR_INTERNAL = -9,       // 内部错误
-                                    // Internal error
+    M5IOE1_OK = 0,                   // 成功
+                                     // Success
+    M5IOE1_FAIL = -1,                // 一般失败
+                                     // General failure
+    M5IOE1_ERR_I2C_CONFIG = -2,      // I2C 配置错误 (如频率不支持)
+                                     // I2C configuration error
+    M5IOE1_ERR_RULE_VIOLATION = -3,  // 条件规则错误 (如引脚冲突，互斥功能)
+                                     // Condition rule violation
+    M5IOE1_ERR_INVALID_ARG = -4,     // 无效参数
+                                     // Invalid argument
+    M5IOE1_ERR_TIMEOUT = -5,         // 超时
+                                     // Timeout
+    M5IOE1_ERR_NOT_SUPPORTED = -6,   // 不支持的功能
+                                     // Function not supported
+    M5IOE1_ERR_I2C_COMM = -7,        // I2C 通信错误
+                                     // I2C communication error
+    M5IOE1_ERR_NOT_INIT = -8,        // 设备未初始化
+                                     // Device not initialized
+    M5IOE1_ERR_INTERNAL = -9,        // 内部错误
+                                     // Internal error
 } m5ioe1_err_t;
-
 
 // ============================
 // 设备常量
@@ -98,118 +97,118 @@ typedef enum {
 // Register Addresses
 // ============================
 // System
-#define M5IOE1_REG_UID_L            0x00    // R     [7:0] UID Low Byte
-#define M5IOE1_REG_UID_H            0x01    // R     [15:8] UID High Byte
-#define M5IOE1_REG_REV              0x02    // R     [7:0] SW7-SW0 Version
+#define M5IOE1_REG_UID_L 0x00  // R     [7:0] UID Low Byte
+#define M5IOE1_REG_UID_H 0x01  // R     [15:8] UID High Byte
+#define M5IOE1_REG_REV   0x02  // R     [7:0] SW7-SW0 Version
 // GPIO
-#define M5IOE1_REG_GPIO_MODE_L      0x03    // R/W   [7:0] Mode P8-P1
-#define M5IOE1_REG_GPIO_MODE_H      0x04    // R/W   [7:6] Res | [5:0] Mode P14-P9
-#define M5IOE1_REG_GPIO_OUT_L       0x05    // R/W   [7:0] Out P8-P1
-#define M5IOE1_REG_GPIO_OUT_H       0x06    // R/W   [7:6] Res | [5:0] Out P14-P9
-#define M5IOE1_REG_GPIO_IN_L        0x07    // R     [7:0] In P8-P1
-#define M5IOE1_REG_GPIO_IN_H        0x08    // R     [7:6] Res | [5:0] In P14-P9
-#define M5IOE1_REG_GPIO_PU_L        0x09    // R/W   [7:0] PU P8-P1
-#define M5IOE1_REG_GPIO_PU_H        0x0A    // R/W   [7:6] Res | [5:0] PU P14-P9
-#define M5IOE1_REG_GPIO_PD_L        0x0B    // R/W   [7:0] PD P8-P1
-#define M5IOE1_REG_GPIO_PD_H        0x0C    // R/W   [7:6] Res | [5:0] PD P14-P9
-#define M5IOE1_REG_GPIO_IE_L        0x0D    // R/W   [7:0] IE P8-P1
-#define M5IOE1_REG_GPIO_IE_H        0x0E    // R/W   [7:6] Res | [5:0] IE P14-P9
-#define M5IOE1_REG_GPIO_IP_L        0x0F    // R/W   [7:0] IP P8-P1
-#define M5IOE1_REG_GPIO_IP_H        0x10    // R/W   [7:6] Res | [5:0] IP P14-P9
-#define M5IOE1_REG_GPIO_IS_L        0x11    // R     [7:0] IS P8-P1
-#define M5IOE1_REG_GPIO_IS_H        0x12    // R     [7:6] Res | [5:0] IS P14-P9
-#define M5IOE1_REG_GPIO_DRV_L       0x13    // R/W   [7:0] Drive P8-P1
-#define M5IOE1_REG_GPIO_DRV_H       0x14    // R/W   [7:6] Res | [5:0] Drive P14-P9
+#define M5IOE1_REG_GPIO_MODE_L 0x03  // R/W   [7:0] Mode P8-P1
+#define M5IOE1_REG_GPIO_MODE_H 0x04  // R/W   [7:6] Res | [5:0] Mode P14-P9
+#define M5IOE1_REG_GPIO_OUT_L  0x05  // R/W   [7:0] Out P8-P1
+#define M5IOE1_REG_GPIO_OUT_H  0x06  // R/W   [7:6] Res | [5:0] Out P14-P9
+#define M5IOE1_REG_GPIO_IN_L   0x07  // R     [7:0] In P8-P1
+#define M5IOE1_REG_GPIO_IN_H   0x08  // R     [7:6] Res | [5:0] In P14-P9
+#define M5IOE1_REG_GPIO_PU_L   0x09  // R/W   [7:0] PU P8-P1
+#define M5IOE1_REG_GPIO_PU_H   0x0A  // R/W   [7:6] Res | [5:0] PU P14-P9
+#define M5IOE1_REG_GPIO_PD_L   0x0B  // R/W   [7:0] PD P8-P1
+#define M5IOE1_REG_GPIO_PD_H   0x0C  // R/W   [7:6] Res | [5:0] PD P14-P9
+#define M5IOE1_REG_GPIO_IE_L   0x0D  // R/W   [7:0] IE P8-P1
+#define M5IOE1_REG_GPIO_IE_H   0x0E  // R/W   [7:6] Res | [5:0] IE P14-P9
+#define M5IOE1_REG_GPIO_IP_L   0x0F  // R/W   [7:0] IP P8-P1
+#define M5IOE1_REG_GPIO_IP_H   0x10  // R/W   [7:6] Res | [5:0] IP P14-P9
+#define M5IOE1_REG_GPIO_IS_L   0x11  // R     [7:0] IS P8-P1
+#define M5IOE1_REG_GPIO_IS_H   0x12  // R     [7:6] Res | [5:0] IS P14-P9
+#define M5IOE1_REG_GPIO_DRV_L  0x13  // R/W   [7:0] Drive P8-P1
+#define M5IOE1_REG_GPIO_DRV_H  0x14  // R/W   [7:6] Res | [5:0] Drive P14-P9
 // ADC
-#define M5IOE1_REG_ADC_CTRL         0x15    // R/W   [7] BUSY | [6] START | [2:0] Channel
-#define M5IOE1_REG_ADC_DATA_L       0x16    // R     [7:0] ADC Data Low
-#define M5IOE1_REG_ADC_DATA_H       0x17    // R     [3:0] ADC Data High
+#define M5IOE1_REG_ADC_CTRL   0x15  // R/W   [7] BUSY | [6] START | [2:0] Channel
+#define M5IOE1_REG_ADC_DATA_L 0x16  // R     [7:0] ADC Data Low
+#define M5IOE1_REG_ADC_DATA_H 0x17  // R     [3:0] ADC Data High
 // Temperature
-#define M5IOE1_REG_TEMP_CTRL        0x18    // R/W   [7] TBUSY | [6] TSTART
-#define M5IOE1_REG_TEMP_DATA_L      0x19    // R     [7:0] Temp Data Low
-#define M5IOE1_REG_TEMP_DATA_H      0x1A    // R     [3:0] Temp Data High
+#define M5IOE1_REG_TEMP_CTRL   0x18  // R/W   [7] TBUSY | [6] TSTART
+#define M5IOE1_REG_TEMP_DATA_L 0x19  // R     [7:0] Temp Data Low
+#define M5IOE1_REG_TEMP_DATA_H 0x1A  // R     [3:0] Temp Data High
 // PWM
-#define M5IOE1_REG_PWM1_DUTY_L      0x1B    // R/W   [7:0] PWM1 Duty Low
-#define M5IOE1_REG_PWM1_DUTY_H      0x1C    // R/W   [7] EN | [6] POL | [3:0] PWM1 Duty High
-#define M5IOE1_REG_PWM2_DUTY_L      0x1D    // R/W   [7:0] PWM2 Duty Low
-#define M5IOE1_REG_PWM2_DUTY_H      0x1E    // R/W   [7] EN | [6] POL | [3:0] PWM2 Duty High
-#define M5IOE1_REG_PWM3_DUTY_L      0x1F    // R/W   [7:0] PWM3 Duty Low
-#define M5IOE1_REG_PWM3_DUTY_H      0x20    // R/W   [7] EN | [6] POL | [3:0] PWM3 Duty High
-#define M5IOE1_REG_PWM4_DUTY_L      0x21    // R/W   [7:0] PWM4 Duty Low
-#define M5IOE1_REG_PWM4_DUTY_H      0x22    // R/W   [7] EN | [6] POL | [3:0] PWM4 Duty High
+#define M5IOE1_REG_PWM1_DUTY_L 0x1B  // R/W   [7:0] PWM1 Duty Low
+#define M5IOE1_REG_PWM1_DUTY_H 0x1C  // R/W   [7] EN | [6] POL | [3:0] PWM1 Duty High
+#define M5IOE1_REG_PWM2_DUTY_L 0x1D  // R/W   [7:0] PWM2 Duty Low
+#define M5IOE1_REG_PWM2_DUTY_H 0x1E  // R/W   [7] EN | [6] POL | [3:0] PWM2 Duty High
+#define M5IOE1_REG_PWM3_DUTY_L 0x1F  // R/W   [7:0] PWM3 Duty Low
+#define M5IOE1_REG_PWM3_DUTY_H 0x20  // R/W   [7] EN | [6] POL | [3:0] PWM3 Duty High
+#define M5IOE1_REG_PWM4_DUTY_L 0x21  // R/W   [7:0] PWM4 Duty Low
+#define M5IOE1_REG_PWM4_DUTY_H 0x22  // R/W   [7] EN | [6] POL | [3:0] PWM4 Duty High
 // System Config
-#define M5IOE1_REG_I2C_CFG          0x23    // R/W   [6] INT_PU/PD | [5] WAKE | [4] SPD | [3:0] SLEEP
-#define M5IOE1_REG_LED_CFG          0x24    // R/W   [6] REFRESH | [5:0] LED Num
-#define M5IOE1_REG_PWM_FREQ_L       0x25    // R/W   [7:0] PWM Freq Low
-#define M5IOE1_REG_PWM_FREQ_H       0x26    // R/W   [7:0] PWM Freq High
-#define M5IOE1_REG_REF_VOLTAGE_L    0x27    // R     [7:0] Ref Voltage Low
-#define M5IOE1_REG_REF_VOLTAGE_H    0x28    // R     [15:8] Ref Voltage High
-#define M5IOE1_REG_FACTORY_RESET    0x29    // W     [7:0] Reset Key
+#define M5IOE1_REG_I2C_CFG       0x23  // R/W   [6] INT_PU/PD | [5] WAKE | [4] SPD | [3:0] SLEEP
+#define M5IOE1_REG_LED_CFG       0x24  // R/W   [6] REFRESH | [5:0] LED Num
+#define M5IOE1_REG_PWM_FREQ_L    0x25  // R/W   [7:0] PWM Freq Low
+#define M5IOE1_REG_PWM_FREQ_H    0x26  // R/W   [7:0] PWM Freq High
+#define M5IOE1_REG_REF_VOLTAGE_L 0x27  // R     [7:0] Ref Voltage Low
+#define M5IOE1_REG_REF_VOLTAGE_H 0x28  // R     [15:8] Ref Voltage High
+#define M5IOE1_REG_FACTORY_RESET 0x29  // W     [7:0] Reset Key
 // Data areas
-#define M5IOE1_REG_LED_RAM_START    0x30    // R/W   NeoPixel RGB565 Data (32 LEDs x 2B)
-#define M5IOE1_REG_LED_RAM_END      0x6F
-#define M5IOE1_REG_RTC_RAM_START    0x70    // R/W   RTC Retention RAM (32B)
-#define M5IOE1_REG_RTC_RAM_END      0x8F
+#define M5IOE1_REG_LED_RAM_START 0x30  // R/W   NeoPixel RGB565 Data (32 LEDs x 2B)
+#define M5IOE1_REG_LED_RAM_END   0x6F
+#define M5IOE1_REG_RTC_RAM_START 0x70  // R/W   RTC Retention RAM (32B)
+#define M5IOE1_REG_RTC_RAM_END   0x8F
 // Extended
-#define M5IOE1_REG_AW8737A_PULSE    0x90    // R/W   [7] REFRESH | [6:5] NUM | [4:0] GPIO
+#define M5IOE1_REG_AW8737A_PULSE 0x90  // R/W   [7] REFRESH | [6:5] NUM | [4:0] GPIO
 
 // ============================
 // 位定义
 // Bit Definitions
 // ============================
 // ADC Control
-#define M5IOE1_ADC_CH_MASK          0x07
-#define M5IOE1_ADC_START            (1 << 6)
-#define M5IOE1_ADC_BUSY             (1 << 7)
+#define M5IOE1_ADC_CH_MASK 0x07
+#define M5IOE1_ADC_START   (1 << 6)
+#define M5IOE1_ADC_BUSY    (1 << 7)
 // Temperature Control
-#define M5IOE1_TEMP_START           (1 << 6)
-#define M5IOE1_TEMP_BUSY            (1 << 7)
+#define M5IOE1_TEMP_START (1 << 6)
+#define M5IOE1_TEMP_BUSY  (1 << 7)
 // PWM Control
-#define M5IOE1_PWM_POLARITY         (1 << 6)
-#define M5IOE1_PWM_ENABLE           (1 << 7)
+#define M5IOE1_PWM_POLARITY (1 << 6)
+#define M5IOE1_PWM_ENABLE   (1 << 7)
 // I2C Config
-#define M5IOE1_I2C_SLEEP_MASK       0x0F
-#define M5IOE1_I2C_SPEED_400K_BIT   (1 << 4)
-#define M5IOE1_I2C_WAKE_RISING      (1 << 5)
-#define M5IOE1_I2C_PULL_OFF         (1 << 6)
+#define M5IOE1_I2C_SLEEP_MASK     0x0F
+#define M5IOE1_I2C_SPEED_400K_BIT (1 << 4)
+#define M5IOE1_I2C_WAKE_RISING    (1 << 5)
+#define M5IOE1_I2C_PULL_OFF       (1 << 6)
 // LED Config
-#define M5IOE1_LED_NUM_MASK         0x3F
-#define M5IOE1_LED_REFRESH          (1 << 6)
+#define M5IOE1_LED_NUM_MASK 0x3F
+#define M5IOE1_LED_REFRESH  (1 << 6)
 // Factory Reset
-#define M5IOE1_FACTORY_RESET_KEY    0x3A
+#define M5IOE1_FACTORY_RESET_KEY 0x3A
 // AW8737A Pulse
-#define M5IOE1_AW8737A_GPIO_MASK    0x1F
-#define M5IOE1_AW8737A_NUM_SHIFT    5
-#define M5IOE1_AW8737A_NUM_MASK     0x03
-#define M5IOE1_AW8737A_REFRESH      (1 << 7)
+#define M5IOE1_AW8737A_GPIO_MASK 0x1F
+#define M5IOE1_AW8737A_NUM_SHIFT 5
+#define M5IOE1_AW8737A_NUM_MASK  0x03
+#define M5IOE1_AW8737A_REFRESH   (1 << 7)
 
 // ============================
 // ADC 通道定义（支持 ADC 的 IO 引脚）
 // ADC Channel Definitions (IO pins that support ADC)
 // ============================
-#define M5IOE1_ADC_CH1              1   // IO2 (pin index 1)
-#define M5IOE1_ADC_CH2              2   // IO4 (pin index 3)
-#define M5IOE1_ADC_CH3              3   // IO5 (pin index 4)
-#define M5IOE1_ADC_CH4              4   // IO7 (pin index 6)
+#define M5IOE1_ADC_CH1 1  // IO2 (pin index 1)
+#define M5IOE1_ADC_CH2 2  // IO4 (pin index 3)
+#define M5IOE1_ADC_CH3 3  // IO5 (pin index 4)
+#define M5IOE1_ADC_CH4 4  // IO7 (pin index 6)
 
 // ============================
 // PWM 通道定义（支持 PWM 的 IO 引脚）
 // PWM Channel Definitions (IO pins that support PWM)
 // ============================
-#define M5IOE1_PWM_CH1              0   // IO9 (pin index 8)
-#define M5IOE1_PWM_CH2              1   // IO8 (pin index 7)
-#define M5IOE1_PWM_CH3              2   // IO11 (pin index 10)
-#define M5IOE1_PWM_CH4              3   // IO10 (pin index 9)
+#define M5IOE1_PWM_CH1 0  // IO9 (pin index 8)
+#define M5IOE1_PWM_CH2 1  // IO8 (pin index 7)
+#define M5IOE1_PWM_CH3 2  // IO11 (pin index 10)
+#define M5IOE1_PWM_CH4 3  // IO10 (pin index 9)
 
 // ============================
 // GPIO 电平定义
 // GPIO Level Definitions
 // ============================
 #ifndef LOW
-#define LOW             0x0
+#define LOW 0x0
 #endif
 #ifndef HIGH
-#define HIGH            0x1
+#define HIGH 0x1
 #endif
 
 // ============================
@@ -217,31 +216,31 @@ typedef enum {
 // GPIO Mode Definitions (Arduino-compatible)
 // ============================
 #ifndef INPUT
-#define INPUT             0x01
+#define INPUT 0x01
 #endif
 #ifndef OUTPUT
-#define OUTPUT            0x03
+#define OUTPUT 0x03
 #endif
 #ifndef PULLUP
-#define PULLUP            0x04
+#define PULLUP 0x04
 #endif
 #ifndef INPUT_PULLUP
-#define INPUT_PULLUP      0x05
+#define INPUT_PULLUP 0x05
 #endif
 #ifndef PULLDOWN
-#define PULLDOWN          0x08
+#define PULLDOWN 0x08
 #endif
 #ifndef INPUT_PULLDOWN
-#define INPUT_PULLDOWN    0x09
+#define INPUT_PULLDOWN 0x09
 #endif
 #ifndef OPEN_DRAIN
-#define OPEN_DRAIN        0x10
+#define OPEN_DRAIN 0x10
 #endif
 #ifndef OUTPUT_OPEN_DRAIN
 #define OUTPUT_OPEN_DRAIN 0x13
 #endif
 #ifndef ANALOG
-#define ANALOG            0xC0
+#define ANALOG 0xC0
 #endif
 
 // ============================
@@ -249,25 +248,25 @@ typedef enum {
 // Interrupt Mode Definitions
 // ============================
 #ifndef DISABLED
-#define DISABLED  0x00
+#define DISABLED 0x00
 #endif
 #ifndef RISING
-#define RISING    0x01
+#define RISING 0x01
 #endif
 #ifndef FALLING
-#define FALLING   0x02
+#define FALLING 0x02
 #endif
 #ifndef CHANGE
-#define CHANGE    0x03
+#define CHANGE 0x03
 #endif
 #ifndef ONLOW
-#define ONLOW     0x04
+#define ONLOW 0x04
 #endif
 #ifndef ONHIGH
-#define ONHIGH    0x05
+#define ONHIGH 0x05
 #endif
 #ifndef ONLOW_WE
-#define ONLOW_WE  0x0C
+#define ONLOW_WE 0x0C
 #endif
 #ifndef ONHIGH_WE
 #define ONHIGH_WE 0x0D
@@ -277,26 +276,26 @@ typedef enum {
 // 上拉/下拉模式定义
 // Pull Mode Definitions
 // ============================
-#define M5IOE1_PULL_NONE    0x00
-#define M5IOE1_PULL_UP      0x01
-#define M5IOE1_PULL_DOWN    0x02
+#define M5IOE1_PULL_NONE 0x00
+#define M5IOE1_PULL_UP   0x01
+#define M5IOE1_PULL_DOWN 0x02
 
 // ============================
 // 驱动模式定义
 // Drive Mode Definitions
 // ============================
-#define M5IOE1_DRIVE_PUSHPULL   0x00
-#define M5IOE1_DRIVE_OPENDRAIN  0x01
+#define M5IOE1_DRIVE_PUSHPULL  0x00
+#define M5IOE1_DRIVE_OPENDRAIN 0x01
 
 // ============================
 // AW8737A 脉冲刷新类型
 // AW8737A PULSE Refresh Types
 // ============================
 typedef enum {
-    M5IOE1_AW8737A_REFRESH_WAIT = 0,    // 不刷新，等待下一次触发
-                                        // No refresh, wait for next trigger
-    M5IOE1_AW8737A_REFRESH_NOW = 1      // 刷新并立即执行
-                                        // Refresh and execute immediately
+    M5IOE1_AW8737A_REFRESH_WAIT = 0,  // 不刷新，等待下一次触发
+                                      // No refresh, wait for next trigger
+    M5IOE1_AW8737A_REFRESH_NOW = 1    // 刷新并立即执行
+                                      // Refresh and execute immediately
 } m5ioe1_aw8737a_refresh_t;
 
 // ============================
@@ -304,14 +303,14 @@ typedef enum {
 // AW8737A PULSE NUM Types
 // ============================
 typedef enum {
-    M5IOE1_AW8737A_PULSE_NUM_0 = 0,     // 0 个脉冲
-                                        // 0 pulse
-    M5IOE1_AW8737A_PULSE_NUM_1 = 1,     // 1 个脉冲
-                                        // 1 pulse
-    M5IOE1_AW8737A_PULSE_NUM_2 = 2,     // 2 个脉冲
-                                        // 2 pulses
-    M5IOE1_AW8737A_PULSE_NUM_3 = 3      // 3 个脉冲
-                                        // 3 pulses
+    M5IOE1_AW8737A_PULSE_NUM_0 = 0,  // 0 个脉冲
+                                     // 0 pulse
+    M5IOE1_AW8737A_PULSE_NUM_1 = 1,  // 1 个脉冲
+                                     // 1 pulse
+    M5IOE1_AW8737A_PULSE_NUM_2 = 2,  // 2 个脉冲
+                                     // 2 pulses
+    M5IOE1_AW8737A_PULSE_NUM_3 = 3   // 3 个脉冲
+                                     // 3 pulses
 } m5ioe1_aw8737a_pulse_num_t;
 
 // ============================
@@ -319,12 +318,12 @@ typedef enum {
 // Interrupt Handling Mode
 // ============================
 typedef enum {
-    M5IOE1_INT_MODE_DISABLED = 0,   // 中断处理已禁用
-                                    // Interrupt handling disabled
-    M5IOE1_INT_MODE_POLLING,        // 轮询模式（默认）
-                                    // Polling mode (default)
-    M5IOE1_INT_MODE_HARDWARE        // 硬件中断模式
-                                    // Hardware interrupt mode
+    M5IOE1_INT_MODE_DISABLED = 0,  // 中断处理已禁用
+                                   // Interrupt handling disabled
+    M5IOE1_INT_MODE_POLLING,       // 轮询模式（默认）
+                                   // Polling mode (default)
+    M5IOE1_INT_MODE_HARDWARE       // 硬件中断模式
+                                   // Hardware interrupt mode
 } m5ioe1_int_mode_t;
 
 // ============================
@@ -332,10 +331,10 @@ typedef enum {
 // I2C Speed Definitions
 // ============================
 typedef enum {
-    M5IOE1_I2C_SPEED_100K = 0,      // 100KHz 标准模式
-                                    // 100KHz standard mode
-    M5IOE1_I2C_SPEED_400K = 1       // 400KHz 快速模式
-                                    // 400KHz fast mode
+    M5IOE1_I2C_SPEED_100K = 0,  // 100KHz 标准模式
+                                // 100KHz standard mode
+    M5IOE1_I2C_SPEED_400K = 1   // 400KHz 快速模式
+                                // 400KHz fast mode
 } m5ioe1_i2c_speed_t;
 
 // ============================
@@ -343,10 +342,10 @@ typedef enum {
 // I2C Wake Edge Definitions
 // ============================
 typedef enum {
-    M5IOE1_WAKE_EDGE_FALLING = 0,   // 下降沿唤醒（默认）
-                                    // Falling edge wake (default)
-    M5IOE1_WAKE_EDGE_RISING = 1     // 上升沿唤醒
-                                    // Rising edge wake
+    M5IOE1_WAKE_EDGE_FALLING = 0,  // 下降沿唤醒（默认）
+                                   // Falling edge wake (default)
+    M5IOE1_WAKE_EDGE_RISING = 1    // 上升沿唤醒
+                                   // Rising edge wake
 } m5ioe1_wake_edge_t;
 
 // ============================
@@ -354,10 +353,10 @@ typedef enum {
 // I2C Internal Pull-up Definitions
 // ============================
 typedef enum {
-    M5IOE1_PULL_ENABLED = 0,        // 内部上拉启用（默认）
-                                    // Internal pull-up enabled (default)
-    M5IOE1_PULL_DISABLED = 1        // 内部上拉禁用
-                                    // Internal pull-up disabled
+    M5IOE1_PULL_ENABLED = 0,  // 内部上拉启用（默认）
+                              // Internal pull-up enabled (default)
+    M5IOE1_PULL_DISABLED = 1  // 内部上拉禁用
+                              // Internal pull-up disabled
 } m5ioe1_pull_config_t;
 
 // ============================
@@ -365,18 +364,18 @@ typedef enum {
 // Log Level Definitions
 // ============================
 typedef enum {
-    M5IOE1_LOG_LEVEL_NONE = 0,      // 无日志输出
-                                    // No log output
-    M5IOE1_LOG_LEVEL_ERROR,         // 仅错误消息
-                                    // Error messages only
-    M5IOE1_LOG_LEVEL_WARN,          // 警告和错误消息
-                                    // Warning and error messages
-    M5IOE1_LOG_LEVEL_INFO,          // 信息、警告和错误消息（默认）
-                                    // Info, warning and error messages (default)
-    M5IOE1_LOG_LEVEL_DEBUG,         // 调试、信息、警告和错误消息
-                                    // Debug, info, warning and error messages
-    M5IOE1_LOG_LEVEL_VERBOSE        // 所有消息包括详细输出
-                                    // All messages including verbose
+    M5IOE1_LOG_LEVEL_NONE = 0,  // 无日志输出
+                                // No log output
+    M5IOE1_LOG_LEVEL_ERROR,     // 仅错误消息
+                                // Error messages only
+    M5IOE1_LOG_LEVEL_WARN,      // 警告和错误消息
+                                // Warning and error messages
+    M5IOE1_LOG_LEVEL_INFO,      // 信息、警告和错误消息（默认）
+                                // Info, warning and error messages (default)
+    M5IOE1_LOG_LEVEL_DEBUG,     // 调试、信息、警告和错误消息
+                                // Debug, info, warning and error messages
+    M5IOE1_LOG_LEVEL_VERBOSE    // 所有消息包括详细输出
+                                // All messages including verbose
 } m5ioe1_log_level_t;
 
 // ============================
@@ -384,20 +383,20 @@ typedef enum {
 // Configuration Type for Validation
 // ============================
 typedef enum {
-    M5IOE1_CONFIG_GPIO_INPUT = 0,   // GPIO 输入模式
-                                    // GPIO input mode
-    M5IOE1_CONFIG_GPIO_OUTPUT,      // GPIO 输出模式
-                                    // GPIO output mode
-    M5IOE1_CONFIG_GPIO_INTERRUPT,   // GPIO 中断模式
-                                    // GPIO interrupt mode
-    M5IOE1_CONFIG_ADC,              // ADC 功能
-                                    // ADC function
-    M5IOE1_CONFIG_PWM,              // PWM 功能
-                                    // PWM function
-    M5IOE1_CONFIG_NEOPIXEL,         // NeoPixel LED 功能（仅 IO14）
-                                    // NeoPixel LED function (IO14 only)
-    M5IOE1_CONFIG_I2C_SLEEP         // I2C 睡眠模式配置
-                                    // I2C sleep mode configuration
+    M5IOE1_CONFIG_GPIO_INPUT = 0,  // GPIO 输入模式
+                                   // GPIO input mode
+    M5IOE1_CONFIG_GPIO_OUTPUT,     // GPIO 输出模式
+                                   // GPIO output mode
+    M5IOE1_CONFIG_GPIO_INTERRUPT,  // GPIO 中断模式
+                                   // GPIO interrupt mode
+    M5IOE1_CONFIG_ADC,             // ADC 功能
+                                   // ADC function
+    M5IOE1_CONFIG_PWM,             // PWM 功能
+                                   // PWM function
+    M5IOE1_CONFIG_NEOPIXEL,        // NeoPixel LED 功能（仅 IO14）
+                                   // NeoPixel LED function (IO14 only)
+    M5IOE1_CONFIG_I2C_SLEEP        // I2C 睡眠模式配置
+                                   // I2C sleep mode configuration
 } m5ioe1_config_type_t;
 
 // ============================
@@ -425,22 +424,22 @@ typedef struct {
 // Snapshot Verification Result
 // ============================
 typedef struct {
-    bool consistent;            // 如果所有缓存值与硬件寄存器匹配则为 true
-                                // true if all cached values match hardware registers
-    bool gpio_mismatch;         // 如果 GPIO 寄存器与缓存不匹配则为 true
-                                // true if GPIO registers don't match cache
-    bool pwm_mismatch;          // 如果 PWM 寄存器与缓存不匹配则为 true
-                                // true if PWM registers don't match cache
-    bool adc_mismatch;          // 如果 ADC 寄存器与缓存不匹配则为 true
-                                // true if ADC registers don't match cache
-    uint16_t expected_mode;     // 缓存的 GPIO 模式寄存器值
-                                // cached GPIO mode register value
-    uint16_t actual_mode;       // 实际的 GPIO 模式寄存器值
-                                // actual GPIO mode register value
-    uint16_t expected_output;   // 缓存的 GPIO 输出寄存器值
-                                // cached GPIO output register value
-    uint16_t actual_output;     // 实际的 GPIO 输出寄存器值
-                                // actual GPIO output register value
+    bool consistent;           // 如果所有缓存值与硬件寄存器匹配则为 true
+                               // true if all cached values match hardware registers
+    bool gpio_mismatch;        // 如果 GPIO 寄存器与缓存不匹配则为 true
+                               // true if GPIO registers don't match cache
+    bool pwm_mismatch;         // 如果 PWM 寄存器与缓存不匹配则为 true
+                               // true if PWM registers don't match cache
+    bool adc_mismatch;         // 如果 ADC 寄存器与缓存不匹配则为 true
+                               // true if ADC registers don't match cache
+    uint16_t expected_mode;    // 缓存的 GPIO 模式寄存器值
+                               // cached GPIO mode register value
+    uint16_t actual_mode;      // 实际的 GPIO 模式寄存器值
+                               // actual GPIO mode register value
+    uint16_t expected_output;  // 缓存的 GPIO 输出寄存器值
+                               // cached GPIO output register value
+    uint16_t actual_output;    // 实际的 GPIO 输出寄存器值
+                               // actual GPIO output register value
 } m5ioe1_snapshot_verify_t;
 
 // ============================
@@ -468,8 +467,10 @@ public:
      * @brief Initialize the M5IOE1 device (Arduino)
      * @note Without intPin (or intPin=-1): Only POLLING and DISABLED modes are supported
      * @note With intPin >= 0: Supports HARDWARE, POLLING, and DISABLED modes
-     * @note HARDWARE mode: Configures intPin as input with internal pull-up. Uses FALLING edge, then reads GPIO_IS registers (0x11-0x12)
-     * @note POLLING mode: Periodically reads GPIO_IS registers (0x11-0x12). Non-zero indicates one or more pins triggered
+     * @note HARDWARE mode: Configures intPin as input with internal pull-up. Uses FALLING edge, then reads GPIO_IS
+     * registers (0x11-0x12)
+     * @note POLLING mode: Periodically reads GPIO_IS registers (0x11-0x12). Non-zero indicates one or more pins
+     * triggered
      * @note DISABLED mode: No interrupt handling
      * @param wire Pointer to TwoWire instance
      * @param addr I2C address (default 0x6F)
@@ -480,10 +481,10 @@ public:
      * @param intMode Interrupt mode (default M5IOE1_INT_MODE_POLLING)
      * @return M5IOE1_OK if successful, error code otherwise
      */
-    m5ioe1_err_t begin(TwoWire *wire, uint8_t addr = M5IOE1_DEFAULT_ADDR,
-               uint8_t sda = -1, uint8_t scl = -1, uint32_t speed = 100000,
-               int8_t intPin = -1, m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_POLLING);
-#else // ESP-IDF
+    m5ioe1_err_t begin(TwoWire* wire, uint8_t addr = M5IOE1_DEFAULT_ADDR, uint8_t sda = -1, uint8_t scl = -1,
+                       uint32_t speed = 100000, int8_t intPin = -1,
+                       m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_POLLING);
+#else  // ESP-IDF
     // =====================================================
     // Type 1A: Self-created I2C bus, no hardware interrupt
     // =====================================================
@@ -497,9 +498,8 @@ public:
      * @param intMode Interrupt mode: M5IOE1_INT_MODE_POLLING or M5IOE1_INT_MODE_DISABLED
      * @return M5IOE1_OK if successful, error code otherwise
      */
-    m5ioe1_err_t begin(i2c_port_t port = I2C_NUM_0, uint8_t addr = M5IOE1_DEFAULT_ADDR,
-               int sda = 21, int scl = 22, uint32_t speed = M5IOE1_I2C_FREQ_100K,
-               m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_POLLING);
+    m5ioe1_err_t begin(i2c_port_t port = I2C_NUM_0, uint8_t addr = M5IOE1_DEFAULT_ADDR, int sda = 21, int scl = 22,
+                       uint32_t speed = M5IOE1_I2C_FREQ_100K, m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_POLLING);
 
     // =====================================================
     // Type 1B: Self-created I2C bus, with hardware interrupt
@@ -515,8 +515,8 @@ public:
      * @param intMode Interrupt mode: M5IOE1_INT_MODE_HARDWARE, POLLING, or DISABLED
      * @return M5IOE1_OK if successful, error code otherwise
      */
-    m5ioe1_err_t begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint32_t speed,
-               int intPin, m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_HARDWARE);
+    m5ioe1_err_t begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint32_t speed, int intPin,
+                       m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_HARDWARE);
 
     // =====================================================
     // Type 2A: Existing i2c_master_bus_handle_t, no hardware interrupt
@@ -530,8 +530,7 @@ public:
      * @return M5IOE1_OK if successful, error code otherwise
      */
     m5ioe1_err_t begin(i2c_master_bus_handle_t bus, uint8_t addr = M5IOE1_DEFAULT_ADDR,
-               uint32_t speed = M5IOE1_I2C_FREQ_100K,
-               m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_POLLING);
+                       uint32_t speed = M5IOE1_I2C_FREQ_100K, m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_POLLING);
 
     // =====================================================
     // Type 2B: Existing i2c_master_bus_handle_t, with hardware interrupt
@@ -545,8 +544,8 @@ public:
      * @param intMode Interrupt mode
      * @return M5IOE1_OK if successful, error code otherwise
      */
-    m5ioe1_err_t begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t speed,
-               int intPin, m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_HARDWARE);
+    m5ioe1_err_t begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t speed, int intPin,
+                       m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_HARDWARE);
 
     // =====================================================
     // Type 3A: Existing i2c_bus_handle_t, no hardware interrupt
@@ -559,9 +558,8 @@ public:
      * @param intMode Interrupt mode: M5IOE1_INT_MODE_POLLING or M5IOE1_INT_MODE_DISABLED
      * @return M5IOE1_OK if successful, error code otherwise
      */
-    m5ioe1_err_t begin(i2c_bus_handle_t bus, uint8_t addr = M5IOE1_DEFAULT_ADDR,
-               uint32_t speed = M5IOE1_I2C_FREQ_100K,
-               m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_POLLING);
+    m5ioe1_err_t begin(i2c_bus_handle_t bus, uint8_t addr = M5IOE1_DEFAULT_ADDR, uint32_t speed = M5IOE1_I2C_FREQ_100K,
+                       m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_POLLING);
 
     // =====================================================
     // Type 3B: Existing i2c_bus_handle_t, with hardware interrupt
@@ -575,8 +573,8 @@ public:
      * @param intMode Interrupt mode
      * @return M5IOE1_OK if successful, error code otherwise
      */
-    m5ioe1_err_t begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed,
-               int intPin, m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_HARDWARE);
+    m5ioe1_err_t begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, int intPin,
+                       m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_HARDWARE);
 #endif
 
     /**
@@ -783,7 +781,7 @@ public:
      * @note When refresh=NOW, there will be a 20ms delay after execution
      */
     m5ioe1_err_t setAw8737aPulse(uint8_t pin, m5ioe1_aw8737a_pulse_num_t pulseNum,
-                         m5ioe1_aw8737a_refresh_t refresh = M5IOE1_AW8737A_REFRESH_NOW);
+                                 m5ioe1_aw8737a_refresh_t refresh = M5IOE1_AW8737A_REFRESH_NOW);
 
     /**
      * @brief Trigger AW8737A pulse refresh
@@ -817,10 +815,9 @@ public:
      * @param pullConfig 上拉配置（M5IOE1_PULL_ENABLED 或 M5IOE1_PULL_DISABLED）
      * @return M5IOE1_OK if successful, error code otherwise
      */
-    m5ioe1_err_t setI2cConfig(uint8_t sleepTime,
-                      m5ioe1_i2c_speed_t speed = M5IOE1_I2C_SPEED_100K,
-                      m5ioe1_wake_edge_t wakeEdge = M5IOE1_WAKE_EDGE_FALLING,
-                      m5ioe1_pull_config_t pullConfig = M5IOE1_PULL_ENABLED);
+    m5ioe1_err_t setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed = M5IOE1_I2C_SPEED_100K,
+                              m5ioe1_wake_edge_t wakeEdge     = M5IOE1_WAKE_EDGE_FALLING,
+                              m5ioe1_pull_config_t pullConfig = M5IOE1_PULL_ENABLED);
 
     /**
      * @brief Switch I2C communication speed / 切换 I2C 通讯速度
@@ -1029,14 +1026,14 @@ private:
     bool _autoSnapshot;
     bool _enableDefaultIsrLog;
     uint32_t _requestedSpeed;  // 用户请求的 I2C 速度（用于 400K 切换）
-                            // User requested I2C speed (for 400K switch)
+                               // User requested I2C speed (for 400K switch)
 
     // 自动唤醒状态
     // Auto wake state
-    bool _autoWakeEnabled;      // 自动唤醒是否启用
-                                // Whether auto wake is enabled
-    uint32_t _lastCommTime;     // 上次通信时间（毫秒）
-                                // Last communication time (milliseconds)
+    bool _autoWakeEnabled;   // 自动唤醒是否启用
+                             // Whether auto wake is enabled
+    uint32_t _lastCommTime;  // 上次通信时间（毫秒）
+                             // Last communication time (milliseconds)
 
     // 中断模式
     // Interrupt mode
@@ -1045,11 +1042,11 @@ private:
     uint32_t _pollingInterval;
 
 #ifdef ARDUINO
-    TwoWire *_wire;
-    uint8_t _sda;   // SDA 引脚编号，用于 I2C 重新初始化
-                    // SDA pin number for I2C re-initialization
-    uint8_t _scl;   // SCL 引脚编号，用于 I2C 重新初始化
-                    // SCL pin number for I2C re-initialization
+    TwoWire* _wire;
+    uint8_t _sda;  // SDA 引脚编号，用于 I2C 重新初始化
+                   // SDA pin number for I2C re-initialization
+    uint8_t _scl;  // SCL 引脚编号，用于 I2C 重新初始化
+                   // SCL pin number for I2C re-initialization
 #else
     // I2C 驱动类型选择
     // I2C driver type selection
@@ -1064,13 +1061,13 @@ private:
     // M5IOE1_I2C_DRIVER_BUS: 使用 _i2c_bus + _i2c_device
     // uses _i2c_bus + _i2c_device
     i2c_master_bus_handle_t _i2c_master_bus;  // ESP-IDF 原生驱动/自创建
-                                            // ESP-IDF native driver / self-created
+                                              // ESP-IDF native driver / self-created
     i2c_master_dev_handle_t _i2c_master_dev;  // ESP-IDF 原生驱动/自创建
-                                            // ESP-IDF native driver / self-created
-    i2c_bus_handle_t _i2c_bus;                 // esp-idf-lib 组件
-                                            // esp-idf-lib component
-    i2c_bus_device_handle_t _i2c_device;       // esp-idf-lib 组件
-                                            // esp-idf-lib component
+                                              // ESP-IDF native driver / self-created
+    i2c_bus_handle_t _i2c_bus;                // esp-idf-lib 组件
+                                              // esp-idf-lib component
+    i2c_bus_device_handle_t _i2c_device;      // esp-idf-lib 组件
+                                              // esp-idf-lib component
 
     // I2C 管理标志
     // I2C management flags
@@ -1105,10 +1102,10 @@ private:
         bool isOutput;
         uint8_t outputLevel;
         uint8_t inputLevel;
-        uint8_t pull;       // 0:无, 1:上拉, 2:下拉
-                            // 0:none, 1:up, 2:down
-        uint8_t drive;      // 0:推挽, 1:开漏
-                            // 0:push-pull, 1:open-drain
+        uint8_t pull;   // 0:无, 1:上拉, 2:下拉
+                        // 0:none, 1:up, 2:down
+        uint8_t drive;  // 0:推挽, 1:开漏
+                        // 0:push-pull, 1:open-drain
         bool intrEnabled;
         bool intrRising;
     } _pinStates[M5IOE1_MAX_GPIO_PINS];
@@ -1136,14 +1133,14 @@ private:
     // 缓存的 I2C 配置状态（用于睡眠模式检测）
     // Cached I2C config state (for sleep mode detection)
     struct {
-        uint8_t sleepTime;      // 0=禁用, 1-15=睡眠时间
-                                // 0=disabled, 1-15=sleep time
-        bool speed400k;         // I2C 速度模式
-                                // I2C speed mode
-        bool wakeRising;        // 唤醒边沿模式
-                                // Wake edge mode
-        bool pullOff;           // 内部上拉关闭
-                                // Internal pull-up off
+        uint8_t sleepTime;  // 0=禁用, 1-15=睡眠时间
+                            // 0=disabled, 1-15=sleep time
+        bool speed400k;     // I2C 速度模式
+                            // I2C speed mode
+        bool wakeRising;    // 唤醒边沿模式
+                            // Wake edge mode
+        bool pullOff;       // 内部上拉关闭
+                            // Internal pull-up off
     } _i2cConfig;
     bool _i2cConfigValid;
 
@@ -1237,4 +1234,4 @@ private:
 #endif
 };
 
-#endif // _M5IOE1_H_
+#endif  // _M5IOE1_H_

@@ -21,7 +21,8 @@
 // ============================
 
 #ifndef M5IOE1_I2C_READ_BYTE
-static inline bool M5IOE1_I2C_READ_BYTE(TwoWire *wire, uint8_t addr, uint8_t reg, uint8_t *data) {
+static inline bool M5IOE1_I2C_READ_BYTE(TwoWire *wire, uint8_t addr, uint8_t reg, uint8_t *data)
+{
     wire->beginTransmission(addr);
     wire->write(reg);
     if (wire->endTransmission(false) != 0) {
@@ -36,7 +37,8 @@ static inline bool M5IOE1_I2C_READ_BYTE(TwoWire *wire, uint8_t addr, uint8_t reg
 #endif
 
 #ifndef M5IOE1_I2C_READ_BYTES
-static inline bool M5IOE1_I2C_READ_BYTES(TwoWire *wire, uint8_t addr, uint8_t start_reg, size_t len, uint8_t *data) {
+static inline bool M5IOE1_I2C_READ_BYTES(TwoWire *wire, uint8_t addr, uint8_t start_reg, size_t len, uint8_t *data)
+{
     wire->beginTransmission(addr);
     wire->write(start_reg);
     if (wire->endTransmission(false) != 0) {
@@ -53,7 +55,8 @@ static inline bool M5IOE1_I2C_READ_BYTES(TwoWire *wire, uint8_t addr, uint8_t st
 #endif
 
 #ifndef M5IOE1_I2C_READ_REG16
-static inline bool M5IOE1_I2C_READ_REG16(TwoWire *wire, uint8_t addr, uint8_t reg, uint16_t *data) {
+static inline bool M5IOE1_I2C_READ_REG16(TwoWire *wire, uint8_t addr, uint8_t reg, uint16_t *data)
+{
     uint8_t buf[2];
     if (!M5IOE1_I2C_READ_BYTES(wire, addr, reg, 2, buf)) {
         return false;
@@ -66,7 +69,8 @@ static inline bool M5IOE1_I2C_READ_REG16(TwoWire *wire, uint8_t addr, uint8_t re
 #endif
 
 #ifndef M5IOE1_I2C_WRITE_BYTE
-static inline bool M5IOE1_I2C_WRITE_BYTE(TwoWire *wire, uint8_t addr, uint8_t reg, uint8_t data) {
+static inline bool M5IOE1_I2C_WRITE_BYTE(TwoWire *wire, uint8_t addr, uint8_t reg, uint8_t data)
+{
     wire->beginTransmission(addr);
     wire->write(reg);
     wire->write(data);
@@ -78,7 +82,9 @@ static inline bool M5IOE1_I2C_WRITE_BYTE(TwoWire *wire, uint8_t addr, uint8_t re
 #endif
 
 #ifndef M5IOE1_I2C_WRITE_BYTES
-static inline bool M5IOE1_I2C_WRITE_BYTES(TwoWire *wire, uint8_t addr, uint8_t start_reg, size_t len, const uint8_t *data) {
+static inline bool M5IOE1_I2C_WRITE_BYTES(TwoWire *wire, uint8_t addr, uint8_t start_reg, size_t len,
+                                          const uint8_t *data)
+{
     wire->beginTransmission(addr);
     wire->write(start_reg);
     for (size_t i = 0; i < len; i++) {
@@ -92,7 +98,8 @@ static inline bool M5IOE1_I2C_WRITE_BYTES(TwoWire *wire, uint8_t addr, uint8_t s
 #endif
 
 #ifndef M5IOE1_I2C_WRITE_REG16
-static inline bool M5IOE1_I2C_WRITE_REG16(TwoWire *wire, uint8_t addr, uint8_t reg, uint16_t data) {
+static inline bool M5IOE1_I2C_WRITE_REG16(TwoWire *wire, uint8_t addr, uint8_t reg, uint16_t data)
+{
     uint8_t buf[2];
     // 小端模式：低字节在前
     // Little-endian: low byte first
@@ -106,18 +113,19 @@ static inline bool M5IOE1_I2C_WRITE_REG16(TwoWire *wire, uint8_t addr, uint8_t r
 // IOE1 使用 SDA 引脚下降沿触发唤醒中断
 // IOE1 uses SDA pin falling edge to trigger wake interrupt
 #ifndef M5IOE1_I2C_SEND_WAKE
-static inline void M5IOE1_I2C_SEND_WAKE(TwoWire *wire, uint8_t addr) {
+static inline void M5IOE1_I2C_SEND_WAKE(TwoWire *wire, uint8_t addr)
+{
     // Send START then STOP to avoid leaving the bus in a busy state
     wire->beginTransmission(addr);
     wire->endTransmission();  // Send START with STOP
 }
 #endif
 
-#else // ESP-IDF
+#else  // ESP-IDF
 
 #include <esp_err.h>
 #include <driver/i2c_master.h>  // ESP-IDF native i2c_master driver
-#include <i2c_bus.h>             // esp-idf-lib i2c_bus component
+#include <i2c_bus.h>            // esp-idf-lib i2c_bus component
 
 #ifdef __cplusplus
 extern "C" {
@@ -128,14 +136,14 @@ extern "C" {
 // I2C Driver Type Selection
 // ============================
 typedef enum {
-    M5IOE1_I2C_DRIVER_NONE = 0,     // 未初始化
-                                    // Not initialized
-    M5IOE1_I2C_DRIVER_SELF_CREATED, // 使用 i2c_port_t 自创建
-                                    // Self-created using i2c_port_t
-    M5IOE1_I2C_DRIVER_MASTER,       // ESP-IDF 原生 i2c_master 驱动
-                                    // ESP-IDF native i2c_master driver
-    M5IOE1_I2C_DRIVER_BUS           // esp-idf-lib i2c_bus 组件
-                                    // esp-idf-lib i2c_bus component
+    M5IOE1_I2C_DRIVER_NONE = 0,      // 未初始化
+                                     // Not initialized
+    M5IOE1_I2C_DRIVER_SELF_CREATED,  // 使用 i2c_port_t 自创建
+                                     // Self-created using i2c_port_t
+    M5IOE1_I2C_DRIVER_MASTER,        // ESP-IDF 原生 i2c_master 驱动
+                                     // ESP-IDF native i2c_master driver
+    M5IOE1_I2C_DRIVER_BUS            // esp-idf-lib i2c_bus 组件
+                                     // esp-idf-lib i2c_bus component
 } m5ioe1_i2c_driver_t;
 
 // ============================
@@ -144,19 +152,22 @@ typedef enum {
 // ============================
 
 #ifndef M5IOE1_I2C_READ_BYTE
-static inline esp_err_t M5IOE1_I2C_READ_BYTE(i2c_bus_device_handle_t dev, uint8_t reg, uint8_t *data) {
+static inline esp_err_t M5IOE1_I2C_READ_BYTE(i2c_bus_device_handle_t dev, uint8_t reg, uint8_t *data)
+{
     return i2c_bus_read_byte(dev, reg, data);
 }
 #endif
 
 #ifndef M5IOE1_I2C_READ_BYTES
-static inline esp_err_t M5IOE1_I2C_READ_BYTES(i2c_bus_device_handle_t dev, uint8_t start_reg, size_t len, uint8_t *data) {
+static inline esp_err_t M5IOE1_I2C_READ_BYTES(i2c_bus_device_handle_t dev, uint8_t start_reg, size_t len, uint8_t *data)
+{
     return i2c_bus_read_bytes(dev, start_reg, len, data);
 }
 #endif
 
 #ifndef M5IOE1_I2C_READ_REG16
-static inline esp_err_t M5IOE1_I2C_READ_REG16(i2c_bus_device_handle_t dev, uint8_t reg, uint16_t *data) {
+static inline esp_err_t M5IOE1_I2C_READ_REG16(i2c_bus_device_handle_t dev, uint8_t reg, uint16_t *data)
+{
     uint8_t buf[2];
     esp_err_t ret = i2c_bus_read_bytes(dev, reg, 2, buf);
     if (ret == ESP_OK) {
@@ -169,19 +180,23 @@ static inline esp_err_t M5IOE1_I2C_READ_REG16(i2c_bus_device_handle_t dev, uint8
 #endif
 
 #ifndef M5IOE1_I2C_WRITE_BYTE
-static inline esp_err_t M5IOE1_I2C_WRITE_BYTE(i2c_bus_device_handle_t dev, uint8_t reg, uint8_t data) {
+static inline esp_err_t M5IOE1_I2C_WRITE_BYTE(i2c_bus_device_handle_t dev, uint8_t reg, uint8_t data)
+{
     return i2c_bus_write_byte(dev, reg, data);
 }
 #endif
 
 #ifndef M5IOE1_I2C_WRITE_BYTES
-static inline esp_err_t M5IOE1_I2C_WRITE_BYTES(i2c_bus_device_handle_t dev, uint8_t start_reg, size_t len, const uint8_t *data) {
-    return i2c_bus_write_bytes(dev, start_reg, len, (uint8_t*)data);
+static inline esp_err_t M5IOE1_I2C_WRITE_BYTES(i2c_bus_device_handle_t dev, uint8_t start_reg, size_t len,
+                                               const uint8_t *data)
+{
+    return i2c_bus_write_bytes(dev, start_reg, len, (uint8_t *)data);
 }
 #endif
 
 #ifndef M5IOE1_I2C_WRITE_REG16
-static inline esp_err_t M5IOE1_I2C_WRITE_REG16(i2c_bus_device_handle_t dev, uint8_t reg, uint16_t data) {
+static inline esp_err_t M5IOE1_I2C_WRITE_REG16(i2c_bus_device_handle_t dev, uint8_t reg, uint16_t data)
+{
     uint8_t buf[2];
     // 小端模式：低字节在前
     // Little-endian: low byte first
@@ -197,19 +212,23 @@ static inline esp_err_t M5IOE1_I2C_WRITE_REG16(i2c_bus_device_handle_t dev, uint
 // ============================
 
 #ifndef M5IOE1_I2C_MASTER_READ_BYTE
-static inline esp_err_t M5IOE1_I2C_MASTER_READ_BYTE(i2c_master_dev_handle_t dev, uint8_t reg, uint8_t *data) {
+static inline esp_err_t M5IOE1_I2C_MASTER_READ_BYTE(i2c_master_dev_handle_t dev, uint8_t reg, uint8_t *data)
+{
     return i2c_master_transmit_receive(dev, &reg, 1, data, 1, -1);
 }
 #endif
 
 #ifndef M5IOE1_I2C_MASTER_READ_BYTES
-static inline esp_err_t M5IOE1_I2C_MASTER_READ_BYTES(i2c_master_dev_handle_t dev, uint8_t start_reg, size_t len, uint8_t *data) {
+static inline esp_err_t M5IOE1_I2C_MASTER_READ_BYTES(i2c_master_dev_handle_t dev, uint8_t start_reg, size_t len,
+                                                     uint8_t *data)
+{
     return i2c_master_transmit_receive(dev, &start_reg, 1, data, len, -1);
 }
 #endif
 
 #ifndef M5IOE1_I2C_MASTER_READ_REG16
-static inline esp_err_t M5IOE1_I2C_MASTER_READ_REG16(i2c_master_dev_handle_t dev, uint8_t reg, uint16_t *data) {
+static inline esp_err_t M5IOE1_I2C_MASTER_READ_REG16(i2c_master_dev_handle_t dev, uint8_t reg, uint16_t *data)
+{
     uint8_t buf[2];
     esp_err_t ret = i2c_master_transmit_receive(dev, &reg, 1, buf, 2, -1);
     if (ret == ESP_OK) {
@@ -222,17 +241,20 @@ static inline esp_err_t M5IOE1_I2C_MASTER_READ_REG16(i2c_master_dev_handle_t dev
 #endif
 
 #ifndef M5IOE1_I2C_MASTER_WRITE_BYTE
-static inline esp_err_t M5IOE1_I2C_MASTER_WRITE_BYTE(i2c_master_dev_handle_t dev, uint8_t reg, uint8_t data) {
+static inline esp_err_t M5IOE1_I2C_MASTER_WRITE_BYTE(i2c_master_dev_handle_t dev, uint8_t reg, uint8_t data)
+{
     uint8_t buf[2] = {reg, data};
     return i2c_master_transmit(dev, buf, 2, -1);
 }
 #endif
 
 #ifndef M5IOE1_I2C_MASTER_WRITE_BYTES
-static inline esp_err_t M5IOE1_I2C_MASTER_WRITE_BYTES(i2c_master_dev_handle_t dev, uint8_t start_reg, size_t len, const uint8_t *data) {
+static inline esp_err_t M5IOE1_I2C_MASTER_WRITE_BYTES(i2c_master_dev_handle_t dev, uint8_t start_reg, size_t len,
+                                                      const uint8_t *data)
+{
     // 需要在数据前添加寄存器地址
     // Need to prepend register address
-    uint8_t *buf = (uint8_t*)malloc(len + 1);
+    uint8_t *buf = (uint8_t *)malloc(len + 1);
     if (buf == NULL) return ESP_ERR_NO_MEM;
     buf[0] = start_reg;
     memcpy(buf + 1, data, len);
@@ -243,7 +265,8 @@ static inline esp_err_t M5IOE1_I2C_MASTER_WRITE_BYTES(i2c_master_dev_handle_t de
 #endif
 
 #ifndef M5IOE1_I2C_MASTER_WRITE_REG16
-static inline esp_err_t M5IOE1_I2C_MASTER_WRITE_REG16(i2c_master_dev_handle_t dev, uint8_t reg, uint16_t data) {
+static inline esp_err_t M5IOE1_I2C_MASTER_WRITE_REG16(i2c_master_dev_handle_t dev, uint8_t reg, uint16_t data)
+{
     uint8_t buf[3];
     buf[0] = reg;
     // 小端模式：低字节在前
@@ -256,7 +279,8 @@ static inline esp_err_t M5IOE1_I2C_MASTER_WRITE_REG16(i2c_master_dev_handle_t de
 
 // 唤醒信号发送 (i2c_bus) / Wake signal send (i2c_bus)
 #ifndef M5IOE1_I2C_SEND_WAKE
-static inline esp_err_t M5IOE1_I2C_SEND_WAKE(i2c_bus_device_handle_t dev, uint8_t reg) {
+static inline esp_err_t M5IOE1_I2C_SEND_WAKE(i2c_bus_device_handle_t dev, uint8_t reg)
+{
     // Read any register to generate I2C start signal for wake
     uint8_t dummy;
     return i2c_bus_read_byte(dev, reg, &dummy);
@@ -265,7 +289,8 @@ static inline esp_err_t M5IOE1_I2C_SEND_WAKE(i2c_bus_device_handle_t dev, uint8_
 
 // 唤醒信号发送 (i2c_master) / Wake signal send (i2c_master)
 #ifndef M5IOE1_I2C_MASTER_SEND_WAKE
-static inline esp_err_t M5IOE1_I2C_MASTER_SEND_WAKE(i2c_master_bus_handle_t bus, uint8_t addr) {
+static inline esp_err_t M5IOE1_I2C_MASTER_SEND_WAKE(i2c_master_bus_handle_t bus, uint8_t addr)
+{
     // Use i2c_master_probe to generate START signal for wake
     return i2c_master_probe(bus, addr, 10);
 }
@@ -275,6 +300,6 @@ static inline esp_err_t M5IOE1_I2C_MASTER_SEND_WAKE(i2c_master_bus_handle_t bus,
 }
 #endif
 
-#endif // ARDUINO
+#endif  // ARDUINO
 
-#endif // __M5IOE1_I2C_COMPAT_H__
+#endif  // __M5IOE1_I2C_COMPAT_H__
