@@ -1,14 +1,14 @@
 {
   "name": "M5IOE1",
-  "version": "0.0.1",
+  "version": "1.0.1",
   "description": "Library for M5Stack M5IOE1",
   "keywords": [
     "m5stack",
-    "ioe1"
+    "IO-Expander"
   ],
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "https://github.com/m5stack/M5IOE1.git"
   },
   "authors": [
     {
