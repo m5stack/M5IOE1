@@ -708,6 +708,27 @@ public:
     m5ioe1_err_t getPwmDuty12bit(uint8_t channel, uint16_t* duty12, bool* polarity, bool* enable);
 
     /**
+     * @brief Configure PWM in one call
+     *        一次性配置 PWM 参数
+     * @param channel PWM channel (0-3)
+     *               PWM 通道（0-3）
+     * @param enable Enable output (true=enable, false=disable)
+     *              输出使能（true=启用，false=禁用）
+     * @param polarity Polarity (false=normal, true=inverted)
+     *                极性（false=正常，true=反相）
+     * @param frequency PWM frequency in Hz (0-65535, shared by all channels)
+     *                  PWM 频率（0-65535，全通道共享）
+     * @param duty12 12-bit duty (0-4095)
+     *               12 位占空比（0-4095）
+     * @note This API warns on conflicts but still applies settings
+     *       此 API 对冲突仅告警，仍会继续配置
+     * @note Changing frequency affects all channels
+     *       变更频率会影响所有通道
+     */
+    m5ioe1_err_t setPwmConfig(uint8_t channel, bool enable, bool polarity,
+                              uint16_t frequency, uint16_t duty12);
+
+    /**
      * @brief Arduino-compatible analogWrite function (PWM output)
      *        Arduino 兼容的 analogWrite 函数（PWM 输出）
      * @param channel PWM channel (0-3): M5IOE1_PWM_CH1/CH2/CH3/CH4
