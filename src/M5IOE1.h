@@ -725,8 +725,7 @@ public:
      * @note Changing frequency affects all channels
      *       变更频率会影响所有通道
      */
-    m5ioe1_err_t setPwmConfig(uint8_t channel, bool enable, bool polarity,
-                              uint16_t frequency, uint16_t duty12);
+    m5ioe1_err_t setPwmConfig(uint8_t channel, bool enable, bool polarity, uint16_t frequency, uint16_t duty12);
 
     /**
      * @brief Arduino-compatible analogWrite function (PWM output)

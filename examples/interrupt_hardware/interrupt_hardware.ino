@@ -65,7 +65,7 @@ volatile int pin2Counter = 0;
 // Custom data structure for callback with argument
 struct ButtonData {
     const char* name;
-    int* counter;
+    volatile int* counter;
     uint8_t pin;
 };
 

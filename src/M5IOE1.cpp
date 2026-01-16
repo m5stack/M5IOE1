@@ -2130,8 +2130,7 @@ m5ioe1_err_t M5IOE1::setPwmDuty12bit(uint8_t channel, uint16_t duty12, bool pola
     return M5IOE1_OK;
 }
 
-m5ioe1_err_t M5IOE1::setPwmConfig(uint8_t channel, bool enable, bool polarity,
-                                  uint16_t frequency, uint16_t duty12)
+m5ioe1_err_t M5IOE1::setPwmConfig(uint8_t channel, bool enable, bool polarity, uint16_t frequency, uint16_t duty12)
 {
     if (channel > 3 || duty12 > 0x0FFF) {
         M5IOE1_LOG_E(TAG, "Invalid PWM config: ch=%d duty12=%d", channel, duty12);
@@ -2143,7 +2142,7 @@ m5ioe1_err_t M5IOE1::setPwmConfig(uint8_t channel, bool enable, bool polarity,
     }
 
     static const uint8_t kPwmPinMap[4] = {8, 7, 10, 9};
-    uint8_t pin = kPwmPinMap[channel];
+    uint8_t pin                        = kPwmPinMap[channel];
 
     m5ioe1_validation_t validation = validateConfig(pin, M5IOE1_CONFIG_PWM, enable);
     if (!validation.valid) {
@@ -2158,8 +2157,7 @@ m5ioe1_err_t M5IOE1::setPwmConfig(uint8_t channel, bool enable, bool polarity,
         for (uint8_t other = 0; other < M5IOE1_MAX_PWM_CHANNELS; other++) {
             if (other == channel) continue;
             if (_pwmStates[other].enabled) {
-                M5IOE1_LOG_W(TAG, "PWM frequency change affects other channels: %d -> %d",
-                            _pwmFrequency, frequency);
+                M5IOE1_LOG_W(TAG, "PWM frequency change affects other channels: %d -> %d", _pwmFrequency, frequency);
                 break;
             }
         }
