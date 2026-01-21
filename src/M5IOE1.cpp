@@ -39,8 +39,8 @@ static m5ioe1_log_level_t _m5ioe1_log_level = M5IOE1_LOG_LEVEL_INFO;
         }                                                                 \
     } while (0)
 
-// Forward declarations for Arduino polling task (defined later in file)
 // 前向声明 Arduino 轮询任务变量（在文件后面定义）
+// Forward declarations for Arduino polling task (defined later in file)
 static TaskHandle_t _arduinoPollingTask   = nullptr;
 static M5IOE1* _arduinoPollingInstance    = nullptr;
 static TaskHandle_t _arduinoInterruptTask = nullptr;
@@ -3202,8 +3202,8 @@ void M5IOE1::_checkAutoWake()
     uint32_t now     = M5IOE1_GET_TIME_MS();
     uint32_t elapsed = now - _lastCommTime;
 
-    // If more than 1 second since last communication, send wake signal
     // 如果距离上次通信超过1秒，发送唤醒信号
+    // If more than 1 second since last communication, send wake signal
     if (elapsed >= 1000) {
         sendWakeSignal();
         M5IOE1_DELAY_MS(10);

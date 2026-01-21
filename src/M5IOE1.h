@@ -708,39 +708,39 @@ public:
     m5ioe1_err_t getPwmDuty12bit(uint8_t channel, uint16_t* duty12, bool* polarity, bool* enable);
 
     /**
-     * @brief Configure PWM in one call
-     *        一次性配置 PWM 参数
-     * @param channel PWM channel (0-3)
-     *               PWM 通道（0-3）
-     * @param enable Enable output (true=enable, false=disable)
-     *              输出使能（true=启用，false=禁用）
-     * @param polarity Polarity (false=normal, true=inverted)
-     *                极性（false=正常，true=反相）
-     * @param frequency PWM frequency in Hz (0-65535, shared by all channels)
-     *                  PWM 频率（0-65535，全通道共享）
-     * @param duty12 12-bit duty (0-4095)
-     *               12 位占空比（0-4095）
-     * @note This API warns on conflicts but still applies settings
-     *       此 API 对冲突仅告警，仍会继续配置
-     * @note Changing frequency affects all channels
-     *       变更频率会影响所有通道
+     * @brief 一次性配置 PWM 参数
+     *        Configure PWM in one call
+     * @param channel PWM 通道（0-3）
+     *               PWM channel (0-3)
+     * @param enable 输出使能（true=启用，false=禁用）
+     *              Enable output (true=enable, false=disable)
+     * @param polarity 极性（false=正常，true=反相）
+     *                Polarity (false=normal, true=inverted)
+     * @param frequency PWM 频率（0-65535，全通道共享）
+     *                  PWM frequency in Hz (0-65535, shared by all channels)
+     * @param duty12 12 位占空比（0-4095）
+     *               12-bit duty (0-4095)
+     * @note 此 API 对冲突仅告警，仍会继续配置
+     *       This API warns on conflicts but still applies settings
+     * @note 变更频率会影响所有通道
+     *       Changing frequency affects all channels
      */
     m5ioe1_err_t setPwmConfig(uint8_t channel, bool enable, bool polarity, uint16_t frequency, uint16_t duty12);
 
     /**
-     * @brief Arduino-compatible analogWrite function (PWM output)
-     *        Arduino 兼容的 analogWrite 函数（PWM 输出）
-     * @param channel PWM channel (0-3): M5IOE1_PWM_CH1/CH2/CH3/CH4
-     *               PWM 通道（0-3）：M5IOE1_PWM_CH1/CH2/CH3/CH4
+     * @brief Arduino 兼容的 analogWrite 函数（PWM 输出）
+     *        Arduino-compatible analogWrite function (PWM output)
+     * @param channel PWM 通道（0-3）：M5IOE1_PWM_CH1/CH2/CH3/CH4
+     *               PWM channel (0-3): M5IOE1_PWM_CH1/CH2/CH3/CH4
      *               CH1=IO9, CH2=IO8, CH3=IO11, CH4=IO10
-     * @param value PWM duty cycle (0-255, 8-bit Arduino standard)
-     *              PWM 占空比（0-255，8-bit Arduino 标准）
+     * @param value PWM 占空比（0-255，8-bit Arduino 标准）
+     *              PWM duty cycle (0-255, 8-bit Arduino standard)
      *              0 = 0% duty, 127 = 50% duty, 255 = 100% duty
      * @return M5IOE1_OK if successful, error code otherwise
-     * @note This function scales 8-bit value to 12-bit internally
-     *       此函数内部将 8-bit 值缩放到 12-bit
-     * @note Value 0 turns off PWM output
-     *       值为 0 时关闭 PWM 输出
+     * @note 此函数内部将 8-bit 值缩放到 12-bit
+     *       This function scales 8-bit value to 12-bit internally
+     * @note 值为 0 时关闭 PWM 输出
+     *       Value 0 turns off PWM output
      */
     m5ioe1_err_t analogWrite(uint8_t channel, uint8_t value);
 
@@ -749,23 +749,23 @@ public:
     // NeoPixel LED Functions
     // ========================
     /**
-     * @brief Configure and set all NeoPixel LEDs at once / 一次性配置并设置所有 NeoPixel LED
-     * @param colors Array of RGB colors / RGB 颜色数组
-     * @param arraySize Size of the colors array (for bounds checking) / 颜色数组的大小（用于边界检查）
-     * @param count Number of LEDs to set (1-32) / 要设置的 LED 数量（1-32）
-     * @param autoRefresh If true, automatically refresh LEDs after setting (default: true)
-     *                    如果为 true，设置后自动刷新 LED（默认：true）
+     * @brief 一次性配置并设置所有 NeoPixel LED / Configure and set all NeoPixel LEDs at once
+     * @param colors RGB 颜色数组 / Array of RGB colors
+     * @param arraySize 颜色数组的大小（用于边界检查） / Size of the colors array (for bounds checking)
+     * @param count 要设置的 LED 数量（1-32） / Number of LEDs to set (1-32)
+     * @param autoRefresh 如果为 true，设置后自动刷新 LED（默认：true）
+     *                    If true, automatically refresh LEDs after setting (default: true)
      * @return M5IOE1_OK if successful, error code otherwise
+     * @note 此函数将：
+     *       1. 验证参数（count <= arraySize，count <= 32）
+     *       2. 设置 LED 数量寄存器
+     *       3. 将所有 RGB 数据写入 LED RAM
+     *       4. 可选触发刷新
      * @note This function will:
      *       1. Validate parameters (count <= arraySize, count <= 32)
      *       2. Set LED count register
      *       3. Write all RGB data to LED RAM
      *       4. Optionally trigger refresh
-     *       此函数将：
-     *       1. 验证参数（count <= arraySize，count <= 32）
-     *       2. 设置 LED 数量寄存器
-     *       3. 将所有 RGB 数据写入 LED RAM
-     *       4. 可选触发刷新
      * @example
      *   m5ioe1_rgb_t leds[8] = {
      *       {255, 0, 0},    // Red
@@ -824,15 +824,15 @@ public:
     // ========================
 
     /**
-     * @brief Set all I2C configuration at once / 一次性设置所有 I2C 配置
-     * @param sleepTime Sleep timeout (0=disabled, 1-15=timeout value)
+     * @brief 一次性设置所有 I2C 配置 / Set all I2C configuration at once
      * @param sleepTime 休眠超时（0=禁用，1-15=超时值）
-     * @param speed I2C speed (M5IOE1_I2C_SPEED_100K or M5IOE1_I2C_SPEED_400K)
+     * @param sleepTime Sleep timeout (0=disabled, 1-15=timeout value)
      * @param speed I2C 速度（M5IOE1_I2C_SPEED_100K 或 M5IOE1_I2C_SPEED_400K）
-     * @param wakeEdge Wake edge (M5IOE1_WAKE_EDGE_FALLING or M5IOE1_WAKE_EDGE_RISING)
+     * @param speed I2C speed (M5IOE1_I2C_SPEED_100K or M5IOE1_I2C_SPEED_400K)
      * @param wakeEdge 唤醒边沿（M5IOE1_WAKE_EDGE_FALLING 或 M5IOE1_WAKE_EDGE_RISING）
-     * @param pullConfig Pull-up config (M5IOE1_PULL_ENABLED or M5IOE1_PULL_DISABLED)
+     * @param wakeEdge Wake edge (M5IOE1_WAKE_EDGE_FALLING or M5IOE1_WAKE_EDGE_RISING)
      * @param pullConfig 上拉配置（M5IOE1_PULL_ENABLED 或 M5IOE1_PULL_DISABLED）
+     * @param pullConfig Pull-up config (M5IOE1_PULL_ENABLED or M5IOE1_PULL_DISABLED)
      * @return M5IOE1_OK if successful, error code otherwise
      */
     m5ioe1_err_t setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed = M5IOE1_I2C_SPEED_100K,
@@ -840,79 +840,79 @@ public:
                               m5ioe1_pull_config_t pullConfig = M5IOE1_PULL_ENABLED);
 
     /**
-     * @brief Switch I2C communication speed / 切换 I2C 通讯速度
-     * @param speed Target speed (M5IOE1_I2C_SPEED_100K or M5IOE1_I2C_SPEED_400K)
+     * @brief 切换 I2C 通讯速度 / Switch I2C communication speed
      * @param speed 目标速度 (M5IOE1_I2C_SPEED_100K 或 M5IOE1_I2C_SPEED_400K)
+     * @param speed Target speed (M5IOE1_I2C_SPEED_100K or M5IOE1_I2C_SPEED_400K)
      * @return M5IOE1_OK if successful, error code otherwise
-     * @note This function will configure both the device and host I2C bus
      * @note 此函数会同时配置设备和主机 I2C 总线
+     * @note This function will configure both the device and host I2C bus
      */
     m5ioe1_err_t switchI2cSpeed(m5ioe1_i2c_speed_t speed);
 
     /**
-     * @brief Get current I2C speed setting / 获取当前 I2C 速度设置
-     * @param speed Pointer to store the speed value / 存储速度值的指针
+     * @brief 获取当前 I2C 速度设置 / Get current I2C speed setting
+     * @param speed 存储速度值的指针 / Pointer to store the speed value
      * @return M5IOE1_OK if successful, error code otherwise
-     * @note Reads from device register and updates internal cache
      * @note 从设备寄存器读取并更新内部缓存
+     * @note Reads from device register and updates internal cache
      */
     m5ioe1_err_t getI2cSpeed(m5ioe1_i2c_speed_t* speed);
 
     /**
-     * @brief Set I2C sleep timeout / 设置 I2C 休眠超时
-     * @param sleepTime Sleep timeout value (0=disabled, 1-15=timeout)
+     * @brief 设置 I2C 休眠超时 / Set I2C sleep timeout
      * @param sleepTime 休眠超时值（0=禁用，1-15=超时）
+     * @param sleepTime Sleep timeout value (0=disabled, 1-15=timeout)
      * @return M5IOE1_OK if successful, error code otherwise
-     * @note Sleep time formula: T = sleepTime * base_time
      * @note 休眠时间公式：T = sleepTime * 基础时间
+     * @note Sleep time formula: T = sleepTime * base_time
      */
     m5ioe1_err_t setI2cSleepTime(uint8_t sleepTime);
 
     /**
-     * @brief Get current I2C sleep timeout / 获取当前 I2C 休眠超时
-     * @param sleepTime Pointer to store the sleep timeout value / 存储休眠超时值的指针
+     * @brief 获取当前 I2C 休眠超时 / Get current I2C sleep timeout
+     * @param sleepTime 存储休眠超时值的指针 / Pointer to store the sleep timeout value
      * @return M5IOE1_OK if successful, error code otherwise
-     * @note Reads from device register and updates internal cache
      * @note 从设备寄存器读取并更新内部缓存
+     * @note Reads from device register and updates internal cache
      */
     m5ioe1_err_t getI2cSleepTime(uint8_t* sleepTime);
 
     /**
-     * @brief Set I2C wake edge / 设置 I2C 唤醒边沿
-     * @param edge Wake edge (M5IOE1_WAKE_EDGE_FALLING or M5IOE1_WAKE_EDGE_RISING)
+     * @brief 设置 I2C 唤醒边沿 / Set I2C wake edge
      * @param edge 唤醒边沿（M5IOE1_WAKE_EDGE_FALLING 或 M5IOE1_WAKE_EDGE_RISING）
+     * @param edge Wake edge (M5IOE1_WAKE_EDGE_FALLING or M5IOE1_WAKE_EDGE_RISING)
      * @return M5IOE1_OK if successful, error code otherwise
      */
     m5ioe1_err_t setI2cWakeEdge(m5ioe1_wake_edge_t edge);
 
     /**
-     * @brief Get current I2C wake edge / 获取当前 I2C 唤醒边沿
-     * @param edge Pointer to store the wake edge setting / 存储唤醒边沿设置的指针
+     * @brief 获取当前 I2C 唤醒边沿 / Get current I2C wake edge
+     * @param edge 存储唤醒边沿设置的指针 / Pointer to store the wake edge setting
      * @return M5IOE1_OK if successful, error code otherwise
-     * @note Reads from device register and updates internal cache
      * @note 从设备寄存器读取并更新内部缓存
+     * @note Reads from device register and updates internal cache
      */
     m5ioe1_err_t getI2cWakeEdge(m5ioe1_wake_edge_t* edge);
 
     /**
-     * @brief Set I2C internal pull-up configuration / 设置 I2C 内部上拉配置
-     * @param config Pull-up config (M5IOE1_PULL_ENABLED or M5IOE1_PULL_DISABLED)
+     * @brief 设置 I2C 内部上拉配置 / Set I2C internal pull-up configuration
      * @param config 上拉配置（M5IOE1_PULL_ENABLED 或 M5IOE1_PULL_DISABLED）
+     * @param config Pull-up config (M5IOE1_PULL_ENABLED or M5IOE1_PULL_DISABLED)
      * @return M5IOE1_OK if successful, error code otherwise
      */
     m5ioe1_err_t setI2cPullConfig(m5ioe1_pull_config_t config);
 
     /**
-     * @brief Get current I2C internal pull-up configuration / 获取当前 I2C 内部上拉配置
-     * @param config Pointer to store the pull-up configuration / 存储上拉配置的指针
+     * @brief 获取当前 I2C 内部上拉配置 / Get current I2C internal pull-up configuration
+     * @param config 存储上拉配置的指针 / Pointer to store the pull-up configuration
      * @return M5IOE1_OK if successful, error code otherwise
-     * @note Reads from device register and updates internal cache
      * @note 从设备寄存器读取并更新内部缓存
+     * @note Reads from device register and updates internal cache
      */
     m5ioe1_err_t getI2cPullConfig(m5ioe1_pull_config_t* config);
 
     /**
-     * @brief Factory reset the device / 恢复出厂设置
+     * @brief 恢复出厂设置 / Factory reset the device
      * @return M5IOE1_OK if successful, error code otherwise
      */
     m5ioe1_err_t factoryReset();
@@ -922,30 +922,30 @@ public:
     // Auto Wake Feature
     // ========================
     /**
-     * @brief Enable/disable automatic wake signal before I2C operations
-     *        启用/禁用 I2C 操作前的自动唤醒信号
+     * @brief 启用/禁用 I2C 操作前的自动唤醒信号
+     *        Enable/disable automatic wake signal before I2C operations
      * @param enable true to enable auto-wake, false to disable
-     * @note When IOE1 enters sleep mode (I2C sleep timeout), it needs a
+     * @note 当 IOE1 进入睡眠模式（I2C 睡眠超时）后，需要在 SDA 上发送
+     *       START 信号来唤醒。此功能会在需要时自动发送唤醒信号。
+     *       When IOE1 enters sleep mode (I2C sleep timeout), it needs a
      *       START signal on SDA to wake up. This feature automatically
      *       sends the wake signal when needed.
-     *       当 IOE1 进入睡眠模式（I2C 睡眠超时）后，需要在 SDA 上发送
-     *       START 信号来唤醒。此功能会在需要时自动发送唤醒信号。
-     * @note Even without enabling this option, communication will likely
+     * @note 即使不启用此选项，通讯在大多数情况下也能成功，因为第一次
+     *       I2C 传输本身就能唤醒设备。启用此选项可确保可靠性。
+     *       Even without enabling this option, communication will likely
      *       succeed in most cases, as the first I2C transaction itself
      *       can wake the device. Enable this for guaranteed reliability.
-     *       即使不启用此选项，通讯在大多数情况下也能成功，因为第一次
-     *       I2C 传输本身就能唤醒设备。启用此选项可确保可靠性。
      */
     void setAutoWakeEnable(bool enable);
 
     /**
-     * @brief Check if auto wake is enabled / 检查自动唤醒是否启用
+     * @brief 检查自动唤醒是否启用 / Check if auto wake is enabled
      * @return true if enabled
      */
     bool isAutoWakeEnabled() const;
 
     /**
-     * @brief Manually send wake signal to IOE1 / 手动发送唤醒信号到 IOE1
+     * @brief 手动发送唤醒信号到 IOE1 / Manually send wake signal to IOE1
      * @return M5IOE1_OK if successful, error code otherwise
      */
     m5ioe1_err_t sendWakeSignal();
