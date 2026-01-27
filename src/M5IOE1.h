@@ -455,7 +455,15 @@ typedef void (*m5ioe1_callback_arg_t)(void*);
 // ============================
 class M5IOE1 {
 public:
+    /**
+     * @brief 构造 M5IOE1 对象
+     *        Construct M5IOE1 object
+     */
     M5IOE1();
+    /**
+     * @brief 析构 M5IOE1 对象并释放资源
+     *        Destroy M5IOE1 object and release resources
+     */
     ~M5IOE1();
 
     // ========================
@@ -612,44 +620,218 @@ public:
     // 设备信息
     // Device Information
     // ========================
+    /**
+     * @brief 读取设备 UID
+     *        Read device UID
+     * @param uid 输出：UID（16-bit）
+     *            Output: 16-bit UID
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t getUID(uint16_t* uid);
+    /**
+     * @brief 读取设备版本号
+     *        Read device version
+     * @param version 输出：版本号
+     *                Output: version value
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t getVersion(uint8_t* version);
+    /**
+     * @brief 读取参考电压（mV）
+     *        Read reference voltage (mV)
+     * @param voltage_mv 输出：参考电压（mV）
+     *                   Output: reference voltage (mV)
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t getRefVoltage(uint16_t* voltage_mv);
 
     // ========================
     // GPIO 功能（Arduino 风格）
     // GPIO Functions (Arduino-style)
     // ========================
+    /**
+     * @brief 设置 GPIO 模式（无返回值）
+     *        Set GPIO mode (no return value)
+     * @param pin GPIO 引脚号（0-13）
+     *            GPIO pin number (0-13)
+     * @param mode 模式：INPUT/OUTPUT/INPUT_PULLUP/INPUT_PULLDOWN/OUTPUT_OPEN_DRAIN 等
+     *             Mode: INPUT/OUTPUT/INPUT_PULLUP/INPUT_PULLDOWN/OUTPUT_OPEN_DRAIN, etc.
+     * @note 如需错误码请使用 pinModeWithRes
+     *       Use pinModeWithRes for error codes
+     */
     void pinMode(uint8_t pin, uint8_t mode);
+    /**
+     * @brief 写入数字电平（无返回值）
+     *        Write digital level (no return value)
+     * @param pin GPIO 引脚号（0-13）
+     *            GPIO pin number (0-13)
+     * @param value 电平值：LOW 或 HIGH
+     *              Level: LOW or HIGH
+     * @note 如需错误码请使用 digitalWriteWithRes
+     *       Use digitalWriteWithRes for error codes
+     */
     void digitalWrite(uint8_t pin, uint8_t value);
+    /**
+     * @brief 读取数字电平（错误时返回 -1）
+     *        Read digital level (returns -1 on error)
+     * @param pin GPIO 引脚号（0-13）
+     *            GPIO pin number (0-13)
+     * @return 成功返回 0/1，失败返回 -1
+     *         Returns 0/1 on success, -1 on failure
+     */
     int digitalRead(uint8_t pin);
 
     // ========================
     // GPIO 功能（Arduino 风格 - 带错误码）
     // GPIO Functions (Arduino-style - with error code)
     // ========================
+    /**
+     * @brief 设置 GPIO 模式并返回错误码
+     *        Set GPIO mode and return error code
+     * @param pin GPIO 引脚号（0-13）
+     *            GPIO pin number (0-13)
+     * @param mode 模式：INPUT/OUTPUT/INPUT_PULLUP/INPUT_PULLDOWN/OUTPUT_OPEN_DRAIN 等
+     *             Mode: INPUT/OUTPUT/INPUT_PULLUP/INPUT_PULLDOWN/OUTPUT_OPEN_DRAIN, etc.
+     * @param err 输出：错误码指针（不能为空）
+     *            Output: error code pointer (must not be NULL)
+     * @note err 为空时仅记录日志并返回
+     *       If err is NULL, the function only logs and returns
+     */
     void pinModeWithRes(uint8_t pin, uint8_t mode, m5ioe1_err_t* err);
+    /**
+     * @brief 写入数字电平并返回错误码
+     *        Write digital level and return error code
+     * @param pin GPIO 引脚号（0-13）
+     *            GPIO pin number (0-13)
+     * @param value 电平值：LOW 或 HIGH
+     *              Level: LOW or HIGH
+     * @param err 输出：错误码指针（不能为空）
+     *            Output: error code pointer (must not be NULL)
+     * @note err 为空时仅记录日志并返回
+     *       If err is NULL, the function only logs and returns
+     */
     void digitalWriteWithRes(uint8_t pin, uint8_t value, m5ioe1_err_t* err);
+    /**
+     * @brief 读取数字电平并返回错误码
+     *        Read digital level and return error code
+     * @param pin GPIO 引脚号（0-13）
+     *            GPIO pin number (0-13)
+     * @param err 输出：错误码指针（不能为空）
+     *            Output: error code pointer (must not be NULL)
+     * @return 成功返回 0/1，失败返回 -1
+     *         Returns 0/1 on success, -1 on failure
+     * @note err 为空时仅记录日志并返回 -1
+     *       If err is NULL, the function only logs and returns -1
+     */
     int digitalReadWithRes(uint8_t pin, m5ioe1_err_t* err);
 
     // ========================
     // 中断功能
     // Interrupt Functions
     // ========================
+    /**
+     * @brief 绑定 GPIO 中断回调（无参数）
+     *        Attach GPIO interrupt callback (no argument)
+     * @param pin GPIO 引脚号（0-13）
+     *            GPIO pin number (0-13)
+     * @param callback 回调函数
+     *                 Callback function
+     * @param mode 中断模式：RISING 或 FALLING（非 RISING 值均视为 FALLING）
+     *             Interrupt mode: RISING or FALLING (non-RISING values treated as FALLING)
+     * @note 需要先调用 begin 完成初始化
+     *       begin must be called before use
+     */
     void attachInterrupt(uint8_t pin, m5ioe1_callback_t callback, uint8_t mode);
+    /**
+     * @brief 绑定 GPIO 中断回调（带参数）
+     *        Attach GPIO interrupt callback (with argument)
+     * @param pin GPIO 引脚号（0-13）
+     *            GPIO pin number (0-13)
+     * @param callback 回调函数（带参数）
+     *                 Callback function with argument
+     * @param arg 回调参数
+     *            Callback argument
+     * @param mode 中断模式：RISING 或 FALLING（非 RISING 值均视为 FALLING）
+     *             Interrupt mode: RISING or FALLING (non-RISING values treated as FALLING)
+     * @note 需要先调用 begin 完成初始化
+     *       begin must be called before use
+     */
     void attachInterruptArg(uint8_t pin, m5ioe1_callback_arg_t callback, void* arg, uint8_t mode);
+    /**
+     * @brief 解绑并禁用 GPIO 中断
+     *        Detach and disable GPIO interrupt
+     * @param pin GPIO 引脚号（0-13）
+     *            GPIO pin number (0-13)
+     */
     void detachInterrupt(uint8_t pin);
+    /**
+     * @brief 启用回调触发（软件开关）
+     *        Enable callback trigger (software switch)
+     * @param pin GPIO 引脚号（0-13）
+     *            GPIO pin number (0-13)
+     * @note 不修改硬件中断寄存器
+     *       Does not change hardware interrupt registers
+     */
     void enableInterrupt(uint8_t pin);
+    /**
+     * @brief 禁用回调触发（软件开关）
+     *        Disable callback trigger (software switch)
+     * @param pin GPIO 引脚号（0-13）
+     *            GPIO pin number (0-13)
+     * @note 不修改硬件中断寄存器
+     *       Does not change hardware interrupt registers
+     */
     void disableInterrupt(uint8_t pin);
+    /**
+     * @brief 获取中断状态位（GPIO_IS）
+     *        Get interrupt status bits (GPIO_IS)
+     * @param status 输出：中断状态位掩码
+     *               Output: interrupt status bitmask
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t getInterruptStatus(uint16_t* status);
-    m5ioe1_err_t clearInterrupt(uint8_t pin);
+    /**
+     * @brief 清除所有中断状态
+     *        Clear all interrupt status
+     * @return M5IOE1_OK if successful, error code otherwise
+     * @note GPIO_IS 寄存器为"写 0 清除"语义，会清除所有引脚的中断状态
+     *       GPIO_IS register uses "write 0 to clear" semantics, clears all pins' interrupt status
+     */
+    m5ioe1_err_t clearInterrupt();
 
     // ========================
     // 高级 GPIO 功能
     // Advanced GPIO Functions
     // ========================
+    /**
+     * @brief 设置上拉/下拉模式
+     *        Set pull-up/pull-down mode
+     * @param pin GPIO 引脚号（0-13）
+     *            GPIO pin number (0-13)
+     * @param pullMode 上拉/下拉模式：M5IOE1_PULL_NONE/UP/DOWN
+     *                 Pull mode: M5IOE1_PULL_NONE/UP/DOWN
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t setPullMode(uint8_t pin, uint8_t pullMode);
+    /**
+     * @brief 设置输出驱动模式
+     *        Set output drive mode
+     * @param pin GPIO 引脚号（0-13）
+     *            GPIO pin number (0-13)
+     * @param driveMode 驱动模式：M5IOE1_DRIVE_PUSHPULL 或 M5IOE1_DRIVE_OPENDRAIN
+     *                  Drive mode: M5IOE1_DRIVE_PUSHPULL or M5IOE1_DRIVE_OPENDRAIN
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t setDriveMode(uint8_t pin, uint8_t driveMode);
+    /**
+     * @brief 读取 GPIO 输入电平
+     *        Read GPIO input level
+     * @param pin GPIO 引脚号（0-13）
+     *            GPIO pin number (0-13)
+     * @param state 输出：电平状态（0/1）
+     *              Output: level state (0/1)
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t getInputState(uint8_t pin, uint8_t* state);
 
     // ========================
@@ -663,14 +845,40 @@ public:
      * @return M5IOE1_OK if successful, error code otherwise
      */
     m5ioe1_err_t analogRead(uint8_t channel, uint16_t* result);
+    /**
+     * @brief 查询 ADC 是否忙
+     *        Check if ADC is busy
+     * @param busy 输出：busy 状态
+     *             Output: busy status
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t isAdcBusy(bool* busy);
+    /**
+     * @brief 禁用 ADC 并清零控制寄存器
+     *        Disable ADC and clear control register
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t disableAdc();
 
     // ========================
     // 温度传感器
     // Temperature Sensor
     // ========================
+    /**
+     * @brief 读取温度传感器原始值
+     *        Read temperature sensor raw value
+     * @param temperature 输出：温度原始值（12-bit）
+     *                    Output: raw temperature value (12-bit)
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t readTemperature(uint16_t* temperature);
+    /**
+     * @brief 查询温度转换是否忙
+     *        Check if temperature conversion is busy
+     * @param busy 输出：busy 状态
+     *             Output: busy status
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t isTemperatureBusy(bool* busy);
 
     // ========================
@@ -683,6 +891,13 @@ public:
      * @return M5IOE1_OK if successful, error code otherwise
      */
     m5ioe1_err_t setPwmFrequency(uint16_t frequency);
+    /**
+     * @brief 读取 PWM 频率
+     *        Read PWM frequency
+     * @param frequency 输出：频率（Hz）
+     *                  Output: frequency in Hz
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t getPwmFrequency(uint16_t* frequency);
 
     /**
@@ -694,6 +909,19 @@ public:
      * @return M5IOE1_OK if successful, error code otherwise
      */
     m5ioe1_err_t setPwmDuty(uint8_t channel, uint8_t duty, bool polarity = false, bool enable = true);
+    /**
+     * @brief 读取 PWM 占空比（百分比）
+     *        Read PWM duty cycle (percentage)
+     * @param channel PWM 通道（0-3）
+     *                PWM channel (0-3)
+     * @param duty 输出：占空比百分比（0-100）
+     *             Output: duty percentage (0-100)
+     * @param polarity 输出：极性状态
+     *                 Output: polarity state
+     * @param enable 输出：使能状态
+     *               Output: enable state
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t getPwmDuty(uint8_t channel, uint8_t* duty, bool* polarity, bool* enable);
 
     /**
@@ -705,6 +933,19 @@ public:
      * @return M5IOE1_OK if successful, error code otherwise
      */
     m5ioe1_err_t setPwmDuty12bit(uint8_t channel, uint16_t duty12, bool polarity = false, bool enable = true);
+    /**
+     * @brief 读取 PWM 占空比（12-bit）
+     *        Read PWM duty cycle (12-bit)
+     * @param channel PWM 通道（0-3）
+     *                PWM channel (0-3)
+     * @param duty12 输出：12-bit 占空比（0-4095）
+     *               Output: 12-bit duty (0-4095)
+     * @param polarity 输出：极性状态
+     *                 Output: polarity state
+     * @param enable 输出：使能状态
+     *               Output: enable state
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t getPwmDuty12bit(uint8_t channel, uint16_t* duty12, bool* polarity, bool* enable);
 
     /**
@@ -780,10 +1021,49 @@ public:
      *   ioe1.setLeds(leds, sizeof(leds)/sizeof(leds[0]), 8, true);
      */
     m5ioe1_err_t setLeds(const m5ioe1_rgb_t* colors, uint8_t arraySize, uint8_t count, bool autoRefresh = true);
+    /**
+     * @brief 设置 NeoPixel LED 数量
+     *        Set NeoPixel LED count
+     * @param count LED 数量（0-32）
+     *              LED count (0-32)
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t setLedCount(uint8_t count);
+    /**
+     * @brief 设置单个 LED 颜色（RGB888）
+     *        Set a single LED color (RGB888)
+     * @param index LED 索引（0-31）
+     *              LED index (0-31)
+     * @param r 红色分量（0-255）
+     *          Red component (0-255)
+     * @param g 绿色分量（0-255）
+     *          Green component (0-255)
+     * @param b 蓝色分量（0-255）
+     *          Blue component (0-255)
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t setLedColor(uint8_t index, uint8_t r, uint8_t g, uint8_t b);
+    /**
+     * @brief 设置单个 LED 颜色（结构体）
+     *        Set a single LED color (struct)
+     * @param index LED 索引（0-31）
+     *              LED index (0-31)
+     * @param color RGB 颜色结构体
+     *              RGB color struct
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t setLedColor(uint8_t index, m5ioe1_rgb_t color);
+    /**
+     * @brief 刷新 LED 显示
+     *        Refresh LED display
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t refreshLeds();
+    /**
+     * @brief 禁用所有 LED 并清零配置
+     *        Disable all LEDs and clear configuration
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t disableLeds();
 
     // ========================
@@ -815,7 +1095,29 @@ public:
     // RTC RAM 功能
     // RTC RAM Functions
     // ========================
+    /**
+     * @brief 写入 RTC RAM 并回读验证
+     *        Write RTC RAM with read-back verification
+     * @param offset 起始偏移（0-31）
+     *               Start offset (0-31)
+     * @param data 输入数据指针
+     *             Input data pointer
+     * @param length 数据长度（1-32，且 offset+length <= 32）
+     *               Data length (1-32, offset+length <= 32)
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t writeRtcRAM(uint8_t offset, const uint8_t* data, uint8_t length);
+    /**
+     * @brief 读取 RTC RAM
+     *        Read RTC RAM
+     * @param offset 起始偏移（0-31）
+     *               Start offset (0-31)
+     * @param data 输出数据缓冲区
+     *             Output data buffer
+     * @param length 数据长度（1-32，且 offset+length <= 32）
+     *               Data length (1-32, offset+length <= 32)
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t readRtcRAM(uint8_t offset, uint8_t* data, uint8_t length);
 
     // ========================
@@ -954,19 +1256,77 @@ public:
     // 状态快照功能
     // State Snapshot Functions
     // ========================
+    /**
+     * @brief 启用/禁用自动快照更新
+     *        Enable/disable automatic snapshot updates
+     * @param enable true 启用，false 禁用
+     *               true to enable, false to disable
+     */
     void setAutoSnapshot(bool enable);
+    /**
+     * @brief 查询自动快照是否启用
+     *        Check if auto snapshot is enabled
+     * @return true if enabled
+     */
     bool isAutoSnapshotEnabled() const;
+    /**
+     * @brief 立即更新快照缓存
+     *        Update snapshot cache immediately
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t updateSnapshot();
 
     // ========================
     // 调试功能
     // Debug Functions
     // ========================
+    /**
+     * @brief 读取 GPIO 模式寄存器
+     *        Read GPIO mode register
+     * @param reg 输出：寄存器值
+     *            Output: register value
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t getModeReg(uint16_t* reg);
+    /**
+     * @brief 读取 GPIO 输出寄存器
+     *        Read GPIO output register
+     * @param reg 输出：寄存器值
+     *            Output: register value
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t getOutputReg(uint16_t* reg);
+    /**
+     * @brief 读取 GPIO 输入寄存器
+     *        Read GPIO input register
+     * @param reg 输出：寄存器值
+     *            Output: register value
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t getInputReg(uint16_t* reg);
+    /**
+     * @brief 读取 GPIO 上拉寄存器
+     *        Read GPIO pull-up register
+     * @param reg 输出：寄存器值
+     *            Output: register value
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t getPullUpReg(uint16_t* reg);
+    /**
+     * @brief 读取 GPIO 下拉寄存器
+     *        Read GPIO pull-down register
+     * @param reg 输出：寄存器值
+     *            Output: register value
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t getPullDownReg(uint16_t* reg);
+    /**
+     * @brief 读取 GPIO 驱动寄存器
+     *        Read GPIO drive register
+     * @param reg 输出：寄存器值
+     *            Output: register value
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
     m5ioe1_err_t getDriveReg(uint16_t* reg);
 
     // ========================

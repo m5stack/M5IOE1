@@ -1756,15 +1756,12 @@ m5ioe1_err_t M5IOE1::getInterruptStatus(uint16_t* status)
     return M5IOE1_OK;
 }
 
-m5ioe1_err_t M5IOE1::clearInterrupt(uint8_t pin)
+m5ioe1_err_t M5IOE1::clearInterrupt()
 {
-    if (!_isValidPin(pin)) return M5IOE1_ERR_INVALID_ARG;
     if (!_initialized) return M5IOE1_FAIL;
 
     // GPIO_IS 寄存器是"写0清除"语义，必须写入0来清除所有中断
-    // 注意：不能读取后写回原值，否则会影响其他引脚的中断状态
     // GPIO_IS register uses "write 0 to clear" semantics, must write 0 to clear all interrupts
-    // Note: Cannot read and write back original value, otherwise it will affect other pins' interrupt status
     if (!_writeReg16(M5IOE1_REG_GPIO_IS_L, 0)) {
         M5IOE1_LOG_E(TAG, "Failed to write GPIO_IS register for clear");
         return M5IOE1_ERR_I2C_COMM;
