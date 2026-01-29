@@ -303,15 +303,30 @@ typedef enum {
 // AW8737A PULSE NUM Types
 // ============================
 typedef enum {
-    M5IOE1_AW8737A_PULSE_NUM_0 = 0,  // 0 个脉冲
-                                     // 0 pulse
-    M5IOE1_AW8737A_PULSE_NUM_1 = 1,  // 1 个脉冲
-                                     // 1 pulse
-    M5IOE1_AW8737A_PULSE_NUM_2 = 2,  // 2 个脉冲
-                                     // 2 pulses
-    M5IOE1_AW8737A_PULSE_NUM_3 = 3   // 3 个脉冲
-                                     // 3 pulses
-} m5ioe1_aw8737a_pulse_num_t;
+    M5IOE1_AW8737A_PULSE_0 = 0,  // 0 个脉冲
+                                 // 0 pulse
+    M5IOE1_AW8737A_PULSE_1 = 1,  // 1 个脉冲
+                                 // 1 pulse
+    M5IOE1_AW8737A_PULSE_2 = 2,  // 2 个脉冲
+                                 // 2 pulses
+    M5IOE1_AW8737A_PULSE_3 = 3   // 3 个脉冲
+                                 // 3 pulses
+} m5ioe1_aw8737a_pulse_t;
+
+// ============================
+// AW8737A 模式类型
+// AW8737A Mode Types
+// ============================
+typedef enum {
+    M5IOE1_AW8737A_MODE_1 = 0,  // 模式1: 0脉冲 (关闭/静音)
+                                // Mode 1: 0 pulse (off/mute)
+    M5IOE1_AW8737A_MODE_2 = 1,  // 模式2: 1脉冲 (低增益)
+                                // Mode 2: 1 pulse (low gain)
+    M5IOE1_AW8737A_MODE_3 = 2,  // 模式3: 2脉冲 (中增益)
+                                // Mode 3: 2 pulses (medium gain)
+    M5IOE1_AW8737A_MODE_4 = 3   // 模式4: 3脉冲 (高增益)
+                                // Mode 4: 3 pulses (high gain)
+} m5ioe1_aw8737a_mode_t;
 
 // ============================
 // 中断处理模式
@@ -432,6 +447,8 @@ typedef struct {
                                // true if PWM registers don't match cache
     bool adc_mismatch;         // 如果 ADC 寄存器与缓存不匹配则为 true
                                // true if ADC registers don't match cache
+    bool aw8737a_mismatch;     // 如果 AW8737A 寄存器与缓存不匹配则为 true
+                               // true if AW8737A registers don't match cache
     uint16_t expected_mode;    // 缓存的 GPIO 模式寄存器值
                                // cached GPIO mode register value
     uint16_t actual_mode;      // 实际的 GPIO 模式寄存器值
@@ -440,6 +457,10 @@ typedef struct {
                                // cached GPIO output register value
     uint16_t actual_output;    // 实际的 GPIO 输出寄存器值
                                // actual GPIO output register value
+    uint8_t expected_aw8737a;  // 缓存的 AW8737A 寄存器值
+                               // cached AW8737A register value
+    uint8_t actual_aw8737a;    // 实际的 AW8737A 寄存器值
+                               // actual AW8737A register value
 } m5ioe1_snapshot_verify_t;
 
 // ============================
@@ -1071,25 +1092,74 @@ public:
     // AW8737A Pulse Functions
     // ========================
     /**
-     * @brief Set AW8737A pulse output configuration
-     * @param pin GPIO pin number (0-13)
-     * @param pulseNum Number of pulses (0-3)
-     * @param refresh Refresh control (WAIT or NOW)
+     * @brief 设置 AW8737A 脉冲输出配置
+     *        Set AW8737A pulse output configuration
+     * @param pin GPIO 引脚号（0-13）
+     *            GPIO pin number (0-13)
+     * @param pulseNum 脉冲数量（0-3）
+     *                 Number of pulses (0-3)
+     * @param refresh 刷新控制：WAIT 或 NOW
+     *                Refresh control: WAIT or NOW
      * @return M5IOE1_OK if successful, error code otherwise
-     * @note This will automatically configure the pin as output
-     * @note If using open-drain output, external pull-up is required
-     * @note When refresh=NOW, there will be a 20ms delay after execution
+     * @note 如果引脚不是输出模式，会自动配置为推挽输出；如果已是输出模式则保持原有配置
+     *       If pin is not output mode, it will be auto-configured as push-pull output; if already output, keeps current config
+     * @note 如果使用开漏输出，需要外部上拉电阻
+     *       If using open-drain output, external pull-up is required
+     * @note 当 refresh=NOW 时，执行后会有 20ms 延迟
+     *       When refresh=NOW, there will be a 20ms delay after execution
      */
-    m5ioe1_err_t setAw8737aPulse(uint8_t pin, m5ioe1_aw8737a_pulse_num_t pulseNum,
+    m5ioe1_err_t setAw8737aPulse(uint8_t pin, m5ioe1_aw8737a_pulse_t pulseNum,
                                  m5ioe1_aw8737a_refresh_t refresh = M5IOE1_AW8737A_REFRESH_NOW);
 
     /**
-     * @brief Trigger AW8737A pulse refresh
+     * @brief 触发 AW8737A 脉冲刷新
+     *        Trigger AW8737A pulse refresh
      * @return M5IOE1_OK if successful, error code otherwise
-     * @note Call setAw8737aPulse with refresh=WAIT first, then call this to trigger
-     * @note There will be a 20ms delay after execution
+     * @note 需要先调用 setAw8737aPulse 并设置 refresh=WAIT，然后调用此函数触发
+     *       Call setAw8737aPulse with refresh=WAIT first, then call this to trigger
+     * @note 如果引脚不是输出模式，会自动配置为推挽输出；如果已是输出模式则保持原有配置
+     *       If pin is not output mode, it will be auto-configured as push-pull output; if already output, keeps current config
+     * @note 如果使用开漏输出，需要外部上拉电阻
+     *       If using open-drain output, external pull-up is required
+     * @note 执行后会有 20ms 延迟
+     *       There will be a 20ms delay after execution
      */
     m5ioe1_err_t refreshAw8737aPulse();
+
+    /**
+     * @brief 设置 AW8737A 增益模式并可选刷新
+     *        Set AW8737A gain mode with optional refresh
+     * @param pin GPIO 引脚号（0-13）
+     *            GPIO pin number (0-13)
+     * @param mode 增益模式 (MODE_1 到 MODE_4)
+     *             Gain mode (MODE_1 to MODE_4)
+     * @param refresh 刷新控制：WAIT 或 NOW
+     *                Refresh control: WAIT or NOW
+     * @return M5IOE1_OK if successful, error code otherwise
+     * @note 如果引脚不是输出模式，会自动配置为推挽输出；如果已是输出模式则保持原有配置
+     *       If pin is not output mode, it will be auto-configured as push-pull output; if already output, keeps current config
+     * @note 如果使用开漏输出，需要外部上拉电阻
+     *       If using open-drain output, external pull-up is required
+     * @note 当 refresh=NOW 时，执行后会有 20ms 延迟
+     *       When refresh=NOW, there will be a 20ms delay after execution
+     */
+    m5ioe1_err_t setAw8737aMode(uint8_t pin, m5ioe1_aw8737a_mode_t mode,
+                                m5ioe1_aw8737a_refresh_t refresh = M5IOE1_AW8737A_REFRESH_NOW);
+
+    /**
+     * @brief 刷新 AW8737A 模式配置
+     *        Refresh AW8737A mode configuration
+     * @return M5IOE1_OK if successful, error code otherwise
+     * @note 需要先调用 setAw8737aMode 并设置 refresh=WAIT，然后调用此函数触发
+     *       Call setAw8737aMode with refresh=WAIT first, then call this to trigger
+     * @note 如果引脚不是输出模式，会自动配置为推挽输出；如果已是输出模式则保持原有配置
+     *       If pin is not output mode, it will be auto-configured as push-pull output; if already output, keeps current config
+     * @note 如果使用开漏输出，需要外部上拉电阻
+     *       If using open-drain output, external pull-up is required
+     * @note 执行后会有 20ms 延迟
+     *       There will be a 20ms delay after execution
+     */
+    m5ioe1_err_t refreshAw8737aMode();
 
     // ========================
     // RTC RAM 功能
@@ -1529,6 +1599,19 @@ private:
     uint8_t _ledCount;
     bool _ledEnabled;
 
+    // AW8737A 配置状态缓存
+    // AW8737A configuration state cache
+    bool _aw8737aConfigured;                   // 是否已调用 setAw8737aPulse 配置
+                                               // Whether setAw8737aPulse has been called
+    uint8_t _aw8737aPin;                       // 配置的引脚号
+                                               // Configured pin number
+    m5ioe1_aw8737a_pulse_t _aw8737aPulseNum;   // 配置的脉冲数
+                                               // Configured pulse count
+    uint8_t _aw8737aRegValue;                  // 缓存的寄存器值（不含 REFRESH 位）
+                                               // Cached register value (without REFRESH bit)
+    bool _aw8737aStateValid;                   // 缓存有效性标志
+                                               // Cache validity flag
+
     // ========================
     // 内部辅助函数
     // Internal Helper Functions
@@ -1556,6 +1639,8 @@ private:
     bool _snapshotPinStates();
     bool _snapshotPwmStates();
     bool _snapshotAdcState();
+    bool _snapshotAw8737a();
+    void _clearAw8737a();
     void _autoSnapshotUpdate();
 
     bool _initDevice();

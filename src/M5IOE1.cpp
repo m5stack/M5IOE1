@@ -166,6 +166,7 @@ M5IOE1::M5IOE1()
     _clearPwmStates();
     _clearAdcState();
     _clearI2cConfig();
+    _clearAw8737a();
 }
 
 M5IOE1::~M5IOE1()
@@ -2494,7 +2495,7 @@ m5ioe1_err_t M5IOE1::setLeds(const m5ioe1_rgb_t* colors, uint8_t count, uint8_t 
 // AW8737A Pulse Functions
 // ============================
 
-m5ioe1_err_t M5IOE1::setAw8737aPulse(uint8_t pin, m5ioe1_aw8737a_pulse_num_t pulseNum, m5ioe1_aw8737a_refresh_t refresh)
+m5ioe1_err_t M5IOE1::setAw8737aPulse(uint8_t pin, m5ioe1_aw8737a_pulse_t pulseNum, m5ioe1_aw8737a_refresh_t refresh)
 {
     if (!_initialized) {
         M5IOE1_LOG_E(TAG, "Device not initialized");
@@ -2510,60 +2511,70 @@ m5ioe1_err_t M5IOE1::setAw8737aPulse(uint8_t pin, m5ioe1_aw8737a_pulse_num_t pul
 
     // 验证脉冲编号 (0-3)
     // Validate pulse number (0-3)
-    if (pulseNum > M5IOE1_AW8737A_PULSE_NUM_3) {
+    if (pulseNum > M5IOE1_AW8737A_PULSE_3) {
         M5IOE1_LOG_E(TAG, "Invalid pulse number: %d (valid range: 0-3)", pulseNum);
         return M5IOE1_ERR_INVALID_ARG;
     }
 
-    // 构建寄存器值
-    // [7] REFRESH | [6:5] NUM[1:0] | [4:0] GPIO[4:0]
-    // Build register value
+    // 检查引脚是否为输出模式，如果不是则自动配置为推挽输出
+    // Check if pin is output mode, if not auto-configure as push-pull output
+    if (!_pinStates[pin].isOutput) {
+        M5IOE1_LOG_I(TAG, "AW8737A: Pin %d not output mode, auto-configuring as push-pull output", pin);
+        pinMode(pin, OUTPUT);
+    }
+
+    // 保存配置到成员变量
+    // Save configuration to member variables
+    _aw8737aConfigured = true;
+    _aw8737aPin        = pin;
+    _aw8737aPulseNum   = pulseNum;
+
+    // 构建寄存器值（不含 REFRESH 位）
+    // Build register value (without REFRESH bit)
     // [7] REFRESH | [6:5] NUM[1:0] | [4:0] GPIO[4:0]
     uint8_t regValue = 0;
     regValue |= (pin & M5IOE1_AW8737A_GPIO_MASK);                                    // 位[4:0]: GPIO 选择
                                                                                      // Bits[4:0]: GPIO selection
     regValue |= ((pulseNum & M5IOE1_AW8737A_NUM_MASK) << M5IOE1_AW8737A_NUM_SHIFT);  // 位[6:5]: 脉冲编号
                                                                                      // Bits[6:5]: Pulse number
-    if (refresh == M5IOE1_AW8737A_REFRESH_NOW) {
-        regValue |= M5IOE1_AW8737A_REFRESH;  // 位[7]: 刷新标志
-                                             // Bit[7]: Refresh flag
-    }
 
-    // 步骤 1: 写入寄存器
-    // Step 1: Write register
+    // 写入寄存器（不含 REFRESH 位）
+    // Write register (without REFRESH bit)
     if (!_writeReg(M5IOE1_REG_AW8737A_PULSE, regValue)) {
         M5IOE1_LOG_E(TAG, "Failed to set AW8737A pulse config");
         return M5IOE1_ERR_I2C_COMM;
     }
 
-    // 如果设置了 REFRESH 位 (REFRESH_NOW)，等待 20ms，因为它会影响 I2C 通信
-    // If REFRESH bit was set (REFRESH_NOW), wait 20ms as it affects I2C communication
-    if (refresh == M5IOE1_AW8737A_REFRESH_NOW) {
-        M5IOE1_DELAY_MS(20);
-    }
+    // 更新缓存
+    // Update cache
+    _aw8737aRegValue   = regValue;
+    _aw8737aStateValid = true;
 
-    // 步骤 2: 回读验证
-    // Step 2: Read-back verification
+    // 回读验证
+    // Read-back verification
     uint8_t actualReg = 0;
     if (!_readReg(M5IOE1_REG_AW8737A_PULSE, &actualReg)) {
         M5IOE1_LOG_E(TAG, "Failed to read back AW8737A pulse register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
-    // 步骤 3: 验证关键位是否匹配
-    // Step 3: Verify critical bits match
-    // 只验证低 7 位 [6:0]，REFRESH 位 [7] 可能自清
-    // Only verify lower 7 bits [6:0], REFRESH bit [7] may self-clear
-    uint8_t expectedValue = regValue & 0x7F;
-    uint8_t actualValue   = actualReg & 0x7F;
-    if (actualValue != expectedValue) {
-        M5IOE1_LOG_E(TAG, "AW8737A pulse verification failed: expected=0x%02X, actual=0x%02X", expectedValue,
-                     actualValue);
+    // 验证关键位是否匹配
+    // Verify critical bits match
+    uint8_t actualValue = actualReg & 0x7F;
+    if (actualValue != regValue) {
+        M5IOE1_LOG_E(TAG, "AW8737A pulse verification failed: expected=0x%02X, actual=0x%02X", regValue, actualValue);
         return M5IOE1_FAIL;
     }
 
-    M5IOE1_LOG_I(TAG, "AW8737A pulse set and verified: pin=%d, num=%d, refresh=%d (reg=0x%02X)", pin, pulseNum, refresh,
-                 regValue);
+    M5IOE1_LOG_I(TAG, "AW8737A pulse configured: pin=%d, num=%d (reg=0x%02X)", pin, pulseNum, regValue);
+
+    // 如果需要立即刷新，调用 refreshAw8737aPulse
+    // If immediate refresh needed, call refreshAw8737aPulse
+    if (refresh == M5IOE1_AW8737A_REFRESH_NOW) {
+        return refreshAw8737aPulse();
+    }
+
+    _autoSnapshotUpdate();
     return M5IOE1_OK;
 }
 
@@ -2574,6 +2585,19 @@ m5ioe1_err_t M5IOE1::refreshAw8737aPulse()
         return M5IOE1_ERR_NOT_INIT;
     }
 
+    // 检查是否已配置
+    // Check if configured
+    if (!_aw8737aConfigured) {
+        M5IOE1_LOG_W(TAG, "AW8737A pulse not configured, executing anyway");
+    }
+
+    // 检查引脚是否为输出模式，如果不是则自动配置为推挽输出
+    // Check if pin is output mode, if not auto-configure as push-pull output
+    if (!_pinStates[_aw8737aPin].isOutput) {
+        M5IOE1_LOG_I(TAG, "AW8737A: Pin %d not output mode, auto-configuring as push-pull output", _aw8737aPin);
+        pinMode(_aw8737aPin, OUTPUT);
+    }
+
     // 读取当前寄存器值
     // Read current register value
     uint8_t regValue = 0;
@@ -2582,8 +2606,8 @@ m5ioe1_err_t M5IOE1::refreshAw8737aPulse()
         return M5IOE1_ERR_I2C_COMM;
     }
 
-    // 将位 7 设置为 1
-    // Set bit 7 to 1
+    // 设置 REFRESH 位
+    // Set REFRESH bit
     regValue |= M5IOE1_AW8737A_REFRESH;
 
     if (!_writeReg(M5IOE1_REG_AW8737A_PULSE, regValue)) {
@@ -2591,13 +2615,35 @@ m5ioe1_err_t M5IOE1::refreshAw8737aPulse()
         return M5IOE1_ERR_I2C_COMM;
     }
 
-    M5IOE1_LOG_I(TAG, "AW8737A pulse refresh triggered (reg=0x%02X)", regValue);
+    // 输出详细日志
+    // Output detailed log
+    const char* driveStr = (_pinStates[_aw8737aPin].drive == M5IOE1_DRIVE_PUSHPULL) ? "PUSH-PULL" : "OPEN-DRAIN";
+    M5IOE1_LOG_I(TAG, "AW8737A pulse refresh: pin=%d, pulseNum=%d, mode=OUTPUT, drive=%s",
+                 _aw8737aPin, _aw8737aPulseNum, driveStr);
 
     // 写入位 7 后等待 20ms，因为它会影响 I2C 通信
     // Wait 20ms after writing bit 7, as it affects I2C communication
     M5IOE1_DELAY_MS(20);
 
+    _autoSnapshotUpdate();
     return M5IOE1_OK;
+}
+
+m5ioe1_err_t M5IOE1::setAw8737aMode(uint8_t pin, m5ioe1_aw8737a_mode_t mode, m5ioe1_aw8737a_refresh_t refresh)
+{
+    // Mode 直接映射到 Pulse (MODE_1=0pulse, MODE_2=1pulse, MODE_3=2pulses, MODE_4=3pulses)
+    // Mode directly maps to Pulse
+    if (mode > M5IOE1_AW8737A_MODE_4) {
+        M5IOE1_LOG_E(TAG, "Invalid AW8737A mode: %d (valid range: 0-3)", mode);
+        return M5IOE1_ERR_INVALID_ARG;
+    }
+
+    return setAw8737aPulse(pin, (m5ioe1_aw8737a_pulse_t)mode, refresh);
+}
+
+m5ioe1_err_t M5IOE1::refreshAw8737aMode()
+{
+    return refreshAw8737aPulse();
 }
 
 // ============================
@@ -3778,6 +3824,7 @@ void M5IOE1::_autoSnapshotUpdate()
         _snapshotPinStates();
         _snapshotPwmStates();
         _snapshotAdcState();
+        _snapshotAw8737a();
     }
 }
 
@@ -4207,6 +4254,36 @@ bool M5IOE1::_snapshotI2cConfig()
     return true;
 }
 
+bool M5IOE1::_snapshotAw8737a()
+{
+    if (!_initialized) return false;
+
+    uint8_t regValue = 0;
+    if (!_readReg(M5IOE1_REG_AW8737A_PULSE, &regValue)) {
+        M5IOE1_LOG_E(TAG, "Failed to read AW8737A pulse register");
+        _aw8737aStateValid = false;
+        return false;
+    }
+
+    // 解析寄存器值（不含 REFRESH 位）
+    // Parse register value (without REFRESH bit)
+    _aw8737aRegValue   = regValue & 0x7F;
+    _aw8737aPin        = regValue & M5IOE1_AW8737A_GPIO_MASK;
+    _aw8737aPulseNum   = (m5ioe1_aw8737a_pulse_t)((regValue >> M5IOE1_AW8737A_NUM_SHIFT) & M5IOE1_AW8737A_NUM_MASK);
+    _aw8737aStateValid = true;
+
+    return true;
+}
+
+void M5IOE1::_clearAw8737a()
+{
+    _aw8737aConfigured = false;
+    _aw8737aPin        = 0;
+    _aw8737aPulseNum   = M5IOE1_AW8737A_PULSE_0;
+    _aw8737aRegValue   = 0;
+    _aw8737aStateValid = false;
+}
+
 // ============================
 // 快照验证
 // Snapshot Verification
@@ -4214,7 +4291,8 @@ bool M5IOE1::_snapshotI2cConfig()
 
 m5ioe1_snapshot_verify_t M5IOE1::verifySnapshot()
 {
-    m5ioe1_snapshot_verify_t result = {true, false, false, false, 0, 0, 0, 0};
+    m5ioe1_snapshot_verify_t result = {0};
+    result.consistent = true;
 
     if (!_initialized) {
         result.consistent = false;
@@ -4291,6 +4369,23 @@ m5ioe1_snapshot_verify_t M5IOE1::verifySnapshot()
                 result.adc_mismatch = true;
                 result.consistent   = false;
             }
+        }
+    }
+
+    // 验证 AW8737A 寄存器
+    // Verify AW8737A registers
+    if (_aw8737aStateValid) {
+        uint8_t actualReg = 0;
+        if (_readReg(M5IOE1_REG_AW8737A_PULSE, &actualReg)) {
+            result.expected_aw8737a = _aw8737aRegValue;
+            result.actual_aw8737a   = actualReg & 0x7F;
+
+            if (result.expected_aw8737a != result.actual_aw8737a) {
+                result.aw8737a_mismatch = true;
+                result.consistent       = false;
+            }
+        } else {
+            result.consistent = false;
         }
     }
 
