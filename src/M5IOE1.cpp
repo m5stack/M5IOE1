@@ -1310,6 +1310,10 @@ m5ioe1_err_t M5IOE1::_digitalWriteWithErr(uint8_t pin, uint8_t value)
     // Step 4: Verification passed, update cache
     _pinStates[pin].outputLevel = value ? 1 : 0;
 
+    // 步骤 5: 打印日志
+    // Step 5: Log
+    M5IOE1_LOG_I(TAG, "Pin %d digital write and verified: %d", pin, value ? HIGH : LOW);
+
     return M5IOE1_OK;
 }
 
