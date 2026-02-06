@@ -2290,7 +2290,7 @@ m5ioe1_err_t M5IOE1::setLedColor(uint8_t index, uint8_t r, uint8_t g, uint8_t b)
     uint16_t rgb565 = (r5 << 11) | (g6 << 5) | b5;
 
     uint8_t regAddr = M5IOE1_REG_LED_RAM_START + (index * 2);
-    uint8_t data[2] = {(uint8_t)((rgb565 >> 8) & 0xFF), (uint8_t)(rgb565 & 0xFF)};
+    uint8_t data[2] = {(uint8_t)(rgb565 & 0xFF), (uint8_t)((rgb565 >> 8) & 0xFF)};
 
     // 步骤 1: 写入寄存器
     // Step 1: Write register
@@ -2307,7 +2307,7 @@ m5ioe1_err_t M5IOE1::setLedColor(uint8_t index, uint8_t r, uint8_t g, uint8_t b)
         M5IOE1_LOG_E(TAG, "Failed to read back LED_RAM register for index %d", index);
         return M5IOE1_ERR_I2C_COMM;
     }
-    actualRgb565 = ((uint16_t)actualData[0] << 8) | actualData[1];
+    actualRgb565 = ((uint16_t)actualData[1] << 8) | actualData[0];
 
     // 步骤 3: 验证关键位是否匹配
     // Step 3: Verify critical bits match
@@ -2449,7 +2449,7 @@ m5ioe1_err_t M5IOE1::setLeds(const m5ioe1_rgb_t* colors, uint8_t count, uint8_t 
         uint16_t rgb565 = (r5 << 11) | (g6 << 5) | b5;
 
         uint8_t regAddr = M5IOE1_REG_LED_RAM_START + (i * 2);
-        uint8_t data[2] = {(uint8_t)((rgb565 >> 8) & 0xFF), (uint8_t)(rgb565 & 0xFF)};
+        uint8_t data[2] = {(uint8_t)(rgb565 & 0xFF), (uint8_t)((rgb565 >> 8) & 0xFF)};
 
         if (!_writeBytes(regAddr, data, 2)) {
             M5IOE1_LOG_E(TAG, "Failed to write LED_RAM for index %d", i);
@@ -2463,7 +2463,7 @@ m5ioe1_err_t M5IOE1::setLeds(const m5ioe1_rgb_t* colors, uint8_t count, uint8_t 
             M5IOE1_LOG_E(TAG, "Failed to read back LED_RAM for index %d", i);
             return M5IOE1_ERR_I2C_COMM;
         }
-        uint16_t actualRgb565 = ((uint16_t)actualData[0] << 8) | actualData[1];
+        uint16_t actualRgb565 = ((uint16_t)actualData[1] << 8) | actualData[0];
         if (actualRgb565 != rgb565) {
             M5IOE1_LOG_E(TAG, "LED color verification failed for index %d: expected=0x%04X, actual=0x%04X", i, rgb565,
                          actualRgb565);
@@ -2622,8 +2622,8 @@ m5ioe1_err_t M5IOE1::refreshAw8737aPulse()
     // 输出详细日志
     // Output detailed log
     const char* driveStr = (_pinStates[_aw8737aPin].drive == M5IOE1_DRIVE_PUSHPULL) ? "PUSH-PULL" : "OPEN-DRAIN";
-    M5IOE1_LOG_I(TAG, "AW8737A pulse refresh: pin=%d, pulseNum=%d, mode=OUTPUT, drive=%s",
-                 _aw8737aPin, _aw8737aPulseNum, driveStr);
+    M5IOE1_LOG_I(TAG, "AW8737A pulse refresh: pin=%d, pulseNum=%d, mode=OUTPUT, drive=%s", _aw8737aPin,
+                 _aw8737aPulseNum, driveStr);
 
     // 写入位 7 后等待 20ms，因为它会影响 I2C 通信
     // Wait 20ms after writing bit 7, as it affects I2C communication
@@ -4296,7 +4296,7 @@ void M5IOE1::_clearAw8737a()
 m5ioe1_snapshot_verify_t M5IOE1::verifySnapshot()
 {
     m5ioe1_snapshot_verify_t result = {0};
-    result.consistent = true;
+    result.consistent               = true;
 
     if (!_initialized) {
         result.consistent = false;

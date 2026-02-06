@@ -1102,7 +1102,8 @@ public:
      *                Refresh control: WAIT or NOW
      * @return M5IOE1_OK if successful, error code otherwise
      * @note 如果引脚不是输出模式，会自动配置为推挽输出；如果已是输出模式则保持原有配置
-     *       If pin is not output mode, it will be auto-configured as push-pull output; if already output, keeps current config
+     *       If pin is not output mode, it will be auto-configured as push-pull output; if already output, keeps current
+     * config
      * @note 如果使用开漏输出，需要外部上拉电阻
      *       If using open-drain output, external pull-up is required
      * @note 当 refresh=NOW 时，执行后会有 20ms 延迟
@@ -1118,7 +1119,8 @@ public:
      * @note 需要先调用 setAw8737aPulse 并设置 refresh=WAIT，然后调用此函数触发
      *       Call setAw8737aPulse with refresh=WAIT first, then call this to trigger
      * @note 如果引脚不是输出模式，会自动配置为推挽输出；如果已是输出模式则保持原有配置
-     *       If pin is not output mode, it will be auto-configured as push-pull output; if already output, keeps current config
+     *       If pin is not output mode, it will be auto-configured as push-pull output; if already output, keeps current
+     * config
      * @note 如果使用开漏输出，需要外部上拉电阻
      *       If using open-drain output, external pull-up is required
      * @note 执行后会有 20ms 延迟
@@ -1137,7 +1139,8 @@ public:
      *                Refresh control: WAIT or NOW
      * @return M5IOE1_OK if successful, error code otherwise
      * @note 如果引脚不是输出模式，会自动配置为推挽输出；如果已是输出模式则保持原有配置
-     *       If pin is not output mode, it will be auto-configured as push-pull output; if already output, keeps current config
+     *       If pin is not output mode, it will be auto-configured as push-pull output; if already output, keeps current
+     * config
      * @note 如果使用开漏输出，需要外部上拉电阻
      *       If using open-drain output, external pull-up is required
      * @note 当 refresh=NOW 时，执行后会有 20ms 延迟
@@ -1153,7 +1156,8 @@ public:
      * @note 需要先调用 setAw8737aMode 并设置 refresh=WAIT，然后调用此函数触发
      *       Call setAw8737aMode with refresh=WAIT first, then call this to trigger
      * @note 如果引脚不是输出模式，会自动配置为推挽输出；如果已是输出模式则保持原有配置
-     *       If pin is not output mode, it will be auto-configured as push-pull output; if already output, keeps current config
+     *       If pin is not output mode, it will be auto-configured as push-pull output; if already output, keeps current
+     * config
      * @note 如果使用开漏输出，需要外部上拉电阻
      *       If using open-drain output, external pull-up is required
      * @note 执行后会有 20ms 延迟
@@ -1601,16 +1605,16 @@ private:
 
     // AW8737A 配置状态缓存
     // AW8737A configuration state cache
-    bool _aw8737aConfigured;                   // 是否已调用 setAw8737aPulse 配置
-                                               // Whether setAw8737aPulse has been called
-    uint8_t _aw8737aPin;                       // 配置的引脚号
-                                               // Configured pin number
-    m5ioe1_aw8737a_pulse_t _aw8737aPulseNum;   // 配置的脉冲数
-                                               // Configured pulse count
-    uint8_t _aw8737aRegValue;                  // 缓存的寄存器值（不含 REFRESH 位）
-                                               // Cached register value (without REFRESH bit)
-    bool _aw8737aStateValid;                   // 缓存有效性标志
-                                               // Cache validity flag
+    bool _aw8737aConfigured;                  // 是否已调用 setAw8737aPulse 配置
+                                              // Whether setAw8737aPulse has been called
+    uint8_t _aw8737aPin;                      // 配置的引脚号
+                                              // Configured pin number
+    m5ioe1_aw8737a_pulse_t _aw8737aPulseNum;  // 配置的脉冲数
+                                              // Configured pulse count
+    uint8_t _aw8737aRegValue;                 // 缓存的寄存器值（不含 REFRESH 位）
+                                              // Cached register value (without REFRESH bit)
+    bool _aw8737aStateValid;                  // 缓存有效性标志
+                                              // Cache validity flag
 
     // ========================
     // 内部辅助函数
