@@ -1600,8 +1600,6 @@ private:
 
     // NeoPixel 状态
     // NeoPixel state
-    uint8_t _ledCount;
-    bool _ledEnabled;
 
     // AW8737A 配置状态缓存
     // AW8737A configuration state cache

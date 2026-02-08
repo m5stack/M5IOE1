@@ -140,8 +140,6 @@ M5IOE1::M5IOE1()
     _pwmFrequency        = 0;
     _adcStateValid       = false;
     _i2cConfigValid      = false;
-    _ledCount            = 0;
-    _ledEnabled          = false;
 
 #ifdef ARDUINO
     _wire = nullptr;
@@ -354,6 +352,7 @@ m5ioe1_err_t M5IOE1::begin(TwoWire* wire, uint8_t addr, uint8_t sda, uint8_t scl
     _snapshotPinStates();
     _snapshotPwmStates();
     _snapshotAdcState();
+    _snapshotAw8737a();
     _snapshotI2cConfig();
 
     M5IOE1_LOG_I(TAG, "M5IOE1 initialized at address 0x%02X (I2C: %lu Hz)", _addr, _requestedSpeed);
@@ -553,6 +552,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint
     _snapshotPinStates();
     _snapshotPwmStates();
     _snapshotAdcState();
+    _snapshotAw8737a();
     _snapshotI2cConfig();
 
     M5IOE1_LOG_I(TAG, "M5IOE1 initialized at address 0x%02X (I2C: %lu Hz)", _addr, _requestedSpeed);
@@ -744,6 +744,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t s
     _snapshotPinStates();
     _snapshotPwmStates();
     _snapshotAdcState();
+    _snapshotAw8737a();
     _snapshotI2cConfig();
 
     M5IOE1_LOG_I(TAG, "M5IOE1 initialized at address 0x%02X (I2C: %lu Hz)", _addr, _requestedSpeed);
@@ -909,6 +910,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, m
     _snapshotPinStates();
     _snapshotPwmStates();
     _snapshotAdcState();
+    _snapshotAw8737a();
     _snapshotI2cConfig();
 
     M5IOE1_LOG_I(TAG, "M5IOE1 initialized at address 0x%02X (I2C: %lu Hz)", _addr, _requestedSpeed);
@@ -2270,8 +2272,6 @@ m5ioe1_err_t M5IOE1::setLedCount(uint8_t count)
 
     // 步骤 4: 验证成功，更新缓存
     // Step 4: Verification passed, update cache
-    _ledCount   = count;
-    _ledEnabled = (count > 0);
 
     M5IOE1_LOG_I(TAG, "LED count set and verified: %d", count);
     return M5IOE1_OK;
@@ -2378,8 +2378,6 @@ m5ioe1_err_t M5IOE1::disableLeds()
 
     // 步骤 4: 验证成功，更新缓存
     // Step 4: Verification passed, update cache
-    _ledCount   = 0;
-    _ledEnabled = false;
 
     M5IOE1_LOG_I(TAG, "LEDs disabled and verified");
     return M5IOE1_OK;
@@ -2473,8 +2471,6 @@ m5ioe1_err_t M5IOE1::setLeds(const m5ioe1_rgb_t* colors, uint8_t count, uint8_t 
 
     // 步骤 4: 更新缓存
     // Step 4: Update cache
-    _ledCount   = count;
-    _ledEnabled = true;
 
     // 步骤 5: 可选刷新
     // Step 5: Optional refresh
@@ -3307,8 +3303,9 @@ m5ioe1_err_t M5IOE1::updateSnapshot()
     bool gpio = _snapshotPinStates();
     bool pwm  = _snapshotPwmStates();
     bool adc  = _snapshotAdcState();
+    bool aw8737a = _snapshotAw8737a();
 
-    return (gpio && pwm && adc) ? M5IOE1_OK : M5IOE1_ERR_I2C_COMM;
+    return (gpio && pwm && adc && aw8737a) ? M5IOE1_OK : M5IOE1_ERR_I2C_COMM;
 }
 
 // ============================
@@ -4220,7 +4217,14 @@ bool M5IOE1::_hasI2cSleepEnabled()
 
 bool M5IOE1::_isLedEnabled()
 {
-    return _ledEnabled;
+    // 直接读取 LED_CFG 寄存器
+    // Read LED_CFG register directly
+    uint8_t ledCfg = 0;
+    if (!_readReg(M5IOE1_REG_LED_CFG, &ledCfg)) {
+        return false;
+    }
+    uint8_t ledCount = ledCfg & M5IOE1_LED_NUM_MASK;
+    return (ledCount > 0);
 }
 
 // ============================
@@ -4246,14 +4250,6 @@ bool M5IOE1::_snapshotI2cConfig()
     _i2cConfig.wakeRising = (cfg & M5IOE1_I2C_WAKE_RISING) != 0;
     _i2cConfig.pullOff    = (cfg & M5IOE1_I2C_PULL_OFF) != 0;
     _i2cConfigValid       = true;
-
-    // 同时快照 LED 配置
-    // Also snapshot LED config
-    uint8_t ledCfg = 0;
-    if (_readReg(M5IOE1_REG_LED_CFG, &ledCfg)) {
-        _ledCount   = ledCfg & M5IOE1_LED_NUM_MASK;
-        _ledEnabled = (_ledCount > 0);
-    }
 
     return true;
 }
