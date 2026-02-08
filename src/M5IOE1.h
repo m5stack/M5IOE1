@@ -1087,6 +1087,15 @@ public:
      */
     m5ioe1_err_t disableLeds();
 
+    /**
+     * @brief 清除 LED RAM 寄存器（将所有 LED 数据设置为 0）
+     *        Clear LED RAM registers (set all LED data to 0)
+     * @return M5IOE1_OK if successful, error code otherwise
+     * @note 此函数会清除所有 32 个 LED 的颜色数据，建议在 begin() 后调用
+     *       This function clears color data for all 32 LEDs, recommended to call after begin()
+     */
+    m5ioe1_err_t clearLedRam();
+
     // ========================
     // AW8737A 脉冲功能
     // AW8737A Pulse Functions

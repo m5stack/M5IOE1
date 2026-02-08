@@ -16,6 +16,18 @@
 #include "Wire.h"
 
 // ============================
+// I2C 延迟配置 (可调整以解决总线冲突)
+// I2C Delay Configuration (adjustable to resolve bus conflicts)
+// ============================
+#ifndef M5IOE1_I2C_WRITE_DELAY_US
+#define M5IOE1_I2C_WRITE_DELAY_US 500  // 写操作后延迟(微秒) / Delay after write (microseconds)
+#endif
+
+#ifndef M5IOE1_I2C_READ_DELAY_US
+#define M5IOE1_I2C_READ_DELAY_US 500  // 读操作前延迟(微秒) / Delay before read (microseconds)
+#endif
+
+// ============================
 // Arduino I2C 功能
 // Arduino I2C Functions
 // ============================
@@ -28,6 +40,7 @@ static inline bool M5IOE1_I2C_READ_BYTE(TwoWire *wire, uint8_t addr, uint8_t reg
     if (wire->endTransmission(false) != 0) {
         return false;
     }
+    delayMicroseconds(M5IOE1_I2C_READ_DELAY_US);  // 增加延迟避免 I2C 总线冲突
     if (wire->requestFrom(addr, (uint8_t)1) != 1) {
         return false;
     }
@@ -44,6 +57,7 @@ static inline bool M5IOE1_I2C_READ_BYTES(TwoWire *wire, uint8_t addr, uint8_t st
     if (wire->endTransmission(false) != 0) {
         return false;
     }
+    delayMicroseconds(M5IOE1_I2C_READ_DELAY_US);  // 增加延迟避免 I2C 总线冲突
     if (wire->requestFrom(addr, (uint8_t)len) != len) {
         return false;
     }
@@ -77,6 +91,7 @@ static inline bool M5IOE1_I2C_WRITE_BYTE(TwoWire *wire, uint8_t addr, uint8_t re
     if (wire->endTransmission() != 0) {
         return false;
     }
+    delayMicroseconds(M5IOE1_I2C_WRITE_DELAY_US);  // 增加延迟给设备处理时间
     return true;
 }
 #endif
@@ -93,6 +108,7 @@ static inline bool M5IOE1_I2C_WRITE_BYTES(TwoWire *wire, uint8_t addr, uint8_t s
     if (wire->endTransmission() != 0) {
         return false;
     }
+    delayMicroseconds(M5IOE1_I2C_WRITE_DELAY_US);  // 增加延迟给设备处理时间
     return true;
 }
 #endif

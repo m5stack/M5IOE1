@@ -2383,6 +2383,36 @@ m5ioe1_err_t M5IOE1::disableLeds()
     return M5IOE1_OK;
 }
 
+m5ioe1_err_t M5IOE1::clearLedRam()
+{
+    if (!_initialized) {
+        M5IOE1_LOG_E(TAG, "Device not initialized");
+        return M5IOE1_ERR_NOT_INIT;
+    }
+
+    // 清除所有 LED RAM (0x30 - 0x6F, 共 64 字节，支持 32 个 LED)
+    // Clear all LED RAM (0x30 - 0x6F, 64 bytes total, supports 32 LEDs)
+    uint8_t zeroData[64] = {0};
+
+    M5IOE1_LOG_I(TAG, "Clearing LED RAM...");
+
+    // 分块写入，每次写入 8 字节，避免 I2C 缓冲区溢出
+    // Write in chunks of 8 bytes to avoid I2C buffer overflow
+    for (uint8_t offset = 0; offset < 64; offset += 8) {
+        uint8_t regAddr = M5IOE1_REG_LED_RAM_START + offset;
+        if (!_writeBytes(regAddr, zeroData, 8)) {
+            M5IOE1_LOG_E(TAG, "Failed to clear LED RAM at offset %d", offset);
+            return M5IOE1_ERR_I2C_COMM;
+        }
+        // 每次写入后增加延迟，确保设备有时间处理
+        // Add delay after each write to ensure device has time to process
+        M5IOE1_DELAY_MS(2);
+    }
+
+    M5IOE1_LOG_I(TAG, "LED RAM cleared successfully");
+    return M5IOE1_OK;
+}
+
 m5ioe1_err_t M5IOE1::setLeds(const m5ioe1_rgb_t* colors, uint8_t count, uint8_t arraySize, bool autoRefresh)
 {
     // 步骤 1: 参数验证
@@ -3300,9 +3330,9 @@ m5ioe1_err_t M5IOE1::updateSnapshot()
 {
     if (!_initialized) return M5IOE1_ERR_NOT_INIT;
 
-    bool gpio = _snapshotPinStates();
-    bool pwm  = _snapshotPwmStates();
-    bool adc  = _snapshotAdcState();
+    bool gpio    = _snapshotPinStates();
+    bool pwm     = _snapshotPwmStates();
+    bool adc     = _snapshotAdcState();
     bool aw8737a = _snapshotAw8737a();
 
     return (gpio && pwm && adc && aw8737a) ? M5IOE1_OK : M5IOE1_ERR_I2C_COMM;
