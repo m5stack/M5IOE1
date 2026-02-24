@@ -146,17 +146,21 @@ M5IOE1::M5IOE1()
     _sda  = 0;
     _scl  = 0;
 #else
-    _i2cDriverType  = M5IOE1_I2C_DRIVER_NONE;
+    _i2cDriverType = M5IOE1_I2C_DRIVER_NONE;
+#if M5IOE1_HAS_I2C_MASTER
     _i2c_master_bus = nullptr;
     _i2c_master_dev = nullptr;
-    _i2c_bus        = nullptr;
-    _i2c_device     = nullptr;
-    _busExternal    = false;
-    _sda            = -1;
-    _scl            = -1;
-    _port           = I2C_NUM_0;
-    _pollTask       = nullptr;
-    _intrQueue      = nullptr;
+#endif  // M5IOE1_HAS_I2C_MASTER
+#if M5IOE1_HAS_I2C_BUS
+    _i2c_bus    = nullptr;
+    _i2c_device = nullptr;
+#endif
+    _busExternal = false;
+    _sda         = -1;
+    _scl         = -1;
+    _port        = I2C_NUM_0;
+    _pollTask    = nullptr;
+    _intrQueue   = nullptr;
 #endif
 
     memset(_callbacks, 0, sizeof(_callbacks));
@@ -179,6 +183,7 @@ M5IOE1::~M5IOE1()
     // 根据驱动类型进行清理
     // Cleanup based on driver type
     switch (_i2cDriverType) {
+#if M5IOE1_HAS_I2C_MASTER
         case M5IOE1_I2C_DRIVER_SELF_CREATED:
             // 自创建：先删除设备，再删除总线
             // Self-created: delete device first, then bus
@@ -200,7 +205,9 @@ M5IOE1::~M5IOE1()
                 _i2c_master_dev = nullptr;
             }
             break;
+#endif  // M5IOE1_HAS_I2C_MASTER
 
+#if M5IOE1_HAS_I2C_BUS
         case M5IOE1_I2C_DRIVER_BUS:
             // 外部 i2c_bus：总是删除我们创建的设备句柄，但不删除总线
             // External i2c_bus: always delete the device handle we created, but not the bus
@@ -209,6 +216,17 @@ M5IOE1::~M5IOE1()
                 _i2c_device = nullptr;
             }
             break;
+#endif  // M5IOE1_HAS_I2C_BUS
+
+#if !M5IOE1_HAS_I2C_MASTER && !M5IOE1_HAS_I2C_BUS
+        case M5IOE1_I2C_DRIVER_LEGACY:
+            // Legacy I2C：如果是自创建则卸载驱动
+            // Legacy I2C: uninstall driver if self-created
+            if (!_busExternal) {
+                i2c_driver_delete(_port);
+            }
+            break;
+#endif  // !M5IOE1_HAS_I2C_MASTER && !M5IOE1_HAS_I2C_BUS
 
         default:
             break;
@@ -274,7 +292,7 @@ m5ioe1_err_t M5IOE1::begin(TwoWire* wire, uint8_t addr, uint8_t sda, uint8_t scl
     // Try to wake up the device - send I2C START signal
     // M5IOE1 可能处于睡眠状态，需要先唤醒
     // M5IOE1 may be in sleep mode, need to wake up first
-    M5IOE1_I2C_SEND_WAKE(_wire, _addr);
+    M5IOE1_I2C_ARDUINO_SEND_WAKE(_wire, _addr);
     M5IOE1_DELAY_MS(10);
 
     // 步骤 1: 先尝试100K通信
@@ -285,7 +303,7 @@ m5ioe1_err_t M5IOE1::begin(TwoWire* wire, uint8_t addr, uint8_t sda, uint8_t scl
         M5IOE1_LOG_W(TAG, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
         M5IOE1_DELAY_MS(800);
 
-        M5IOE1_I2C_SEND_WAKE(_wire, _addr);
+        M5IOE1_I2C_ARDUINO_SEND_WAKE(_wire, _addr);
         M5IOE1_DELAY_MS(10);
 
         if (!_initDevice()) {
@@ -302,7 +320,7 @@ m5ioe1_err_t M5IOE1::begin(TwoWire* wire, uint8_t addr, uint8_t sda, uint8_t scl
             }
             M5IOE1_DELAY_MS(100);
 
-            M5IOE1_I2C_SEND_WAKE(_wire, _addr);
+            M5IOE1_I2C_ARDUINO_SEND_WAKE(_wire, _addr);
             M5IOE1_DELAY_MS(10);
 
             if (!_initDevice()) {
@@ -377,13 +395,17 @@ m5ioe1_err_t M5IOE1::begin(TwoWire* wire, uint8_t addr, uint8_t sda, uint8_t scl
 // =====================================================
 m5ioe1_err_t M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint32_t speed, m5ioe1_int_mode_t intMode)
 {
-    _addr          = addr;
-    _busExternal   = false;
+    _addr        = addr;
+    _busExternal = false;
+#if M5IOE1_HAS_I2C_MASTER
     _i2cDriverType = M5IOE1_I2C_DRIVER_SELF_CREATED;
-    _intPin        = -1;
-    _port          = port;
-    _sda           = sda;
-    _scl           = scl;
+#else
+    _i2cDriverType = M5IOE1_I2C_DRIVER_LEGACY;
+#endif
+    _intPin = -1;
+    _port   = port;
+    _sda    = sda;
+    _scl    = scl;
 
     if (intMode == M5IOE1_INT_MODE_HARDWARE) {
         M5IOE1_LOG_E(TAG, "Hardware interrupt mode requires interrupt pin");
@@ -401,6 +423,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint
         _requestedSpeed = speed;
     }
 
+#if M5IOE1_HAS_I2C_MASTER
     // 始终以 100KHz 开始 - M5IOE1 在上电/复位后默认为 100KHz
     // Always start with 100KHz - M5IOE1 defaults to 100KHz after power-on/reset
     M5IOE1_LOG_I(TAG, "Initializing M5IOE1 with 100KHz (device default)");
@@ -516,6 +539,74 @@ m5ioe1_err_t M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint
         }
     }
 
+#else  // !M5IOE1_HAS_I2C_MASTER
+    // 始终以 100KHz 开始 - Legacy API (IDF < 5.3.0)
+    M5IOE1_LOG_I(TAG, "Initializing M5IOE1 with 100KHz (Legacy API, IDF < 5.3.0)");
+
+    i2c_config_t i2c_conf     = {};
+    i2c_conf.mode             = I2C_MODE_MASTER;
+    i2c_conf.sda_io_num       = sda;
+    i2c_conf.scl_io_num       = scl;
+    i2c_conf.sda_pullup_en    = GPIO_PULLUP_ENABLE;
+    i2c_conf.scl_pullup_en    = GPIO_PULLUP_ENABLE;
+    i2c_conf.master.clk_speed = M5IOE1_I2C_FREQ_100K;
+
+    esp_err_t ret = i2c_param_config(port, &i2c_conf);
+    if (ret != ESP_OK) {
+        M5IOE1_LOG_E(TAG, "i2c_param_config failed: %s", esp_err_to_name(ret));
+        return M5IOE1_ERR_I2C_CONFIG;
+    }
+
+    ret = i2c_driver_install(port, I2C_MODE_MASTER, 0, 0, 0);
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
+        M5IOE1_LOG_E(TAG, "i2c_driver_install failed: %s", esp_err_to_name(ret));
+        return M5IOE1_ERR_I2C_CONFIG;
+    }
+
+    // 尝试唤醒设备 - 发送 I2C START 信号
+    // Try to wake up the device - send I2C START signal
+    M5IOE1_I2C_LEGACY_SEND_WAKE(port, _addr);
+    M5IOE1_DELAY_MS(10);
+
+    // 步骤 1: 先尝试100K通信
+    // Step 1: Try 100K communication first
+    if (!_initDevice()) {
+        // 步骤 2: 100K失败，等待800ms后再尝试一次100K
+        // Step 2: 100K failed, wait 800ms and retry 100K
+        M5IOE1_LOG_W(TAG, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
+        M5IOE1_DELAY_MS(800);
+
+        M5IOE1_I2C_LEGACY_SEND_WAKE(port, _addr);
+        M5IOE1_DELAY_MS(10);
+
+        if (!_initDevice()) {
+            // 步骤 3: 100K第二次失败，尝试400K
+            // Step 3: 100K failed again, try 400K
+            M5IOE1_LOG_W(TAG, "Failed at 100KHz (retry), trying 400KHz...");
+
+            i2c_conf.master.clk_speed = M5IOE1_I2C_FREQ_400K;
+            ret                       = i2c_param_config(port, &i2c_conf);
+            if (ret != ESP_OK) {
+                M5IOE1_LOG_E(TAG, "i2c_param_config (400K) failed: %s", esp_err_to_name(ret));
+                i2c_driver_delete(port);
+                return M5IOE1_ERR_I2C_CONFIG;
+            }
+
+            M5IOE1_I2C_LEGACY_SEND_WAKE(port, _addr);
+            M5IOE1_DELAY_MS(10);
+
+            if (!_initDevice()) {
+                // 步骤 4: 都失败，初始化失败
+                // Step 4: All attempts failed, initialization failed
+                M5IOE1_LOG_E(TAG, "Failed at 100KHz (twice) and 400KHz");
+                i2c_driver_delete(port);
+                return M5IOE1_ERR_I2C_COMM;
+            }
+        }
+    }
+
+#endif  // M5IOE1_HAS_I2C_MASTER
+
     // 步骤 5: 通信成功，设置为已初始化
     // Step 5: Communication succeeded, set as initialized
     _initialized = true;
@@ -596,6 +687,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint
     return M5IOE1_OK;
 }
 
+#if M5IOE1_HAS_I2C_MASTER
 // =====================================================
 // Type 2A: Existing i2c_master_bus_handle_t, no hardware interrupt
 // =====================================================
@@ -785,10 +877,12 @@ m5ioe1_err_t M5IOE1::begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t s
     }
     return M5IOE1_OK;
 }
+#endif  // M5IOE1_HAS_I2C_MASTER
 
 // =====================================================
 // Type 3A: Existing i2c_bus_handle_t, no hardware interrupt
 // =====================================================
+#if M5IOE1_HAS_I2C_BUS
 m5ioe1_err_t M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, m5ioe1_int_mode_t intMode)
 {
     _addr          = addr;
@@ -828,7 +922,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, m
     // Try to wake up the device - send I2C START signal
     // M5IOE1 可能处于睡眠状态，需要先唤醒
     // M5IOE1 may be in sleep mode, need to wake up first
-    M5IOE1_I2C_SEND_WAKE(_i2c_device, M5IOE1_REG_REV);
+    M5IOE1_I2C_BUS_SEND_WAKE(_i2c_device, M5IOE1_REG_REV);
     M5IOE1_DELAY_MS(10);
 
     // 步骤 1: 先尝试100K通信
@@ -839,7 +933,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, m
         M5IOE1_LOG_W(TAG, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
         M5IOE1_DELAY_MS(800);
 
-        M5IOE1_I2C_SEND_WAKE(_i2c_device, M5IOE1_REG_REV);
+        M5IOE1_I2C_BUS_SEND_WAKE(_i2c_device, M5IOE1_REG_REV);
         M5IOE1_DELAY_MS(10);
 
         if (!_initDevice()) {
@@ -860,7 +954,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, m
                 return M5IOE1_ERR_I2C_CONFIG;
             }
 
-            M5IOE1_I2C_SEND_WAKE(_i2c_device, M5IOE1_REG_REV);
+            M5IOE1_I2C_BUS_SEND_WAKE(_i2c_device, M5IOE1_REG_REV);
             M5IOE1_DELAY_MS(10);
 
             if (!_initDevice()) {
@@ -951,7 +1045,9 @@ m5ioe1_err_t M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, i
     return M5IOE1_OK;
 }
 
-#endif
+#endif  // M5IOE1_HAS_I2C_BUS
+
+#endif  // !ARDUINO
 
 m5ioe1_err_t M5IOE1::setInterruptMode(m5ioe1_int_mode_t intMode, uint32_t pollingIntervalMs)
 {
@@ -2826,6 +2922,7 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
 #else
         esp_err_t ret;
         switch (_i2cDriverType) {
+#if M5IOE1_HAS_I2C_MASTER
             case M5IOE1_I2C_DRIVER_SELF_CREATED:
             case M5IOE1_I2C_DRIVER_MASTER:
                 if (_i2c_master_dev != nullptr) {
@@ -2851,7 +2948,9 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
                     }
                 }
                 break;
+#endif  // M5IOE1_HAS_I2C_MASTER
 
+#if M5IOE1_HAS_I2C_BUS
             case M5IOE1_I2C_DRIVER_BUS:
                 if (_i2c_device != nullptr) {
                     ret = i2c_bus_device_delete(&_i2c_device);
@@ -2867,6 +2966,25 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
                     }
                 }
                 break;
+#endif  // M5IOE1_HAS_I2C_BUS
+
+#if !M5IOE1_HAS_I2C_MASTER && !M5IOE1_HAS_I2C_BUS
+            case M5IOE1_I2C_DRIVER_LEGACY: {
+                i2c_config_t i2c_conf     = {};
+                i2c_conf.mode             = I2C_MODE_MASTER;
+                i2c_conf.sda_io_num       = _sda;
+                i2c_conf.scl_io_num       = _scl;
+                i2c_conf.sda_pullup_en    = GPIO_PULLUP_ENABLE;
+                i2c_conf.scl_pullup_en    = GPIO_PULLUP_ENABLE;
+                i2c_conf.master.clk_speed = targetFreq;
+                ret                       = i2c_param_config(_port, &i2c_conf);
+                if (ret != ESP_OK) {
+                    M5IOE1_LOG_E(TAG, "i2c_param_config failed: %s", esp_err_to_name(ret));
+                    return M5IOE1_ERR_I2C_CONFIG;
+                }
+                break;
+            }
+#endif  // !M5IOE1_HAS_I2C_MASTER && !M5IOE1_HAS_I2C_BUS
 
             default:
                 break;
@@ -2890,6 +3008,7 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
             }
 #else
             switch (_i2cDriverType) {
+#if M5IOE1_HAS_I2C_MASTER
                 case M5IOE1_I2C_DRIVER_SELF_CREATED:
                 case M5IOE1_I2C_DRIVER_MASTER:
                     if (_i2c_master_dev != nullptr) {
@@ -2904,12 +3023,28 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
                         i2c_master_bus_add_device(_i2c_master_bus, &dev_config, &_i2c_master_dev);
                     }
                     break;
+#endif  // M5IOE1_HAS_I2C_MASTER
+#if M5IOE1_HAS_I2C_BUS
                 case M5IOE1_I2C_DRIVER_BUS:
                     if (_i2c_device != nullptr) {
                         i2c_bus_device_delete(&_i2c_device);
                         _i2c_device = i2c_bus_device_create(_i2c_bus, _addr, originalFreq);
                     }
                     break;
+#endif  // M5IOE1_HAS_I2C_BUS
+#if !M5IOE1_HAS_I2C_MASTER && !M5IOE1_HAS_I2C_BUS
+                case M5IOE1_I2C_DRIVER_LEGACY: {
+                    i2c_config_t i2c_conf     = {};
+                    i2c_conf.mode             = I2C_MODE_MASTER;
+                    i2c_conf.sda_io_num       = _sda;
+                    i2c_conf.scl_io_num       = _scl;
+                    i2c_conf.sda_pullup_en    = GPIO_PULLUP_ENABLE;
+                    i2c_conf.scl_pullup_en    = GPIO_PULLUP_ENABLE;
+                    i2c_conf.master.clk_speed = originalFreq;
+                    i2c_param_config(_port, &i2c_conf);  // best effort rollback
+                    break;
+                }
+#endif  // !M5IOE1_HAS_I2C_MASTER && !M5IOE1_HAS_I2C_BUS
                 default:
                     break;
             }
@@ -3253,15 +3388,23 @@ bool M5IOE1::isAutoWakeEnabled() const
 m5ioe1_err_t M5IOE1::sendWakeSignal()
 {
 #ifdef ARDUINO
-    M5IOE1_I2C_SEND_WAKE(_wire, _addr);
+    M5IOE1_I2C_ARDUINO_SEND_WAKE(_wire, _addr);
     return M5IOE1_OK;
 #else
     switch (_i2cDriverType) {
+#if M5IOE1_HAS_I2C_MASTER
         case M5IOE1_I2C_DRIVER_SELF_CREATED:
         case M5IOE1_I2C_DRIVER_MASTER:
             return M5IOE1_I2C_MASTER_SEND_WAKE(_i2c_master_bus, _addr) == ESP_OK ? M5IOE1_OK : M5IOE1_ERR_I2C_COMM;
+#endif
+#if M5IOE1_HAS_I2C_BUS
         case M5IOE1_I2C_DRIVER_BUS:
-            return M5IOE1_I2C_SEND_WAKE(_i2c_device, M5IOE1_REG_REV) == ESP_OK ? M5IOE1_OK : M5IOE1_ERR_I2C_COMM;
+            return M5IOE1_I2C_BUS_SEND_WAKE(_i2c_device, M5IOE1_REG_REV) == ESP_OK ? M5IOE1_OK : M5IOE1_ERR_I2C_COMM;
+#endif
+#if !M5IOE1_HAS_I2C_MASTER && !M5IOE1_HAS_I2C_BUS
+        case M5IOE1_I2C_DRIVER_LEGACY:
+            return M5IOE1_I2C_LEGACY_SEND_WAKE(_port, _addr) == ESP_OK ? M5IOE1_OK : M5IOE1_ERR_I2C_COMM;
+#endif
         default:
             return M5IOE1_ERR_INTERNAL;
     }
@@ -3535,19 +3678,28 @@ bool M5IOE1::_writeReg(uint8_t reg, uint8_t value)
     _checkAutoWake();
     for (int attempt = 0; attempt < M5IOE1_I2C_RETRY_COUNT; ++attempt) {
 #ifdef ARDUINO
-        if (M5IOE1_I2C_WRITE_BYTE(_wire, _addr, reg, value)) {
+        if (M5IOE1_I2C_ARDUINO_WRITE_BYTE(_wire, _addr, reg, value)) {
             return true;
         }
 #else
         bool ok = false;
         switch (_i2cDriverType) {
+#if M5IOE1_HAS_I2C_MASTER
             case M5IOE1_I2C_DRIVER_SELF_CREATED:
             case M5IOE1_I2C_DRIVER_MASTER:
                 ok = (M5IOE1_I2C_MASTER_WRITE_BYTE(_i2c_master_dev, reg, value) == ESP_OK);
                 break;
+#endif
+#if M5IOE1_HAS_I2C_BUS
             case M5IOE1_I2C_DRIVER_BUS:
-                ok = (M5IOE1_I2C_WRITE_BYTE(_i2c_device, reg, value) == ESP_OK);
+                ok = (M5IOE1_I2C_BUS_WRITE_BYTE(_i2c_device, reg, value) == ESP_OK);
                 break;
+#endif
+#if !M5IOE1_HAS_I2C_MASTER && !M5IOE1_HAS_I2C_BUS
+            case M5IOE1_I2C_DRIVER_LEGACY:
+                ok = (M5IOE1_I2C_LEGACY_WRITE_BYTE(_port, _addr, reg, value) == ESP_OK);
+                break;
+#endif
             default:
                 ok = false;
                 break;
@@ -3565,19 +3717,28 @@ bool M5IOE1::_writeReg16(uint8_t reg, uint16_t value)
     _checkAutoWake();
     for (int attempt = 0; attempt < M5IOE1_I2C_RETRY_COUNT; ++attempt) {
 #ifdef ARDUINO
-        if (M5IOE1_I2C_WRITE_REG16(_wire, _addr, reg, value)) {
+        if (M5IOE1_I2C_ARDUINO_WRITE_REG16(_wire, _addr, reg, value)) {
             return true;
         }
 #else
         bool ok = false;
         switch (_i2cDriverType) {
+#if M5IOE1_HAS_I2C_MASTER
             case M5IOE1_I2C_DRIVER_SELF_CREATED:
             case M5IOE1_I2C_DRIVER_MASTER:
                 ok = (M5IOE1_I2C_MASTER_WRITE_REG16(_i2c_master_dev, reg, value) == ESP_OK);
                 break;
+#endif
+#if M5IOE1_HAS_I2C_BUS
             case M5IOE1_I2C_DRIVER_BUS:
-                ok = (M5IOE1_I2C_WRITE_REG16(_i2c_device, reg, value) == ESP_OK);
+                ok = (M5IOE1_I2C_BUS_WRITE_REG16(_i2c_device, reg, value) == ESP_OK);
                 break;
+#endif
+#if !M5IOE1_HAS_I2C_MASTER && !M5IOE1_HAS_I2C_BUS
+            case M5IOE1_I2C_DRIVER_LEGACY:
+                ok = (M5IOE1_I2C_LEGACY_WRITE_REG16(_port, _addr, reg, value) == ESP_OK);
+                break;
+#endif
             default:
                 ok = false;
                 break;
@@ -3595,19 +3756,28 @@ bool M5IOE1::_readReg(uint8_t reg, uint8_t* value)
     _checkAutoWake();
     for (int attempt = 0; attempt < M5IOE1_I2C_RETRY_COUNT; ++attempt) {
 #ifdef ARDUINO
-        if (M5IOE1_I2C_READ_BYTE(_wire, _addr, reg, value)) {
+        if (M5IOE1_I2C_ARDUINO_READ_BYTE(_wire, _addr, reg, value)) {
             return true;
         }
 #else
         bool ok = false;
         switch (_i2cDriverType) {
+#if M5IOE1_HAS_I2C_MASTER
             case M5IOE1_I2C_DRIVER_SELF_CREATED:
             case M5IOE1_I2C_DRIVER_MASTER:
                 ok = (M5IOE1_I2C_MASTER_READ_BYTE(_i2c_master_dev, reg, value) == ESP_OK);
                 break;
+#endif
+#if M5IOE1_HAS_I2C_BUS
             case M5IOE1_I2C_DRIVER_BUS:
-                ok = (M5IOE1_I2C_READ_BYTE(_i2c_device, reg, value) == ESP_OK);
+                ok = (M5IOE1_I2C_BUS_READ_BYTE(_i2c_device, reg, value) == ESP_OK);
                 break;
+#endif
+#if !M5IOE1_HAS_I2C_MASTER && !M5IOE1_HAS_I2C_BUS
+            case M5IOE1_I2C_DRIVER_LEGACY:
+                ok = (M5IOE1_I2C_LEGACY_READ_BYTE(_port, _addr, reg, value) == ESP_OK);
+                break;
+#endif
             default:
                 ok = false;
                 break;
@@ -3625,19 +3795,28 @@ bool M5IOE1::_readReg16(uint8_t reg, uint16_t* value)
     _checkAutoWake();
     for (int attempt = 0; attempt < M5IOE1_I2C_RETRY_COUNT; ++attempt) {
 #ifdef ARDUINO
-        if (M5IOE1_I2C_READ_REG16(_wire, _addr, reg, value)) {
+        if (M5IOE1_I2C_ARDUINO_READ_REG16(_wire, _addr, reg, value)) {
             return true;
         }
 #else
         bool ok = false;
         switch (_i2cDriverType) {
+#if M5IOE1_HAS_I2C_MASTER
             case M5IOE1_I2C_DRIVER_SELF_CREATED:
             case M5IOE1_I2C_DRIVER_MASTER:
                 ok = (M5IOE1_I2C_MASTER_READ_REG16(_i2c_master_dev, reg, value) == ESP_OK);
                 break;
+#endif
+#if M5IOE1_HAS_I2C_BUS
             case M5IOE1_I2C_DRIVER_BUS:
-                ok = (M5IOE1_I2C_READ_REG16(_i2c_device, reg, value) == ESP_OK);
+                ok = (M5IOE1_I2C_BUS_READ_REG16(_i2c_device, reg, value) == ESP_OK);
                 break;
+#endif
+#if !M5IOE1_HAS_I2C_MASTER && !M5IOE1_HAS_I2C_BUS
+            case M5IOE1_I2C_DRIVER_LEGACY:
+                ok = (M5IOE1_I2C_LEGACY_READ_REG16(_port, _addr, reg, value) == ESP_OK);
+                break;
+#endif
             default:
                 ok = false;
                 break;
@@ -3655,19 +3834,28 @@ bool M5IOE1::_writeBytes(uint8_t reg, const uint8_t* data, uint8_t len)
     _checkAutoWake();
     for (int attempt = 0; attempt < M5IOE1_I2C_RETRY_COUNT; ++attempt) {
 #ifdef ARDUINO
-        if (M5IOE1_I2C_WRITE_BYTES(_wire, _addr, reg, len, data)) {
+        if (M5IOE1_I2C_ARDUINO_WRITE_BYTES(_wire, _addr, reg, len, data)) {
             return true;
         }
 #else
         bool ok = false;
         switch (_i2cDriverType) {
+#if M5IOE1_HAS_I2C_MASTER
             case M5IOE1_I2C_DRIVER_SELF_CREATED:
             case M5IOE1_I2C_DRIVER_MASTER:
                 ok = (M5IOE1_I2C_MASTER_WRITE_BYTES(_i2c_master_dev, reg, len, data) == ESP_OK);
                 break;
+#endif
+#if M5IOE1_HAS_I2C_BUS
             case M5IOE1_I2C_DRIVER_BUS:
-                ok = (M5IOE1_I2C_WRITE_BYTES(_i2c_device, reg, len, data) == ESP_OK);
+                ok = (M5IOE1_I2C_BUS_WRITE_BYTES(_i2c_device, reg, len, data) == ESP_OK);
                 break;
+#endif
+#if !M5IOE1_HAS_I2C_MASTER && !M5IOE1_HAS_I2C_BUS
+            case M5IOE1_I2C_DRIVER_LEGACY:
+                ok = (M5IOE1_I2C_LEGACY_WRITE_BYTES(_port, _addr, reg, len, data) == ESP_OK);
+                break;
+#endif
             default:
                 ok = false;
                 break;
@@ -3685,19 +3873,28 @@ bool M5IOE1::_readBytes(uint8_t reg, uint8_t* data, uint8_t len)
     _checkAutoWake();
     for (int attempt = 0; attempt < M5IOE1_I2C_RETRY_COUNT; ++attempt) {
 #ifdef ARDUINO
-        if (M5IOE1_I2C_READ_BYTES(_wire, _addr, reg, len, data)) {
+        if (M5IOE1_I2C_ARDUINO_READ_BYTES(_wire, _addr, reg, len, data)) {
             return true;
         }
 #else
         bool ok = false;
         switch (_i2cDriverType) {
+#if M5IOE1_HAS_I2C_MASTER
             case M5IOE1_I2C_DRIVER_SELF_CREATED:
             case M5IOE1_I2C_DRIVER_MASTER:
                 ok = (M5IOE1_I2C_MASTER_READ_BYTES(_i2c_master_dev, reg, len, data) == ESP_OK);
                 break;
+#endif
+#if M5IOE1_HAS_I2C_BUS
             case M5IOE1_I2C_DRIVER_BUS:
-                ok = (M5IOE1_I2C_READ_BYTES(_i2c_device, reg, len, data) == ESP_OK);
+                ok = (M5IOE1_I2C_BUS_READ_BYTES(_i2c_device, reg, len, data) == ESP_OK);
                 break;
+#endif
+#if !M5IOE1_HAS_I2C_MASTER && !M5IOE1_HAS_I2C_BUS
+            case M5IOE1_I2C_DRIVER_LEGACY:
+                ok = (M5IOE1_I2C_LEGACY_READ_BYTES(_port, _addr, reg, len, data) == ESP_OK);
+                break;
+#endif
             default:
                 ok = false;
                 break;
@@ -3957,6 +4154,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
     esp_err_t ret;
 
     switch (_i2cDriverType) {
+#if M5IOE1_HAS_I2C_MASTER
         case M5IOE1_I2C_DRIVER_SELF_CREATED:
         case M5IOE1_I2C_DRIVER_MASTER:
             // 对于 i2c_master 驱动：删除设备并以新速度重新添加
@@ -3996,7 +4194,9 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
                 M5IOE1_LOG_I(TAG, "I2C master device recreated at %lu Hz", targetFreq);
             }
             break;
+#endif  // M5IOE1_HAS_I2C_MASTER
 
+#if M5IOE1_HAS_I2C_BUS
         case M5IOE1_I2C_DRIVER_BUS:
             // 对于 i2c_bus 驱动：删除设备并以新速度创建
             // For i2c_bus driver: delete device and create with new speed
@@ -4022,6 +4222,26 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
                 M5IOE1_LOG_I(TAG, "I2C bus device recreated at %lu Hz", targetFreq);
             }
             break;
+#endif  // M5IOE1_HAS_I2C_BUS
+
+#if !M5IOE1_HAS_I2C_MASTER && !M5IOE1_HAS_I2C_BUS
+        case M5IOE1_I2C_DRIVER_LEGACY: {
+            i2c_config_t i2c_conf     = {};
+            i2c_conf.mode             = I2C_MODE_MASTER;
+            i2c_conf.sda_io_num       = _sda;
+            i2c_conf.scl_io_num       = _scl;
+            i2c_conf.sda_pullup_en    = GPIO_PULLUP_ENABLE;
+            i2c_conf.scl_pullup_en    = GPIO_PULLUP_ENABLE;
+            i2c_conf.master.clk_speed = targetFreq;
+            ret                       = i2c_param_config(_port, &i2c_conf);
+            if (ret != ESP_OK) {
+                M5IOE1_LOG_E(TAG, "i2c_param_config failed: %s", esp_err_to_name(ret));
+                return M5IOE1_ERR_I2C_CONFIG;
+            }
+            M5IOE1_LOG_I(TAG, "Legacy I2C reconfigured to %lu Hz", targetFreq);
+            break;
+        }
+#endif  // !M5IOE1_HAS_I2C_MASTER && !M5IOE1_HAS_I2C_BUS
 
         default:
             M5IOE1_LOG_E(TAG, "Unknown I2C driver type");
@@ -4053,6 +4273,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
         }
 #else
         switch (_i2cDriverType) {
+#if M5IOE1_HAS_I2C_MASTER
             case M5IOE1_I2C_DRIVER_SELF_CREATED:
             case M5IOE1_I2C_DRIVER_MASTER:
                 if (_i2c_master_dev != nullptr) {
@@ -4067,12 +4288,28 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
                     i2c_master_bus_add_device(_i2c_master_bus, &dev_config, &_i2c_master_dev);
                 }
                 break;
+#endif  // M5IOE1_HAS_I2C_MASTER
+#if M5IOE1_HAS_I2C_BUS
             case M5IOE1_I2C_DRIVER_BUS:
                 if (_i2c_device != nullptr) {
                     i2c_bus_device_delete(&_i2c_device);
                     _i2c_device = i2c_bus_device_create(_i2c_bus, _addr, originalFreq);
                 }
                 break;
+#endif  // M5IOE1_HAS_I2C_BUS
+#if !M5IOE1_HAS_I2C_MASTER && !M5IOE1_HAS_I2C_BUS
+            case M5IOE1_I2C_DRIVER_LEGACY: {
+                i2c_config_t i2c_conf     = {};
+                i2c_conf.mode             = I2C_MODE_MASTER;
+                i2c_conf.sda_io_num       = _sda;
+                i2c_conf.scl_io_num       = _scl;
+                i2c_conf.sda_pullup_en    = GPIO_PULLUP_ENABLE;
+                i2c_conf.scl_pullup_en    = GPIO_PULLUP_ENABLE;
+                i2c_conf.master.clk_speed = originalFreq;
+                i2c_param_config(_port, &i2c_conf);  // best effort rollback
+                break;
+            }
+#endif  // !M5IOE1_HAS_I2C_MASTER && !M5IOE1_HAS_I2C_BUS
             default:
                 break;
         }

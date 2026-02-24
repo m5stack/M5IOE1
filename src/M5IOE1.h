@@ -548,10 +548,11 @@ public:
                        m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_HARDWARE);
 
     // =====================================================
-    // Type 2A: Existing i2c_master_bus_handle_t, no hardware interrupt
+    // Type 2A/2B: Existing i2c_master_bus_handle_t (ESP-IDF >= 5.3.0 only)
     // =====================================================
+#if M5IOE1_HAS_I2C_MASTER
     /**
-     * @brief Initialize with existing i2c_master_bus handle (ESP-IDF native driver)
+     * @brief Initialize with existing i2c_master_bus handle (ESP-IDF native driver, IDF >= 5.3.0)
      * @param bus Existing i2c_master_bus_handle_t
      * @param addr I2C address (default 0x6F)
      * @param speed I2C speed in Hz (for device handle creation)
@@ -561,11 +562,8 @@ public:
     m5ioe1_err_t begin(i2c_master_bus_handle_t bus, uint8_t addr = M5IOE1_DEFAULT_ADDR,
                        uint32_t speed = M5IOE1_I2C_FREQ_100K, m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_POLLING);
 
-    // =====================================================
-    // Type 2B: Existing i2c_master_bus_handle_t, with hardware interrupt
-    // =====================================================
     /**
-     * @brief Initialize with existing i2c_master_bus handle, with hardware interrupt
+     * @brief Initialize with existing i2c_master_bus handle, with hardware interrupt (IDF >= 5.3.0)
      * @param bus Existing i2c_master_bus_handle_t
      * @param addr I2C address
      * @param speed I2C speed in Hz
@@ -575,10 +573,12 @@ public:
      */
     m5ioe1_err_t begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t speed, int intPin,
                        m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_HARDWARE);
+#endif  // M5IOE1_HAS_I2C_MASTER
 
     // =====================================================
     // Type 3A: Existing i2c_bus_handle_t, no hardware interrupt
     // =====================================================
+#if M5IOE1_HAS_I2C_BUS
     /**
      * @brief Initialize with existing i2c_bus handle (esp-idf-lib component)
      * @param bus Existing i2c_bus_handle_t
@@ -604,7 +604,33 @@ public:
      */
     m5ioe1_err_t begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, int intPin,
                        m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_HARDWARE);
-#endif
+#else
+    /**
+     * @brief i2c_bus overload is intentionally kept for diagnostics when unavailable
+     * @note This overload exists only to provide a clear compile-time message when called.
+     */
+    inline m5ioe1_err_t begin(i2c_bus_handle_t bus, uint8_t addr = M5IOE1_DEFAULT_ADDR,
+                              uint32_t speed            = M5IOE1_I2C_FREQ_100K,
+                              m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_POLLING)
+    {
+        (void)bus;
+        (void)addr;
+        (void)speed;
+        (void)intMode;
+        return M5IOE1_ERR_NOT_SUPPORTED;
+    }
+    inline m5ioe1_err_t begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, int intPin,
+                              m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_HARDWARE)
+    {
+        (void)bus;
+        (void)addr;
+        (void)speed;
+        (void)intPin;
+        (void)intMode;
+        return M5IOE1_ERR_NOT_SUPPORTED;
+    }
+#endif  // M5IOE1_HAS_I2C_BUS
+#endif  // !ARDUINO
 
     /**
      * @brief Set interrupt handling mode
@@ -1517,20 +1543,26 @@ private:
 
     // I2C 句柄（根据驱动类型仅使用一对）
     // I2C handles (only one pair is used based on driver type)
-    // M5IOE1_I2C_DRIVER_SELF_CREATED: 使用 _i2c_master_bus + _i2c_master_dev
+    // M5IOE1_I2C_DRIVER_SELF_CREATED (IDF >= 5.3.0): 使用 _i2c_master_bus + _i2c_master_dev
     // uses _i2c_master_bus + _i2c_master_dev
     // M5IOE1_I2C_DRIVER_MASTER: 使用 _i2c_master_bus + _i2c_master_dev
     // uses _i2c_master_bus + _i2c_master_dev
     // M5IOE1_I2C_DRIVER_BUS: 使用 _i2c_bus + _i2c_device
     // uses _i2c_bus + _i2c_device
-    i2c_master_bus_handle_t _i2c_master_bus;  // ESP-IDF 原生驱动/自创建
-                                              // ESP-IDF native driver / self-created
-    i2c_master_dev_handle_t _i2c_master_dev;  // ESP-IDF 原生驱动/自创建
-                                              // ESP-IDF native driver / self-created
-    i2c_bus_handle_t _i2c_bus;                // esp-idf-lib 组件
-                                              // esp-idf-lib component
-    i2c_bus_device_handle_t _i2c_device;      // esp-idf-lib 组件
-                                              // esp-idf-lib component
+    // M5IOE1_I2C_DRIVER_LEGACY (IDF < 5.3.0): 使用 _port + _addr，无额外句柄
+    // uses _port + _addr, no additional handle
+#if M5IOE1_HAS_I2C_MASTER
+    i2c_master_bus_handle_t _i2c_master_bus;  // ESP-IDF 原生驱动/自创建 (IDF >= 5.3.0)
+                                              // ESP-IDF native driver / self-created (IDF >= 5.3.0)
+    i2c_master_dev_handle_t _i2c_master_dev;  // ESP-IDF 原生驱动/自创建 (IDF >= 5.3.0)
+                                              // ESP-IDF native driver / self-created (IDF >= 5.3.0)
+#endif  // M5IOE1_HAS_I2C_MASTER
+#if M5IOE1_HAS_I2C_BUS
+    i2c_bus_handle_t _i2c_bus;            // esp-idf-lib 组件
+                                          // esp-idf-lib component
+    i2c_bus_device_handle_t _i2c_device;  // esp-idf-lib 组件
+                                          // esp-idf-lib component
+#endif
 
     // I2C 管理标志
     // I2C management flags
