@@ -375,6 +375,23 @@ typedef enum {
 } m5ioe1_pull_config_t;
 
 // ============================
+// 快照域定义（位掩码）
+// Snapshot Domain Definitions (bitmask)
+// ============================
+typedef enum {
+    M5IOE1_SNAPSHOT_DOMAIN_GPIO = 1 << 0,     // GPIO 引脚状态
+                                              // GPIO pin states
+    M5IOE1_SNAPSHOT_DOMAIN_PWM = 1 << 1,      // PWM 配置
+                                              // PWM configuration
+    M5IOE1_SNAPSHOT_DOMAIN_ADC = 1 << 2,      // ADC 状态
+                                              // ADC state
+    M5IOE1_SNAPSHOT_DOMAIN_AW8737A = 1 << 3,  // AW8737A 音频放大器
+                                              // AW8737A audio amplifier
+    M5IOE1_SNAPSHOT_DOMAIN_ALL = 0x0F         // 所有域
+                                              // All domains
+} m5ioe1_snapshot_domain_t;
+
+// ============================
 // 日志级别定义
 // Log Level Definitions
 // ============================
@@ -630,6 +647,41 @@ public:
         return M5IOE1_ERR_NOT_SUPPORTED;
     }
 #endif  // M5IOE1_HAS_I2C_BUS
+
+#if M5IOE1_HAS_M5UNIFIED_I2C
+    // =====================================================
+    // Type 4A: M5Unified I2C_Class, no hardware interrupt
+    // =====================================================
+    /**
+     * @brief Initialize with M5Unified I2C_Class instance, no hardware interrupt (ESP-IDF)
+     * @note  The I2C bus must already be initialized (i2c->begin() called).
+     *        M5IOE1 borrows the I2C_Class; caller retains ownership and lifecycle.
+     *        不负责驱动安装或释放，I2C 由调用方全程管理。
+     * @param i2c     已 begin() 的 m5::I2C_Class 指针 / Already begin()-ed m5::I2C_Class
+     * @param addr    I2C 地址 / I2C address (default 0x6F)
+     * @param speed   I2C 速率（Hz）/ I2C speed in Hz (default 100000)
+     * @param intMode 中断模式 / Interrupt mode (POLLING or DISABLED)
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
+    m5ioe1_err_t begin(m5::I2C_Class* i2c, uint8_t addr = M5IOE1_DEFAULT_ADDR, uint32_t speed = M5IOE1_I2C_FREQ_100K,
+                       m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_POLLING);
+
+    // =====================================================
+    // Type 4B: M5Unified I2C_Class, with hardware interrupt
+    // =====================================================
+    /**
+     * @brief Initialize with M5Unified I2C_Class instance, with hardware interrupt (ESP-IDF)
+     * @param i2c     已 begin() 的 m5::I2C_Class 指针 / Already begin()-ed m5::I2C_Class
+     * @param addr    I2C 地址 / I2C address
+     * @param speed   I2C 速率（Hz）/ I2C speed in Hz
+     * @param intPin  硬件中断 GPIO引脚 / Hardware interrupt GPIO pin
+     * @param intMode 中断模式 / Interrupt mode
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
+    m5ioe1_err_t begin(m5::I2C_Class* i2c, uint8_t addr, uint32_t speed, int intPin,
+                       m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_HARDWARE);
+#endif  // M5IOE1_HAS_M5UNIFIED_I2C
+
 #endif  // !ARDUINO
 
     /**
@@ -1579,6 +1631,14 @@ private:
     // Interrupt handling
     TaskHandle_t _pollTask;
     QueueHandle_t _intrQueue;
+
+    // M5Unified I2C_Class 借用句柄及当前通信频率
+    // Borrowed M5Unified I2C_Class handle and current communication frequency
+#if M5IOE1_HAS_M5UNIFIED_I2C
+    m5::I2C_Class* _m5_i2c;
+    uint32_t _commFreq;  // M5UNIFIED 路径专用，init 时从 100K 起，完成后切换至 _requestedSpeed
+                         // M5UNIFIED path: starts at 100K during init, switches to _requestedSpeed after
+#endif
 #endif
 
     // 中断回调
@@ -1684,7 +1744,7 @@ private:
     bool _snapshotAdcState();
     bool _snapshotAw8737a();
     void _clearAw8737a();
-    void _autoSnapshotUpdate();
+    void _autoSnapshotUpdate(uint8_t domains = M5IOE1_SNAPSHOT_DOMAIN_ALL);
 
     bool _initDevice();
     void _handleInterrupt();
@@ -1730,6 +1790,7 @@ private:
     bool _setupHardwareInterruptArduino();
     void _cleanupHardwareInterruptArduino();
     static void _intrTaskArduino(void* arg);
+    static void IRAM_ATTR _arduinoIsrHandler(void* arg);
 #else
     // ESP-IDF 专用
     // ESP-IDF specific
