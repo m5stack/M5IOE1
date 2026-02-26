@@ -82,7 +82,10 @@ typedef enum {
 #define M5IOE1_MAX_PWM_CHANNELS 4
 #define M5IOE1_MAX_LED_COUNT    32
 #define M5IOE1_RTC_RAM_SIZE     32
-#define M5IOE1_I2C_RETRY_COUNT  2
+
+// I2C retry settings
+#define M5IOE1_I2C_RETRY_COUNT    2
+#define M5IOE1_I2C_RETRY_DELAY_MS 50
 
 // ============================
 // I2C 频率常量

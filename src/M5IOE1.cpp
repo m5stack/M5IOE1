@@ -3867,6 +3867,9 @@ bool M5IOE1::_writeReg(uint8_t reg, uint8_t value)
             return true;
         }
 #endif
+        if (attempt + 1 < M5IOE1_I2C_RETRY_COUNT) {
+            M5IOE1_DELAY_MS(M5IOE1_I2C_RETRY_DELAY_MS);
+        }
     }
     return false;
 }
@@ -3911,6 +3914,9 @@ bool M5IOE1::_writeReg16(uint8_t reg, uint16_t value)
             return true;
         }
 #endif
+        if (attempt + 1 < M5IOE1_I2C_RETRY_COUNT) {
+            M5IOE1_DELAY_MS(M5IOE1_I2C_RETRY_DELAY_MS);
+        }
     }
     return false;
 }
@@ -3955,6 +3961,9 @@ bool M5IOE1::_readReg(uint8_t reg, uint8_t* value)
             return true;
         }
 #endif
+        if (attempt + 1 < M5IOE1_I2C_RETRY_COUNT) {
+            M5IOE1_DELAY_MS(M5IOE1_I2C_RETRY_DELAY_MS);
+        }
     }
     return false;
 }
@@ -3999,6 +4008,9 @@ bool M5IOE1::_readReg16(uint8_t reg, uint16_t* value)
             return true;
         }
 #endif
+        if (attempt + 1 < M5IOE1_I2C_RETRY_COUNT) {
+            M5IOE1_DELAY_MS(M5IOE1_I2C_RETRY_DELAY_MS);
+        }
     }
     return false;
 }
@@ -4043,6 +4055,9 @@ bool M5IOE1::_writeBytes(uint8_t reg, const uint8_t* data, uint8_t len)
             return true;
         }
 #endif
+        if (attempt + 1 < M5IOE1_I2C_RETRY_COUNT) {
+            M5IOE1_DELAY_MS(M5IOE1_I2C_RETRY_DELAY_MS);
+        }
     }
     return false;
 }
@@ -4087,6 +4102,9 @@ bool M5IOE1::_readBytes(uint8_t reg, uint8_t* data, uint8_t len)
             return true;
         }
 #endif
+        if (attempt + 1 < M5IOE1_I2C_RETRY_COUNT) {
+            M5IOE1_DELAY_MS(M5IOE1_I2C_RETRY_DELAY_MS);
+        }
     }
     return false;
 }
