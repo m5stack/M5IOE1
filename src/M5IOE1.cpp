@@ -142,6 +142,10 @@ M5IOE1::M5IOE1()
     _wire = nullptr;
     _sda  = 0;
     _scl  = 0;
+#if M5IOE1_HAS_M5UNIFIED_I2C
+    _m5_i2c   = nullptr;
+    _commFreq = 0;
+#endif
 #else
     _i2cDriverType = M5IOE1_I2C_DRIVER_NONE;
 #if M5IOE1_HAS_I2C_MASTER
@@ -388,6 +392,156 @@ m5ioe1_err_t M5IOE1::begin(TwoWire* wire, uint8_t addr, uint8_t sda, uint8_t scl
 
     return M5IOE1_OK;
 }
+
+#if M5IOE1_HAS_M5UNIFIED_I2C
+// =====================================================
+// Type A (Arduino): M5Unified I2C_Class, no hardware interrupt
+// =====================================================
+m5ioe1_err_t M5IOE1::begin(m5::I2C_Class* i2c, uint8_t addr, uint32_t speed, m5ioe1_int_mode_t intMode)
+{
+    if (!i2c || !i2c->isEnabled()) {
+        M5IOE1_LOG_E(TAG, "M5Unified I2C_Class not initialized");
+        return M5IOE1_ERR_INVALID_ARG;
+    }
+
+    _wire   = nullptr;
+    _m5_i2c = i2c;
+    _addr   = addr;
+    _sda    = 0;
+    _scl    = 0;
+    _intPin = -1;
+
+    if (intMode == M5IOE1_INT_MODE_HARDWARE) {
+        M5IOE1_LOG_E(TAG, "Hardware interrupt mode requires interrupt pin");
+        return M5IOE1_ERR_INVALID_ARG;
+    }
+
+    // 验证 I2C 频率
+    // Validate I2C frequency
+    if (!_isValidI2cFrequency(speed)) {
+        M5IOE1_LOG_W(TAG, "Invalid I2C frequency: %lu Hz. Falling back to 100KHz.", speed);
+        _requestedSpeed = M5IOE1_I2C_FREQ_100K;
+    } else {
+        _requestedSpeed = speed;
+    }
+
+    M5IOE1_LOG_I(TAG, "Initializing M5IOE1 with 100KHz (device default)");
+
+    // 步骤 1: 尝试唤醒设备
+    // Step 1: Try to wake up the device
+    _commFreq = M5IOE1_I2C_FREQ_100K;
+    M5IOE1_M5UNIFIED_SEND_WAKE(_m5_i2c, _addr, _commFreq);
+    M5IOE1_DELAY_MS(10);
+
+    // 步骤 2: 先尝试100K通信
+    // Step 2: Try 100K communication first
+    if (!_initDevice()) {
+        // 步骤 3: 100K失败，等待800ms后再尝试一次100K
+        // Step 3: 100K failed, wait 800ms and retry 100K
+        M5IOE1_LOG_W(TAG, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
+        M5IOE1_DELAY_MS(800);
+
+        M5IOE1_M5UNIFIED_SEND_WAKE(_m5_i2c, _addr, _commFreq);
+        M5IOE1_DELAY_MS(10);
+
+        if (!_initDevice()) {
+            // 步骤 4: 100K第二次失败，尝试400K
+            // Step 4: 100K failed again, try 400K
+            M5IOE1_LOG_W(TAG, "Failed at 100KHz (retry), trying 400KHz...");
+            _commFreq = M5IOE1_I2C_FREQ_400K;
+
+            M5IOE1_M5UNIFIED_SEND_WAKE(_m5_i2c, _addr, _commFreq);
+            M5IOE1_DELAY_MS(10);
+
+            if (!_initDevice()) {
+                // 步骤 5: 都失败，初始化失败
+                // Step 5: All attempts failed, initialization failed
+                M5IOE1_LOG_E(TAG, "Failed at 100KHz (twice) and 400KHz");
+                _m5_i2c = nullptr;
+                return M5IOE1_ERR_I2C_COMM;
+            }
+        }
+    }
+
+    // 步骤 6: 通信成功，设置为已初始化
+    // Step 6: Communication succeeded, set as initialized
+    _initialized = true;
+
+    // 步骤 7: 强制配置I2C（用户请求的频率 + 关闭休眠）
+    // Step 7: Force configure I2C (user requested speed + disable sleep)
+    m5ioe1_i2c_speed_t targetSpeed =
+        (_requestedSpeed == M5IOE1_I2C_FREQ_400K) ? M5IOE1_I2C_SPEED_400K : M5IOE1_I2C_SPEED_100K;
+
+    // 检查当前速度
+    // Check current speed
+    m5ioe1_i2c_speed_t currentSpeed;
+    if (getI2cSpeed(&currentSpeed) == M5IOE1_OK) {
+        if (currentSpeed == targetSpeed) {
+            M5IOE1_LOG_I(TAG, "Current I2C speed matches user request (%s)",
+                         (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
+        } else {
+            M5IOE1_LOG_I(TAG, "Current I2C speed differs from user request (Current: %s, Requested: %s)",
+                         (currentSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K",
+                         (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
+        }
+    } else {
+        M5IOE1_LOG_W(TAG, "Failed to read current I2C speed");
+    }
+
+    if (setI2cConfig(0, targetSpeed, M5IOE1_WAKE_EDGE_FALLING, M5IOE1_PULL_ENABLED) != M5IOE1_OK) {
+        M5IOE1_LOG_W(TAG, "Failed to set I2C config");
+    }
+
+    // 切换到目标频率
+    // Switch to target frequency
+    _commFreq = _requestedSpeed;
+
+    // 步骤 8: 快照
+    // Step 8: Snapshot
+    _snapshotPinStates();
+    _snapshotPwmStates();
+    _snapshotAdcState();
+    _snapshotAw8737a();
+    _snapshotI2cConfig();
+
+    M5IOE1_LOG_I(TAG, "M5IOE1 initialized at address 0x%02X (I2C: %lu Hz)", _addr, _requestedSpeed);
+
+    if (intMode != M5IOE1_INT_MODE_DISABLED) {
+        m5ioe1_err_t err = setInterruptMode(intMode);
+        if (err != M5IOE1_OK) {
+            _initialized = false;
+            return err;
+        }
+    }
+
+    return M5IOE1_OK;
+}
+
+// =====================================================
+// Type B (Arduino): M5Unified I2C_Class, with hardware interrupt
+// =====================================================
+m5ioe1_err_t M5IOE1::begin(m5::I2C_Class* i2c, uint8_t addr, uint32_t speed, int intPin, m5ioe1_int_mode_t intMode)
+{
+    m5ioe1_err_t err = begin(i2c, addr, speed, M5IOE1_INT_MODE_DISABLED);
+    if (err != M5IOE1_OK) {
+        return err;
+    }
+
+    _intPin = intPin;
+    if (intMode == M5IOE1_INT_MODE_HARDWARE && _intPin < 0) {
+        M5IOE1_LOG_E(TAG, "Hardware interrupt mode requires interrupt pin");
+        return M5IOE1_ERR_INVALID_ARG;
+    }
+    if (intMode != M5IOE1_INT_MODE_DISABLED) {
+        err = setInterruptMode(intMode);
+        if (err != M5IOE1_OK) {
+            _initialized = false;
+            return err;
+        }
+    }
+    return M5IOE1_OK;
+}
+#endif  // M5IOE1_HAS_M5UNIFIED_I2C
 
 #else  // ESP-IDF
 
@@ -3051,7 +3205,13 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
         M5IOE1_LOG_I(TAG, "Switching host I2C bus from %lu Hz to %lu Hz", _requestedSpeed, targetFreq);
 
 #ifdef ARDUINO
-        if (_wire != nullptr) {
+#if M5IOE1_HAS_M5UNIFIED_I2C
+        if (_m5_i2c) {
+            _commFreq = targetFreq;
+            M5IOE1_LOG_I(TAG, "M5Unified I2C frequency updated to %lu Hz", targetFreq);
+        } else
+#endif
+            if (_wire != nullptr) {
             _wire->end();
             M5IOE1_DELAY_MS(10);
             if (!_wire->begin(_sda, _scl, targetFreq)) {
@@ -3136,6 +3296,12 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
             }
 #endif  // !M5IOE1_HAS_I2C_MASTER && !M5IOE1_HAS_I2C_BUS
 
+#if M5IOE1_HAS_M5UNIFIED_I2C
+            case M5IOE1_I2C_DRIVER_M5UNIFIED:
+                _commFreq = targetFreq;
+                M5IOE1_LOG_I(TAG, "M5Unified I2C frequency updated to %lu Hz", targetFreq);
+                break;
+#endif
             default:
                 break;
         }
@@ -3150,7 +3316,12 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
             // Rollback
             uint32_t originalFreq = _requestedSpeed;
 #ifdef ARDUINO
-            if (_wire != nullptr) {
+#if M5IOE1_HAS_M5UNIFIED_I2C
+            if (_m5_i2c) {
+                _commFreq = originalFreq;
+            } else
+#endif
+                if (_wire != nullptr) {
                 _wire->end();
                 M5IOE1_DELAY_MS(10);
                 _wire->begin(_sda, _scl, originalFreq);
@@ -3195,6 +3366,11 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
                     break;
                 }
 #endif  // !M5IOE1_HAS_I2C_MASTER && !M5IOE1_HAS_I2C_BUS
+#if M5IOE1_HAS_M5UNIFIED_I2C
+                case M5IOE1_I2C_DRIVER_M5UNIFIED:
+                    _commFreq = originalFreq;
+                    break;
+#endif
                 default:
                     break;
             }
@@ -3538,6 +3714,12 @@ bool M5IOE1::isAutoWakeEnabled() const
 m5ioe1_err_t M5IOE1::sendWakeSignal()
 {
 #ifdef ARDUINO
+#if M5IOE1_HAS_M5UNIFIED_I2C
+    if (_m5_i2c) {
+        M5IOE1_M5UNIFIED_SEND_WAKE(_m5_i2c, _addr, _commFreq);
+        return M5IOE1_OK;
+    }
+#endif
     M5IOE1_I2C_ARDUINO_SEND_WAKE(_wire, _addr);
     return M5IOE1_OK;
 #else
@@ -3832,7 +4014,14 @@ bool M5IOE1::_writeReg(uint8_t reg, uint8_t value)
     _checkAutoWake();
     for (int attempt = 0; attempt < M5IOE1_I2C_RETRY_COUNT; ++attempt) {
 #ifdef ARDUINO
-        if (M5IOE1_I2C_ARDUINO_WRITE_BYTE(_wire, _addr, reg, value)) {
+#if M5IOE1_HAS_M5UNIFIED_I2C
+        if (_m5_i2c) {
+            if (M5IOE1_M5UNIFIED_WRITE_BYTE(_m5_i2c, _addr, reg, value, _commFreq)) {
+                return true;
+            }
+        } else
+#endif
+            if (M5IOE1_I2C_ARDUINO_WRITE_BYTE(_wire, _addr, reg, value)) {
             return true;
         }
 #else
@@ -3879,7 +4068,14 @@ bool M5IOE1::_writeReg16(uint8_t reg, uint16_t value)
     _checkAutoWake();
     for (int attempt = 0; attempt < M5IOE1_I2C_RETRY_COUNT; ++attempt) {
 #ifdef ARDUINO
-        if (M5IOE1_I2C_ARDUINO_WRITE_REG16(_wire, _addr, reg, value)) {
+#if M5IOE1_HAS_M5UNIFIED_I2C
+        if (_m5_i2c) {
+            if (M5IOE1_M5UNIFIED_WRITE_REG16(_m5_i2c, _addr, reg, value, _commFreq)) {
+                return true;
+            }
+        } else
+#endif
+            if (M5IOE1_I2C_ARDUINO_WRITE_REG16(_wire, _addr, reg, value)) {
             return true;
         }
 #else
@@ -3926,7 +4122,14 @@ bool M5IOE1::_readReg(uint8_t reg, uint8_t* value)
     _checkAutoWake();
     for (int attempt = 0; attempt < M5IOE1_I2C_RETRY_COUNT; ++attempt) {
 #ifdef ARDUINO
-        if (M5IOE1_I2C_ARDUINO_READ_BYTE(_wire, _addr, reg, value)) {
+#if M5IOE1_HAS_M5UNIFIED_I2C
+        if (_m5_i2c) {
+            if (M5IOE1_M5UNIFIED_READ_BYTE(_m5_i2c, _addr, reg, value, _commFreq)) {
+                return true;
+            }
+        } else
+#endif
+            if (M5IOE1_I2C_ARDUINO_READ_BYTE(_wire, _addr, reg, value)) {
             return true;
         }
 #else
@@ -3973,7 +4176,14 @@ bool M5IOE1::_readReg16(uint8_t reg, uint16_t* value)
     _checkAutoWake();
     for (int attempt = 0; attempt < M5IOE1_I2C_RETRY_COUNT; ++attempt) {
 #ifdef ARDUINO
-        if (M5IOE1_I2C_ARDUINO_READ_REG16(_wire, _addr, reg, value)) {
+#if M5IOE1_HAS_M5UNIFIED_I2C
+        if (_m5_i2c) {
+            if (M5IOE1_M5UNIFIED_READ_REG16(_m5_i2c, _addr, reg, value, _commFreq)) {
+                return true;
+            }
+        } else
+#endif
+            if (M5IOE1_I2C_ARDUINO_READ_REG16(_wire, _addr, reg, value)) {
             return true;
         }
 #else
@@ -4020,7 +4230,14 @@ bool M5IOE1::_writeBytes(uint8_t reg, const uint8_t* data, uint8_t len)
     _checkAutoWake();
     for (int attempt = 0; attempt < M5IOE1_I2C_RETRY_COUNT; ++attempt) {
 #ifdef ARDUINO
-        if (M5IOE1_I2C_ARDUINO_WRITE_BYTES(_wire, _addr, reg, len, data)) {
+#if M5IOE1_HAS_M5UNIFIED_I2C
+        if (_m5_i2c) {
+            if (M5IOE1_M5UNIFIED_WRITE_BYTES(_m5_i2c, _addr, reg, len, data, _commFreq)) {
+                return true;
+            }
+        } else
+#endif
+            if (M5IOE1_I2C_ARDUINO_WRITE_BYTES(_wire, _addr, reg, len, data)) {
             return true;
         }
 #else
@@ -4067,7 +4284,14 @@ bool M5IOE1::_readBytes(uint8_t reg, uint8_t* data, uint8_t len)
     _checkAutoWake();
     for (int attempt = 0; attempt < M5IOE1_I2C_RETRY_COUNT; ++attempt) {
 #ifdef ARDUINO
-        if (M5IOE1_I2C_ARDUINO_READ_BYTES(_wire, _addr, reg, len, data)) {
+#if M5IOE1_HAS_M5UNIFIED_I2C
+        if (_m5_i2c) {
+            if (M5IOE1_M5UNIFIED_READ_BYTES(_m5_i2c, _addr, reg, len, data, _commFreq)) {
+                return true;
+            }
+        } else
+#endif
+            if (M5IOE1_I2C_ARDUINO_READ_BYTES(_wire, _addr, reg, len, data)) {
             return true;
         }
 #else
@@ -4334,7 +4558,13 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
     // 步骤 4: 将主机 I2C 总线切换到目标速度
     // Step 4: Switch host I2C bus to target speed
 #ifdef ARDUINO
-    if (_wire != nullptr) {
+#if M5IOE1_HAS_M5UNIFIED_I2C
+    if (_m5_i2c) {
+        _commFreq = targetFreq;
+        M5IOE1_LOG_I(TAG, "M5Unified I2C frequency updated to %lu Hz", targetFreq);
+    } else
+#endif
+        if (_wire != nullptr) {
         // 必须使用 Wire.end() + Wire.begin() 在 ESP32 上正确切换 I2C 频率
         // Must use Wire.end() + Wire.begin() to properly switch I2C frequency on ESP32
         _wire->end();
@@ -4453,6 +4683,12 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
         }
 #endif  // !M5IOE1_HAS_I2C_MASTER && !M5IOE1_HAS_I2C_BUS
 
+#if M5IOE1_HAS_M5UNIFIED_I2C
+        case M5IOE1_I2C_DRIVER_M5UNIFIED:
+            _commFreq = targetFreq;
+            M5IOE1_LOG_I(TAG, "M5Unified I2C frequency updated to %lu Hz", targetFreq);
+            break;
+#endif
         default:
             M5IOE1_LOG_E(TAG, "Unknown I2C driver type");
             return M5IOE1_ERR_INTERNAL;
@@ -4475,7 +4711,12 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
         uint32_t originalFreq = (speed == M5IOE1_I2C_SPEED_400K) ? M5IOE1_I2C_FREQ_100K : M5IOE1_I2C_FREQ_400K;
 
 #ifdef ARDUINO
-        if (_wire != nullptr) {
+#if M5IOE1_HAS_M5UNIFIED_I2C
+        if (_m5_i2c) {
+            _commFreq = originalFreq;
+        } else
+#endif
+            if (_wire != nullptr) {
             _wire->end();
             M5IOE1_DELAY_MS(10);
             _wire->begin(_sda, _scl, originalFreq);
@@ -4520,6 +4761,11 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
                 break;
             }
 #endif  // !M5IOE1_HAS_I2C_MASTER && !M5IOE1_HAS_I2C_BUS
+#if M5IOE1_HAS_M5UNIFIED_I2C
+            case M5IOE1_I2C_DRIVER_M5UNIFIED:
+                _commFreq = originalFreq;
+                break;
+#endif
             default:
                 break;
         }

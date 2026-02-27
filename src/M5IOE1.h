@@ -533,7 +533,34 @@ public:
     m5ioe1_err_t begin(TwoWire* wire, uint8_t addr = M5IOE1_DEFAULT_ADDR, uint8_t sda = -1, uint8_t scl = -1,
                        uint32_t speed = 100000, int8_t intPin = -1,
                        m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_POLLING);
-#else  // ESP-IDF
+#if M5IOE1_HAS_M5UNIFIED_I2C
+    /**
+     * @brief Initialize with M5Unified I2C_Class instance, no hardware interrupt (Arduino)
+     * @note  The I2C bus must already be initialized (i2c->begin() called).
+     *        M5IOE1 borrows the I2C_Class; caller retains ownership and lifecycle.
+     *        不负责驱动安装或释放，I2C 由调用方全程管理。
+     * @param i2c     已 begin() 的 m5::I2C_Class 指针 / Already begin()-ed m5::I2C_Class
+     * @param addr    I2C 地址 / I2C address (default 0x6F)
+     * @param speed   I2C 速率（Hz）/ I2C speed in Hz (default 100000)
+     * @param intMode 中断模式 / Interrupt mode (default POLLING)
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
+    m5ioe1_err_t begin(m5::I2C_Class* i2c, uint8_t addr = M5IOE1_DEFAULT_ADDR, uint32_t speed = M5IOE1_I2C_FREQ_100K,
+                       m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_POLLING);
+
+    /**
+     * @brief Initialize with M5Unified I2C_Class instance, with hardware interrupt (Arduino)
+     * @param i2c     已 begin() 的 m5::I2C_Class 指针 / Already begin()-ed m5::I2C_Class
+     * @param addr    I2C 地址 / I2C address
+     * @param speed   I2C 速率（Hz）/ I2C speed in Hz
+     * @param intPin  硬件中断引脚 / Hardware interrupt pin
+     * @param intMode 中断模式 / Interrupt mode (default HARDWARE)
+     * @return M5IOE1_OK if successful, error code otherwise
+     */
+    m5ioe1_err_t begin(m5::I2C_Class* i2c, uint8_t addr, uint32_t speed, int intPin,
+                       m5ioe1_int_mode_t intMode = M5IOE1_INT_MODE_HARDWARE);
+#endif  // M5IOE1_HAS_M5UNIFIED_I2C
+#else   // ESP-IDF
     // =====================================================
     // Type 1A: Self-created I2C bus, no hardware interrupt
     // =====================================================
@@ -1591,6 +1618,11 @@ private:
                    // SDA pin number for I2C re-initialization
     uint8_t _scl;  // SCL 引脚编号，用于 I2C 重新初始化
                    // SCL pin number for I2C re-initialization
+#if M5IOE1_HAS_M5UNIFIED_I2C
+    m5::I2C_Class* _m5_i2c;
+    uint32_t _commFreq;  // M5UNIFIED 路径专用，init 时从 100K 起，完成后切换至 _requestedSpeed
+                         // M5UNIFIED path: starts at 100K during init, switches to _requestedSpeed after
+#endif
 #else
     // I2C 驱动类型选择
     // I2C driver type selection
