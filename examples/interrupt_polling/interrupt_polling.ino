@@ -78,7 +78,7 @@ void setup()
     // When intPin is not provided (or set to -1), only POLLING and DISABLED modes are supported
     Serial.println("Initializing M5IOE1 in polling mode...");
 
-    if (ioe1.begin(&Wire, I2C_ADDR, I2C_SDA_PIN, I2C_SCL_PIN, I2C_FREQ, M5IOE1_INT_MODE_POLLING) != M5IOE1_OK) {
+    if (ioe1.begin(&Wire, I2C_ADDR, I2C_SDA_PIN, I2C_SCL_PIN, I2C_FREQ, -1, M5IOE1_INT_MODE_POLLING) != M5IOE1_OK) {
         Serial.println("ERROR: Failed to initialize M5IOE1!");
         Serial.println("Please check:");
         Serial.println("  - I2C connections (SDA=" + String(I2C_SDA_PIN) + ", SCL=" + String(I2C_SCL_PIN) + ")");

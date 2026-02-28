@@ -189,13 +189,14 @@ M5IOE1::M5IOE1()
     _sda         = -1;
     _scl         = -1;
     _port        = I2C_NUM_0;
-    _pollTask    = nullptr;
     _intrQueue   = nullptr;
 #if M5IOE1_HAS_M5UNIFIED_I2C
     _m5_i2c   = nullptr;
     _commFreq = M5IOE1_I2C_FREQ_100K;
 #endif
 #endif
+
+    _pollTask = nullptr;
 
     memset(_callbacks, 0, sizeof(_callbacks));
     _clearPinStates();
@@ -2235,6 +2236,26 @@ m5ioe1_err_t M5IOE1::clearInterrupt()
     }
 
     M5IOE1_LOG_I(TAG_IRQ, "Interrupt cleared (all pins)");
+    return M5IOE1_OK;
+}
+
+m5ioe1_err_t M5IOE1::clearInterrupt(uint8_t pin)
+{
+    if (!_initialized) return M5IOE1_FAIL;
+    if (pin >= M5IOE1_MAX_GPIO_PINS) {
+        M5IOE1_LOG_E(TAG_IRQ, "Invalid pin: %d", pin);
+        return M5IOE1_ERR_INVALID_ARG;
+    }
+
+    // GPIO_IS 寄存器为"写 0 清除"语义：写 0 清除对应位，写 1 不影响
+    // GPIO_IS register uses "write 0 to clear" semantics: write 0 clears the bit, write 1 has no effect
+    uint16_t mask = ~(1U << pin) & 0xFFFF;
+    if (!_writeReg16(M5IOE1_REG_GPIO_IS_L, mask)) {
+        M5IOE1_LOG_E(TAG_IRQ, "Failed to write GPIO_IS register for pin %d", pin);
+        return M5IOE1_ERR_I2C_COMM;
+    }
+
+    M5IOE1_LOG_I(TAG_IRQ, "Interrupt cleared (pin %d)", pin);
     return M5IOE1_OK;
 }
 

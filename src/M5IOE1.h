@@ -928,6 +928,17 @@ public:
      */
     m5ioe1_err_t clearInterrupt();
 
+    /**
+     * @brief 清除指定引脚的中断状态
+     *        Clear interrupt status for a specific pin
+     * @param pin GPIO 引脚号（0-13）
+     *            GPIO pin number (0-13)
+     * @return M5IOE1_OK if successful, error code otherwise
+     * @note GPIO_IS 寄存器为"写 0 清除"语义，仅清除指定引脚的中断位
+     *       GPIO_IS register uses "write 0 to clear" semantics, clears only the specified pin's interrupt bit
+     */
+    m5ioe1_err_t clearInterrupt(uint8_t pin);
+
     // ========================
     // 高级 GPIO 功能
     // Advanced GPIO Functions
@@ -1664,7 +1675,6 @@ private:
 
     // 中断处理
     // Interrupt handling
-    TaskHandle_t _pollTask;
     QueueHandle_t _intrQueue;
 
     // M5Unified I2C_Class 借用句柄及当前通信频率
@@ -1675,6 +1685,10 @@ private:
                          // M5UNIFIED path: starts at 100K during init, switches to _requestedSpeed after
 #endif
 #endif
+
+    // 中断轮询任务句柄（Arduino / ESP-IDF 共用）
+    // Interrupt poll task handle (shared by Arduino and ESP-IDF)
+    TaskHandle_t _pollTask;
 
     // 中断回调
     // Interrupt callbacks
