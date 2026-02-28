@@ -26,39 +26,39 @@ static const char* TAG_SYS  = "M5IOE1_SYS";
 // Arduino log level control
 static m5ioe1_log_level_t _m5ioe1_log_level = M5IOE1_LOG_LEVEL_INFO;
 
-#define M5IOE1_LOG_I(tag, fmt, ...)                                    \
-    do {                                                               \
-        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_INFO) {              \
-            Serial.printf("[I][%s] " fmt "\r\n", tag, ##__VA_ARGS__);  \
-        }                                                              \
+#define M5IOE1_LOG_I(tag, fmt, ...)                                   \
+    do {                                                              \
+        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_INFO) {             \
+            Serial.printf("[I][%s] " fmt "\r\n", tag, ##__VA_ARGS__); \
+        }                                                             \
     } while (0)
 
-#define M5IOE1_LOG_W(tag, fmt, ...)                                    \
-    do {                                                               \
-        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_WARN) {              \
-            Serial.printf("[W][%s] " fmt "\r\n", tag, ##__VA_ARGS__);  \
-        }                                                              \
+#define M5IOE1_LOG_W(tag, fmt, ...)                                   \
+    do {                                                              \
+        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_WARN) {             \
+            Serial.printf("[W][%s] " fmt "\r\n", tag, ##__VA_ARGS__); \
+        }                                                             \
     } while (0)
 
-#define M5IOE1_LOG_E(tag, fmt, ...)                                    \
-    do {                                                               \
-        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_ERROR) {             \
-            Serial.printf("[E][%s] " fmt "\r\n", tag, ##__VA_ARGS__);  \
-        }                                                              \
+#define M5IOE1_LOG_E(tag, fmt, ...)                                   \
+    do {                                                              \
+        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_ERROR) {            \
+            Serial.printf("[E][%s] " fmt "\r\n", tag, ##__VA_ARGS__); \
+        }                                                             \
     } while (0)
 
-#define M5IOE1_LOG_D(tag, fmt, ...)                                    \
-    do {                                                               \
-        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_DEBUG) {             \
-            Serial.printf("[D][%s] " fmt "\r\n", tag, ##__VA_ARGS__);  \
-        }                                                              \
+#define M5IOE1_LOG_D(tag, fmt, ...)                                   \
+    do {                                                              \
+        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_DEBUG) {            \
+            Serial.printf("[D][%s] " fmt "\r\n", tag, ##__VA_ARGS__); \
+        }                                                             \
     } while (0)
 
-#define M5IOE1_LOG_V(tag, fmt, ...)                                    \
-    do {                                                               \
-        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_VERBOSE) {           \
-            Serial.printf("[V][%s] " fmt "\r\n", tag, ##__VA_ARGS__);  \
-        }                                                              \
+#define M5IOE1_LOG_V(tag, fmt, ...)                                   \
+    do {                                                              \
+        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_VERBOSE) {          \
+            Serial.printf("[V][%s] " fmt "\r\n", tag, ##__VA_ARGS__); \
+        }                                                             \
     } while (0)
 
 // (Arduino 轮询/中断任务句柄已移至实例成员 _pollTask，支持多实例)
@@ -1672,8 +1672,8 @@ m5ioe1_err_t M5IOE1::_pinModeWithErr(uint8_t pin, uint8_t mode)
     bool modeMatch = ((actualMode & (1 << pin)) == (modeReg & (1 << pin)));
 
     if (!puMatch || !pdMatch || !drvMatch || !modeMatch) {
-        M5IOE1_LOG_E(TAG_GPIO, "Pin %d mode verification failed: PU=%c, PD=%c, DRV=%c, MODE=%c", pin, puMatch ? 'Y' : 'N',
-                     pdMatch ? 'Y' : 'N', drvMatch ? 'Y' : 'N', modeMatch ? 'Y' : 'N');
+        M5IOE1_LOG_E(TAG_GPIO, "Pin %d mode verification failed: PU=%c, PD=%c, DRV=%c, MODE=%c", pin,
+                     puMatch ? 'Y' : 'N', pdMatch ? 'Y' : 'N', drvMatch ? 'Y' : 'N', modeMatch ? 'Y' : 'N');
         return M5IOE1_FAIL;
     }
 
@@ -1681,9 +1681,13 @@ m5ioe1_err_t M5IOE1::_pinModeWithErr(uint8_t pin, uint8_t mode)
     // Step 4: Verification passed, update cache
     _autoSnapshotUpdate(M5IOE1_SNAPSHOT_DOMAIN_GPIO);
 
-    const char* modeName = (mode == INPUT) ? "INPUT" : (mode == OUTPUT) ? "OUTPUT" :
-                           (mode == INPUT_PULLUP) ? "INPUT_PULLUP" : (mode == INPUT_PULLDOWN) ? "INPUT_PULLDOWN" :
-                           (mode == OPEN_DRAIN) ? "OPEN_DRAIN" : (mode == OUTPUT_OPEN_DRAIN) ? "OUTPUT_OPEN_DRAIN" : "UNKNOWN";
+    const char* modeName = (mode == INPUT)               ? "INPUT"
+                           : (mode == OUTPUT)            ? "OUTPUT"
+                           : (mode == INPUT_PULLUP)      ? "INPUT_PULLUP"
+                           : (mode == INPUT_PULLDOWN)    ? "INPUT_PULLDOWN"
+                           : (mode == OPEN_DRAIN)        ? "OPEN_DRAIN"
+                           : (mode == OUTPUT_OPEN_DRAIN) ? "OUTPUT_OPEN_DRAIN"
+                                                         : "UNKNOWN";
     M5IOE1_LOG_I(TAG_GPIO, "Pin %d mode set and verified: %s (0x%02X)", pin, modeName, mode);
     return M5IOE1_OK;
 }
@@ -1895,9 +1899,10 @@ m5ioe1_err_t M5IOE1::setPullMode(uint8_t pin, uint8_t pullMode)
     // Step 4: Verification passed, update cache
     _autoSnapshotUpdate(M5IOE1_SNAPSHOT_DOMAIN_GPIO);
 
-    const char* pullName = (pullMode == M5IOE1_PULL_NONE) ? "NONE" :
-                           (pullMode == M5IOE1_PULL_UP) ? "PULL_UP" :
-                           (pullMode == M5IOE1_PULL_DOWN) ? "PULL_DOWN" : "UNKNOWN";
+    const char* pullName = (pullMode == M5IOE1_PULL_NONE)   ? "NONE"
+                           : (pullMode == M5IOE1_PULL_UP)   ? "PULL_UP"
+                           : (pullMode == M5IOE1_PULL_DOWN) ? "PULL_DOWN"
+                                                            : "UNKNOWN";
     M5IOE1_LOG_I(TAG_GPIO, "Pin %d pull mode set and verified: %s", pin, pullName);
     return M5IOE1_OK;
 }
@@ -2061,7 +2066,8 @@ void M5IOE1::attachInterrupt(uint8_t pin, m5ioe1_callback_t callback, uint8_t mo
     _pinStates[pin].intrEnabled = true;
     _pinStates[pin].intrRising  = (mode == RISING);
 
-    M5IOE1_LOG_I(TAG_IRQ, "Pin %d interrupt attached and verified: mode=%s", pin, mode == RISING ? "RISING" : "FALLING");
+    M5IOE1_LOG_I(TAG_IRQ, "Pin %d interrupt attached and verified: mode=%s", pin,
+                 mode == RISING ? "RISING" : "FALLING");
 }
 
 void M5IOE1::attachInterruptArg(uint8_t pin, m5ioe1_callback_arg_t callback, void* arg, uint8_t mode)
@@ -2146,7 +2152,8 @@ void M5IOE1::attachInterruptArg(uint8_t pin, m5ioe1_callback_arg_t callback, voi
     _pinStates[pin].intrEnabled = true;
     _pinStates[pin].intrRising  = (mode == RISING);
 
-    M5IOE1_LOG_I(TAG_IRQ, "Pin %d interrupt attached and verified: mode=%s", pin, mode == RISING ? "RISING" : "FALLING");
+    M5IOE1_LOG_I(TAG_IRQ, "Pin %d interrupt attached and verified: mode=%s", pin,
+                 mode == RISING ? "RISING" : "FALLING");
 }
 
 void M5IOE1::detachInterrupt(uint8_t pin)
@@ -2526,7 +2533,8 @@ m5ioe1_err_t M5IOE1::setPwmDuty12bit(uint8_t channel, uint16_t duty12, bool pola
     if (channel > 3 || duty12 > 0x0FFF) return M5IOE1_ERR_INVALID_ARG;
     if (!_initialized) return M5IOE1_ERR_NOT_INIT;
 
-    M5IOE1_LOG_D(TAG_PWM, "setPwmDuty12bit: ch=%d duty=%d pol=%s en=%s", channel, duty12, polarity ? "Inv" : "Norm", enable ? "On" : "Off");
+    M5IOE1_LOG_D(TAG_PWM, "setPwmDuty12bit: ch=%d duty=%d pol=%s en=%s", channel, duty12, polarity ? "Inv" : "Norm",
+                 enable ? "On" : "Off");
 
     // 获取对应的引脚
     // Get corresponding pin
@@ -2588,7 +2596,8 @@ m5ioe1_err_t M5IOE1::setPwmDuty12bit(uint8_t channel, uint16_t duty12, bool pola
 
     _autoSnapshotUpdate(M5IOE1_SNAPSHOT_DOMAIN_PWM | M5IOE1_SNAPSHOT_DOMAIN_GPIO);
 
-    M5IOE1_LOG_I(TAG_PWM, "PWM ch%d verified: duty=%d pol=%s en=%s", channel, duty12, polarity ? "Inv" : "Norm", enable ? "On" : "Off");
+    M5IOE1_LOG_I(TAG_PWM, "PWM ch%d verified: duty=%d pol=%s en=%s", channel, duty12, polarity ? "Inv" : "Norm",
+                 enable ? "On" : "Off");
 
     return M5IOE1_OK;
 }
@@ -2620,7 +2629,8 @@ m5ioe1_err_t M5IOE1::setPwmConfig(uint8_t channel, bool enable, bool polarity, u
         for (uint8_t other = 0; other < M5IOE1_MAX_PWM_CHANNELS; other++) {
             if (other == channel) continue;
             if (_pwmStates[other].enabled) {
-                M5IOE1_LOG_W(TAG_PWM, "PWM frequency change affects other channels: %d -> %d", _pwmFrequency, frequency);
+                M5IOE1_LOG_W(TAG_PWM, "PWM frequency change affects other channels: %d -> %d", _pwmFrequency,
+                             frequency);
                 break;
             }
         }
@@ -2773,8 +2783,8 @@ m5ioe1_err_t M5IOE1::setLedColor(uint8_t index, uint8_t r, uint8_t g, uint8_t b)
     // 步骤 3: 验证关键位是否匹配
     // Step 3: Verify critical bits match
     if (actualRgb565 != rgb565) {
-        M5IOE1_LOG_E(TAG_LED, "LED color verification failed for index %d: expected=0x%04X, actual=0x%04X", index, rgb565,
-                     actualRgb565);
+        M5IOE1_LOG_E(TAG_LED, "LED color verification failed for index %d: expected=0x%04X, actual=0x%04X", index,
+                     rgb565, actualRgb565);
         return M5IOE1_FAIL;
     }
 
@@ -2902,7 +2912,8 @@ m5ioe1_err_t M5IOE1::setLeds(const m5ioe1_rgb_t* colors, uint8_t count, uint8_t 
     // 边界检查：确保不会越界访问数组
     // Bounds check: ensure no out-of-bounds array access
     if (count > arraySize) {
-        M5IOE1_LOG_E(TAG_LED, "LED count %d exceeds array size %d (would cause out-of-bounds access)", count, arraySize);
+        M5IOE1_LOG_E(TAG_LED, "LED count %d exceeds array size %d (would cause out-of-bounds access)", count,
+                     arraySize);
         return M5IOE1_ERR_INVALID_ARG;
     }
 
@@ -2955,8 +2966,8 @@ m5ioe1_err_t M5IOE1::setLeds(const m5ioe1_rgb_t* colors, uint8_t count, uint8_t 
         }
         uint16_t actualRgb565 = ((uint16_t)actualData[1] << 8) | actualData[0];
         if (actualRgb565 != rgb565) {
-            M5IOE1_LOG_E(TAG_LED, "LED color verification failed for index %d: expected=0x%04X, actual=0x%04X", i, rgb565,
-                         actualRgb565);
+            M5IOE1_LOG_E(TAG_LED, "LED color verification failed for index %d: expected=0x%04X, actual=0x%04X", i,
+                         rgb565, actualRgb565);
             return M5IOE1_FAIL;
         }
     }
@@ -3054,7 +3065,8 @@ m5ioe1_err_t M5IOE1::setAw8737aPulse(uint8_t pin, m5ioe1_aw8737a_pulse_t pulseNu
     // Verify critical bits match
     uint8_t actualValue = actualReg & 0x7F;
     if (actualValue != regValue) {
-        M5IOE1_LOG_E(TAG_AMP, "AW8737A pulse verification failed: expected=0x%02X, actual=0x%02X", regValue, actualValue);
+        M5IOE1_LOG_E(TAG_AMP, "AW8737A pulse verification failed: expected=0x%02X, actual=0x%02X", regValue,
+                     actualValue);
         return M5IOE1_FAIL;
     }
 
@@ -3177,8 +3189,8 @@ m5ioe1_err_t M5IOE1::writeRtcRAM(uint8_t offset, const uint8_t* data, uint8_t le
     for (uint8_t i = 0; i < length; i++) {
         if (actualData[i] != data[i]) {
             allMatch = false;
-            M5IOE1_LOG_E(TAG_SYS, "RTC_RAM verification failed at offset %d: expected=0x%02X, actual=0x%02X", offset + i,
-                         data[i], actualData[i]);
+            M5IOE1_LOG_E(TAG_SYS, "RTC_RAM verification failed at offset %d: expected=0x%02X, actual=0x%02X",
+                         offset + i, data[i], actualData[i]);
             break;
         }
     }
@@ -3313,7 +3325,8 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
 
                     ret = i2c_master_bus_add_device(_i2c_master_bus, &dev_config, &_i2c_master_dev);
                     if (ret != ESP_OK) {
-                        M5IOE1_LOG_E(TAG_I2C, "Failed to add I2C device at %lu Hz: %s", targetFreq, esp_err_to_name(ret));
+                        M5IOE1_LOG_E(TAG_I2C, "Failed to add I2C device at %lu Hz: %s", targetFreq,
+                                     esp_err_to_name(ret));
                         return M5IOE1_ERR_I2C_CONFIG;
                     }
                 }
@@ -4316,8 +4329,8 @@ bool M5IOE1::_writeBytes(uint8_t reg, const uint8_t* data, uint8_t len)
         } else
 #endif
             if (M5IOE1_I2C_ARDUINO_WRITE_BYTES(_wire, _addr, reg, len, data)) {
-            M5IOE1_LOG_V(TAG_I2C, "WriteBytes Reg[0x%02X] len=%d: %02X %02X %02X...", reg, len,
-                         len > 0 ? data[0] : 0, len > 1 ? data[1] : 0, len > 2 ? data[2] : 0);
+            M5IOE1_LOG_V(TAG_I2C, "WriteBytes Reg[0x%02X] len=%d: %02X %02X %02X...", reg, len, len > 0 ? data[0] : 0,
+                         len > 1 ? data[1] : 0, len > 2 ? data[2] : 0);
             return true;
         }
 #else
@@ -4349,8 +4362,8 @@ bool M5IOE1::_writeBytes(uint8_t reg, const uint8_t* data, uint8_t len)
                 break;
         }
         if (ok) {
-            M5IOE1_LOG_V(TAG_I2C, "WriteBytes Reg[0x%02X] len=%d: %02X %02X %02X...", reg, len,
-                         len > 0 ? data[0] : 0, len > 1 ? data[1] : 0, len > 2 ? data[2] : 0);
+            M5IOE1_LOG_V(TAG_I2C, "WriteBytes Reg[0x%02X] len=%d: %02X %02X %02X...", reg, len, len > 0 ? data[0] : 0,
+                         len > 1 ? data[1] : 0, len > 2 ? data[2] : 0);
             return true;
         }
 #endif
@@ -4377,8 +4390,8 @@ bool M5IOE1::_readBytes(uint8_t reg, uint8_t* data, uint8_t len)
         } else
 #endif
             if (M5IOE1_I2C_ARDUINO_READ_BYTES(_wire, _addr, reg, len, data)) {
-            M5IOE1_LOG_V(TAG_I2C, "ReadBytes  Reg[0x%02X] len=%d: %02X %02X %02X...", reg, len,
-                         len > 0 ? data[0] : 0, len > 1 ? data[1] : 0, len > 2 ? data[2] : 0);
+            M5IOE1_LOG_V(TAG_I2C, "ReadBytes  Reg[0x%02X] len=%d: %02X %02X %02X...", reg, len, len > 0 ? data[0] : 0,
+                         len > 1 ? data[1] : 0, len > 2 ? data[2] : 0);
             return true;
         }
 #else
@@ -4410,8 +4423,8 @@ bool M5IOE1::_readBytes(uint8_t reg, uint8_t* data, uint8_t len)
                 break;
         }
         if (ok) {
-            M5IOE1_LOG_V(TAG_I2C, "ReadBytes  Reg[0x%02X] len=%d: %02X %02X %02X...", reg, len,
-                         len > 0 ? data[0] : 0, len > 1 ? data[1] : 0, len > 2 ? data[2] : 0);
+            M5IOE1_LOG_V(TAG_I2C, "ReadBytes  Reg[0x%02X] len=%d: %02X %02X %02X...", reg, len, len > 0 ? data[0] : 0,
+                         len > 1 ? data[1] : 0, len > 2 ? data[2] : 0);
             return true;
         }
 #endif
@@ -4912,7 +4925,8 @@ void M5IOE1::_handleInterrupt()
     for (uint8_t pin = 0; pin < M5IOE1_MAX_GPIO_PINS; pin++) {
         if ((status & (1 << pin)) && _callbacks[pin].enabled) {
             if (_enableDefaultIsrLog) {
-                M5IOE1_LOG_I(TAG_IRQ, "Pin %d triggered by %s edge", pin, _callbacks[pin].rising ? "RISING" : "FALLING");
+                M5IOE1_LOG_I(TAG_IRQ, "Pin %d triggered by %s edge", pin,
+                             _callbacks[pin].rising ? "RISING" : "FALLING");
             }
 
             if (_callbacks[pin].callbackArg != nullptr) {
@@ -5464,7 +5478,8 @@ void M5IOE1::_cleanupHardwareInterrupt()
         // is expected behavior
         esp_err_t err = gpio_isr_handler_remove((gpio_num_t)_intPin);
         if (err != ESP_OK) {
-            M5IOE1_LOG_W(TAG_IRQ, "gpio_isr_handler_remove failed (can be ignored if ISR service was not installed): %s",
+            M5IOE1_LOG_W(TAG_IRQ,
+                         "gpio_isr_handler_remove failed (can be ignored if ISR service was not installed): %s",
                          esp_err_to_name(err));
         }
     }
