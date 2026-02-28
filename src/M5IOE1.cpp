@@ -7,7 +7,15 @@
 #include "M5IOE1.h"
 #include <string.h>
 
-static const char* TAG = "M5IOE1";
+static const char* TAG      = "M5IOE1";
+static const char* TAG_I2C  = "M5IOE1_I2C";
+static const char* TAG_GPIO = "M5IOE1_GPIO";
+static const char* TAG_ADC  = "M5IOE1_ADC";
+static const char* TAG_PWM  = "M5IOE1_PWM";
+static const char* TAG_LED  = "M5IOE1_LED";
+static const char* TAG_AMP  = "M5IOE1_AMP";
+static const char* TAG_IRQ  = "M5IOE1_IRQ";
+static const char* TAG_SYS  = "M5IOE1_SYS";
 
 #ifdef ARDUINO
 #include <Arduino.h>
@@ -18,30 +26,49 @@ static const char* TAG = "M5IOE1";
 // Arduino log level control
 static m5ioe1_log_level_t _m5ioe1_log_level = M5IOE1_LOG_LEVEL_INFO;
 
-#define M5IOE1_LOG_I(tag, fmt, ...)                                \
-    do {                                                           \
-        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_INFO) {          \
-            Serial.printf("[%s] " fmt "\r\n", tag, ##__VA_ARGS__); \
-        }                                                          \
+#define M5IOE1_LOG_I(tag, fmt, ...)                                    \
+    do {                                                               \
+        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_INFO) {              \
+            Serial.printf("[I][%s] " fmt "\r\n", tag, ##__VA_ARGS__);  \
+        }                                                              \
     } while (0)
 
-#define M5IOE1_LOG_W(tag, fmt, ...)                                      \
-    do {                                                                 \
-        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_WARN) {                \
-            Serial.printf("[%s] WARN: " fmt "\r\n", tag, ##__VA_ARGS__); \
-        }                                                                \
+#define M5IOE1_LOG_W(tag, fmt, ...)                                    \
+    do {                                                               \
+        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_WARN) {              \
+            Serial.printf("[W][%s] " fmt "\r\n", tag, ##__VA_ARGS__);  \
+        }                                                              \
     } while (0)
 
-#define M5IOE1_LOG_E(tag, fmt, ...)                                       \
-    do {                                                                  \
-        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_ERROR) {                \
-            Serial.printf("[%s] ERROR: " fmt "\r\n", tag, ##__VA_ARGS__); \
-        }                                                                 \
+#define M5IOE1_LOG_E(tag, fmt, ...)                                    \
+    do {                                                               \
+        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_ERROR) {             \
+            Serial.printf("[E][%s] " fmt "\r\n", tag, ##__VA_ARGS__);  \
+        }                                                              \
+    } while (0)
+
+#define M5IOE1_LOG_D(tag, fmt, ...)                                    \
+    do {                                                               \
+        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_DEBUG) {             \
+            Serial.printf("[D][%s] " fmt "\r\n", tag, ##__VA_ARGS__);  \
+        }                                                              \
+    } while (0)
+
+#define M5IOE1_LOG_V(tag, fmt, ...)                                    \
+    do {                                                               \
+        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_VERBOSE) {           \
+            Serial.printf("[V][%s] " fmt "\r\n", tag, ##__VA_ARGS__);  \
+        }                                                              \
     } while (0)
 
 // (Arduino 轮询/中断任务句柄已移至实例成员 _pollTask，支持多实例)
 // (Arduino polling/interrupt task handles moved to instance member _pollTask for multi-instance support)
 #else
+// 强制本组件编译所有级别的日志，实际输出由运行时的 esp_log_level_set 控制
+// Force compile all log levels for this component; actual output controlled by esp_log_level_set at runtime
+#ifndef LOG_LOCAL_LEVEL
+#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
+#endif
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -52,6 +79,8 @@ static m5ioe1_log_level_t _m5ioe1_log_level = M5IOE1_LOG_LEVEL_INFO;
 #define M5IOE1_LOG_I(tag, fmt, ...) ESP_LOGI(tag, fmt, ##__VA_ARGS__)
 #define M5IOE1_LOG_W(tag, fmt, ...) ESP_LOGW(tag, fmt, ##__VA_ARGS__)
 #define M5IOE1_LOG_E(tag, fmt, ...) ESP_LOGE(tag, fmt, ##__VA_ARGS__)
+#define M5IOE1_LOG_D(tag, fmt, ...) ESP_LOGD(tag, fmt, ##__VA_ARGS__)
+#define M5IOE1_LOG_V(tag, fmt, ...) ESP_LOGV(tag, fmt, ##__VA_ARGS__)
 
 // ESP-IDF 平台日志级别控制
 // ESP-IDF platform log level control
@@ -256,14 +285,14 @@ m5ioe1_err_t M5IOE1::begin(TwoWire* wire, uint8_t addr, uint8_t sda, uint8_t scl
     _intPin = intPin;
 
     if (intMode == M5IOE1_INT_MODE_HARDWARE && _intPin < 0) {
-        M5IOE1_LOG_E(TAG, "Hardware interrupt mode requires interrupt pin");
+        M5IOE1_LOG_E(TAG_I2C, "Hardware interrupt mode requires interrupt pin");
         return M5IOE1_ERR_INVALID_ARG;
     }
 
     // 验证 I2C 频率 - M5IOE1 仅支持 100KHz 或 400KHz
     // Validate I2C frequency - M5IOE1 only supports 100KHz or 400KHz
     if (!_isValidI2cFrequency(speed)) {
-        M5IOE1_LOG_W(TAG,
+        M5IOE1_LOG_W(TAG_I2C,
                      "Invalid I2C frequency: %lu Hz. M5IOE1 only supports 100KHz or 400KHz. Falling back to 100KHz.",
                      speed);
         _requestedSpeed = M5IOE1_I2C_FREQ_100K;
@@ -273,7 +302,7 @@ m5ioe1_err_t M5IOE1::begin(TwoWire* wire, uint8_t addr, uint8_t sda, uint8_t scl
 
     // 始终以 100KHz 开始 - M5IOE1 在上电/复位后默认为 100KHz
     // Always start with 100KHz - M5IOE1 defaults to 100KHz after power-on/reset
-    M5IOE1_LOG_I(TAG, "Initializing M5IOE1 with 100KHz (device default)");
+    M5IOE1_LOG_I(TAG_I2C, "Initializing M5IOE1 with 100KHz (device default)");
 
     // 在开始新的 I2C 会话之前结束之前的会话（修复 ESP_ERR_INVALID_STATE）
     // End any previous I2C session before starting new one (fixes ESP_ERR_INVALID_STATE)
@@ -285,7 +314,7 @@ m5ioe1_err_t M5IOE1::begin(TwoWire* wire, uint8_t addr, uint8_t sda, uint8_t scl
     // 初始化 I2C 总线并检查返回值
     // Initialize I2C bus and check return value
     if (!_wire->begin(sda, scl, M5IOE1_I2C_FREQ_100K)) {
-        M5IOE1_LOG_E(TAG, "Failed to initialize I2C bus (SDA=%d, SCL=%d)", sda, scl);
+        M5IOE1_LOG_E(TAG_I2C, "Failed to initialize I2C bus (SDA=%d, SCL=%d)", sda, scl);
         return M5IOE1_ERR_I2C_CONFIG;
     }
 
@@ -305,7 +334,7 @@ m5ioe1_err_t M5IOE1::begin(TwoWire* wire, uint8_t addr, uint8_t sda, uint8_t scl
     if (!_initDevice()) {
         // 步骤 2: 100K失败，等待800ms后再尝试一次100K
         // Step 2: 100K failed, wait 800ms and retry 100K
-        M5IOE1_LOG_W(TAG, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
+        M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
         M5IOE1_DELAY_MS(800);
 
         M5IOE1_I2C_ARDUINO_SEND_WAKE(_wire, _addr);
@@ -314,13 +343,13 @@ m5ioe1_err_t M5IOE1::begin(TwoWire* wire, uint8_t addr, uint8_t sda, uint8_t scl
         if (!_initDevice()) {
             // 步骤 3: 100K第二次失败，尝试400K
             // Step 3: 100K failed again, try 400K
-            M5IOE1_LOG_W(TAG, "Failed at 100KHz (retry), trying 400KHz...");
+            M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz (retry), trying 400KHz...");
 
             _wire->end();
             M5IOE1_DELAY_MS(50);
 
             if (!_wire->begin(sda, scl, M5IOE1_I2C_FREQ_400K)) {
-                M5IOE1_LOG_E(TAG, "Failed to initialize I2C bus at 400KHz");
+                M5IOE1_LOG_E(TAG_I2C, "Failed to initialize I2C bus at 400KHz");
                 return M5IOE1_ERR_I2C_CONFIG;
             }
             M5IOE1_DELAY_MS(100);
@@ -331,7 +360,7 @@ m5ioe1_err_t M5IOE1::begin(TwoWire* wire, uint8_t addr, uint8_t sda, uint8_t scl
             if (!_initDevice()) {
                 // 步骤 4: 都失败，初始化失败
                 // Step 4: All attempts failed, initialization failed
-                M5IOE1_LOG_E(TAG, "Failed at 100KHz (twice) and 400KHz");
+                M5IOE1_LOG_E(TAG_I2C, "Failed at 100KHz (twice) and 400KHz");
                 return M5IOE1_ERR_I2C_COMM;
             }
         }
@@ -353,21 +382,21 @@ m5ioe1_err_t M5IOE1::begin(TwoWire* wire, uint8_t addr, uint8_t sda, uint8_t scl
     m5ioe1_i2c_speed_t currentSpeed;
     if (getI2cSpeed(&currentSpeed) == M5IOE1_OK) {
         if (currentSpeed == targetSpeed) {
-            M5IOE1_LOG_I(TAG, "Current I2C speed matches user request (%s)",
+            M5IOE1_LOG_I(TAG_I2C, "Current I2C speed matches user request (%s)",
                          (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
         } else {
-            M5IOE1_LOG_I(TAG, "Current I2C speed differs from user request (Current: %s, Requested: %s)",
+            M5IOE1_LOG_I(TAG_I2C, "Current I2C speed differs from user request (Current: %s, Requested: %s)",
                          (currentSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K",
                          (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
         }
     } else {
-        M5IOE1_LOG_W(TAG, "Failed to read current I2C speed");
+        M5IOE1_LOG_W(TAG_I2C, "Failed to read current I2C speed");
     }
 
     // 使用setI2cConfig一次性配置：sleepTime=0, 用户速度, 默认唤醒边沿, 默认上拉
     // Use setI2cConfig to configure at once: sleepTime=0, user speed, default wake edge, default pull
     if (setI2cConfig(0, targetSpeed, M5IOE1_WAKE_EDGE_FALLING, M5IOE1_PULL_ENABLED) != M5IOE1_OK) {
-        M5IOE1_LOG_W(TAG, "Failed to set I2C config");
+        M5IOE1_LOG_W(TAG_I2C, "Failed to set I2C config");
     }
 
     // 步骤 6: 快照
@@ -377,8 +406,9 @@ m5ioe1_err_t M5IOE1::begin(TwoWire* wire, uint8_t addr, uint8_t sda, uint8_t scl
     _snapshotAdcState();
     _snapshotAw8737a();
     _snapshotI2cConfig();
+    M5IOE1_LOG_D(TAG_I2C, "Snapshot completed (pins/pwm/adc/aw8737a/i2c)");
 
-    M5IOE1_LOG_I(TAG, "M5IOE1 initialized at address 0x%02X (I2C: %lu Hz)", _addr, _requestedSpeed);
+    M5IOE1_LOG_I(TAG_I2C, "M5IOE1 initialized at address 0x%02X (I2C: %lu Hz)", _addr, _requestedSpeed);
 
     // 步骤 7: 设置中断模式
     // Step 7: Set interrupt mode
@@ -400,7 +430,7 @@ m5ioe1_err_t M5IOE1::begin(TwoWire* wire, uint8_t addr, uint8_t sda, uint8_t scl
 m5ioe1_err_t M5IOE1::begin(m5::I2C_Class* i2c, uint8_t addr, uint32_t speed, m5ioe1_int_mode_t intMode)
 {
     if (!i2c || !i2c->isEnabled()) {
-        M5IOE1_LOG_E(TAG, "M5Unified I2C_Class not initialized");
+        M5IOE1_LOG_E(TAG_I2C, "M5Unified I2C_Class not initialized");
         return M5IOE1_ERR_INVALID_ARG;
     }
 
@@ -412,20 +442,20 @@ m5ioe1_err_t M5IOE1::begin(m5::I2C_Class* i2c, uint8_t addr, uint32_t speed, m5i
     _intPin = -1;
 
     if (intMode == M5IOE1_INT_MODE_HARDWARE) {
-        M5IOE1_LOG_E(TAG, "Hardware interrupt mode requires interrupt pin");
+        M5IOE1_LOG_E(TAG_I2C, "Hardware interrupt mode requires interrupt pin");
         return M5IOE1_ERR_INVALID_ARG;
     }
 
     // 验证 I2C 频率
     // Validate I2C frequency
     if (!_isValidI2cFrequency(speed)) {
-        M5IOE1_LOG_W(TAG, "Invalid I2C frequency: %lu Hz. Falling back to 100KHz.", speed);
+        M5IOE1_LOG_W(TAG_I2C, "Invalid I2C frequency: %lu Hz. Falling back to 100KHz.", speed);
         _requestedSpeed = M5IOE1_I2C_FREQ_100K;
     } else {
         _requestedSpeed = speed;
     }
 
-    M5IOE1_LOG_I(TAG, "Initializing M5IOE1 with 100KHz (device default)");
+    M5IOE1_LOG_I(TAG_I2C, "Initializing M5IOE1 with 100KHz (device default)");
 
     // 步骤 1: 尝试唤醒设备
     // Step 1: Try to wake up the device
@@ -438,7 +468,7 @@ m5ioe1_err_t M5IOE1::begin(m5::I2C_Class* i2c, uint8_t addr, uint32_t speed, m5i
     if (!_initDevice()) {
         // 步骤 3: 100K失败，等待800ms后再尝试一次100K
         // Step 3: 100K failed, wait 800ms and retry 100K
-        M5IOE1_LOG_W(TAG, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
+        M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
         M5IOE1_DELAY_MS(800);
 
         M5IOE1_M5UNIFIED_SEND_WAKE(_m5_i2c, _addr, _commFreq);
@@ -447,7 +477,7 @@ m5ioe1_err_t M5IOE1::begin(m5::I2C_Class* i2c, uint8_t addr, uint32_t speed, m5i
         if (!_initDevice()) {
             // 步骤 4: 100K第二次失败，尝试400K
             // Step 4: 100K failed again, try 400K
-            M5IOE1_LOG_W(TAG, "Failed at 100KHz (retry), trying 400KHz...");
+            M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz (retry), trying 400KHz...");
             _commFreq = M5IOE1_I2C_FREQ_400K;
 
             M5IOE1_M5UNIFIED_SEND_WAKE(_m5_i2c, _addr, _commFreq);
@@ -456,7 +486,7 @@ m5ioe1_err_t M5IOE1::begin(m5::I2C_Class* i2c, uint8_t addr, uint32_t speed, m5i
             if (!_initDevice()) {
                 // 步骤 5: 都失败，初始化失败
                 // Step 5: All attempts failed, initialization failed
-                M5IOE1_LOG_E(TAG, "Failed at 100KHz (twice) and 400KHz");
+                M5IOE1_LOG_E(TAG_I2C, "Failed at 100KHz (twice) and 400KHz");
                 _m5_i2c = nullptr;
                 return M5IOE1_ERR_I2C_COMM;
             }
@@ -477,19 +507,19 @@ m5ioe1_err_t M5IOE1::begin(m5::I2C_Class* i2c, uint8_t addr, uint32_t speed, m5i
     m5ioe1_i2c_speed_t currentSpeed;
     if (getI2cSpeed(&currentSpeed) == M5IOE1_OK) {
         if (currentSpeed == targetSpeed) {
-            M5IOE1_LOG_I(TAG, "Current I2C speed matches user request (%s)",
+            M5IOE1_LOG_I(TAG_I2C, "Current I2C speed matches user request (%s)",
                          (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
         } else {
-            M5IOE1_LOG_I(TAG, "Current I2C speed differs from user request (Current: %s, Requested: %s)",
+            M5IOE1_LOG_I(TAG_I2C, "Current I2C speed differs from user request (Current: %s, Requested: %s)",
                          (currentSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K",
                          (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
         }
     } else {
-        M5IOE1_LOG_W(TAG, "Failed to read current I2C speed");
+        M5IOE1_LOG_W(TAG_I2C, "Failed to read current I2C speed");
     }
 
     if (setI2cConfig(0, targetSpeed, M5IOE1_WAKE_EDGE_FALLING, M5IOE1_PULL_ENABLED) != M5IOE1_OK) {
-        M5IOE1_LOG_W(TAG, "Failed to set I2C config");
+        M5IOE1_LOG_W(TAG_I2C, "Failed to set I2C config");
     }
 
     // 切换到目标频率
@@ -503,8 +533,9 @@ m5ioe1_err_t M5IOE1::begin(m5::I2C_Class* i2c, uint8_t addr, uint32_t speed, m5i
     _snapshotAdcState();
     _snapshotAw8737a();
     _snapshotI2cConfig();
+    M5IOE1_LOG_D(TAG_I2C, "Snapshot completed (pins/pwm/adc/aw8737a/i2c)");
 
-    M5IOE1_LOG_I(TAG, "M5IOE1 initialized at address 0x%02X (I2C: %lu Hz)", _addr, _requestedSpeed);
+    M5IOE1_LOG_I(TAG_I2C, "M5IOE1 initialized at address 0x%02X (I2C: %lu Hz)", _addr, _requestedSpeed);
 
     if (intMode != M5IOE1_INT_MODE_DISABLED) {
         m5ioe1_err_t err = setInterruptMode(intMode);
@@ -529,7 +560,7 @@ m5ioe1_err_t M5IOE1::begin(m5::I2C_Class* i2c, uint8_t addr, uint32_t speed, int
 
     _intPin = intPin;
     if (intMode == M5IOE1_INT_MODE_HARDWARE && _intPin < 0) {
-        M5IOE1_LOG_E(TAG, "Hardware interrupt mode requires interrupt pin");
+        M5IOE1_LOG_E(TAG_I2C, "Hardware interrupt mode requires interrupt pin");
         return M5IOE1_ERR_INVALID_ARG;
     }
     if (intMode != M5IOE1_INT_MODE_DISABLED) {
@@ -563,14 +594,14 @@ m5ioe1_err_t M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint
     _scl    = scl;
 
     if (intMode == M5IOE1_INT_MODE_HARDWARE) {
-        M5IOE1_LOG_E(TAG, "Hardware interrupt mode requires interrupt pin");
+        M5IOE1_LOG_E(TAG_I2C, "Hardware interrupt mode requires interrupt pin");
         return M5IOE1_ERR_INVALID_ARG;
     }
 
     // 验证 I2C 频率 - M5IOE1 仅支持 100KHz 或 400KHz
     // Validate I2C frequency - M5IOE1 only supports 100KHz or 400KHz
     if (!_isValidI2cFrequency(speed)) {
-        M5IOE1_LOG_W(TAG,
+        M5IOE1_LOG_W(TAG_I2C,
                      "Invalid I2C frequency: %lu Hz. M5IOE1 only supports 100KHz or 400KHz. Falling back to 100KHz.",
                      speed);
         _requestedSpeed = M5IOE1_I2C_FREQ_100K;
@@ -581,7 +612,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint
 #if M5IOE1_HAS_I2C_MASTER
     // 始终以 100KHz 开始 - M5IOE1 在上电/复位后默认为 100KHz
     // Always start with 100KHz - M5IOE1 defaults to 100KHz after power-on/reset
-    M5IOE1_LOG_I(TAG, "Initializing M5IOE1 with 100KHz (device default)");
+    M5IOE1_LOG_I(TAG_I2C, "Initializing M5IOE1 with 100KHz (device default)");
 
     // 使用 ESP-IDF 原生驱动创建 I2C 主总线
     // Create I2C master bus using ESP-IDF native driver
@@ -602,7 +633,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint
 
     esp_err_t ret = i2c_new_master_bus(&bus_config, &_i2c_master_bus);
     if (ret != ESP_OK) {
-        M5IOE1_LOG_E(TAG, "Failed to create I2C master bus: %s", esp_err_to_name(ret));
+        M5IOE1_LOG_E(TAG_I2C, "Failed to create I2C master bus: %s", esp_err_to_name(ret));
         return M5IOE1_ERR_I2C_CONFIG;
     }
 
@@ -623,7 +654,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint
     // Create device handle at 100KHz
     ret = i2c_master_bus_add_device(_i2c_master_bus, &dev_config, &_i2c_master_dev);
     if (ret != ESP_OK) {
-        M5IOE1_LOG_E(TAG, "Failed to add I2C device: %s", esp_err_to_name(ret));
+        M5IOE1_LOG_E(TAG_I2C, "Failed to add I2C device: %s", esp_err_to_name(ret));
         i2c_del_master_bus(_i2c_master_bus);
         _i2c_master_bus = nullptr;
         return M5IOE1_ERR_I2C_CONFIG;
@@ -641,7 +672,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint
     if (!_initDevice()) {
         // 步骤 2: 100K失败，等待800ms后再尝试一次100K
         // Step 2: 100K failed, wait 800ms and retry 100K
-        M5IOE1_LOG_W(TAG, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
+        M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
         M5IOE1_DELAY_MS(800);
 
         M5IOE1_I2C_MASTER_SEND_WAKE(_i2c_master_bus, _addr);
@@ -650,7 +681,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint
         if (!_initDevice()) {
             // 步骤 3: 100K第二次失败，尝试400K
             // Step 3: 100K failed again, try 400K
-            M5IOE1_LOG_W(TAG, "Failed at 100KHz (retry), trying 400KHz...");
+            M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz (retry), trying 400KHz...");
 
             // 删除当前100K设备句柄
             // Remove current 100K device handle
@@ -672,7 +703,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint
 
             ret = i2c_master_bus_add_device(_i2c_master_bus, &dev_config_400k, &_i2c_master_dev);
             if (ret != ESP_OK) {
-                M5IOE1_LOG_E(TAG, "Failed to add I2C device at 400KHz: %s", esp_err_to_name(ret));
+                M5IOE1_LOG_E(TAG_I2C, "Failed to add I2C device at 400KHz: %s", esp_err_to_name(ret));
                 i2c_del_master_bus(_i2c_master_bus);
                 _i2c_master_bus = nullptr;
                 return M5IOE1_ERR_I2C_CONFIG;
@@ -684,7 +715,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint
             if (!_initDevice()) {
                 // 步骤 4: 都失败，初始化失败
                 // Step 4: All attempts failed, initialization failed
-                M5IOE1_LOG_E(TAG, "Failed at 100KHz (twice) and 400KHz");
+                M5IOE1_LOG_E(TAG_I2C, "Failed at 100KHz (twice) and 400KHz");
                 i2c_master_bus_rm_device(_i2c_master_dev);
                 i2c_del_master_bus(_i2c_master_bus);
                 _i2c_master_dev = nullptr;
@@ -696,7 +727,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint
 
 #else  // !M5IOE1_HAS_I2C_MASTER
     // 始终以 100KHz 开始 - Legacy API (IDF < 5.3.0)
-    M5IOE1_LOG_I(TAG, "Initializing M5IOE1 with 100KHz (Legacy API, IDF < 5.3.0)");
+    M5IOE1_LOG_I(TAG_I2C, "Initializing M5IOE1 with 100KHz (Legacy API, IDF < 5.3.0)");
 
     i2c_config_t i2c_conf     = {};
     i2c_conf.mode             = I2C_MODE_MASTER;
@@ -708,13 +739,13 @@ m5ioe1_err_t M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint
 
     esp_err_t ret = i2c_param_config(port, &i2c_conf);
     if (ret != ESP_OK) {
-        M5IOE1_LOG_E(TAG, "i2c_param_config failed: %s", esp_err_to_name(ret));
+        M5IOE1_LOG_E(TAG_I2C, "i2c_param_config failed: %s", esp_err_to_name(ret));
         return M5IOE1_ERR_I2C_CONFIG;
     }
 
     ret = i2c_driver_install(port, I2C_MODE_MASTER, 0, 0, 0);
     if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
-        M5IOE1_LOG_E(TAG, "i2c_driver_install failed: %s", esp_err_to_name(ret));
+        M5IOE1_LOG_E(TAG_I2C, "i2c_driver_install failed: %s", esp_err_to_name(ret));
         return M5IOE1_ERR_I2C_CONFIG;
     }
 
@@ -728,7 +759,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint
     if (!_initDevice()) {
         // 步骤 2: 100K失败，等待800ms后再尝试一次100K
         // Step 2: 100K failed, wait 800ms and retry 100K
-        M5IOE1_LOG_W(TAG, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
+        M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
         M5IOE1_DELAY_MS(800);
 
         M5IOE1_I2C_LEGACY_SEND_WAKE(port, _addr);
@@ -737,12 +768,12 @@ m5ioe1_err_t M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint
         if (!_initDevice()) {
             // 步骤 3: 100K第二次失败，尝试400K
             // Step 3: 100K failed again, try 400K
-            M5IOE1_LOG_W(TAG, "Failed at 100KHz (retry), trying 400KHz...");
+            M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz (retry), trying 400KHz...");
 
             i2c_conf.master.clk_speed = M5IOE1_I2C_FREQ_400K;
             ret                       = i2c_param_config(port, &i2c_conf);
             if (ret != ESP_OK) {
-                M5IOE1_LOG_E(TAG, "i2c_param_config (400K) failed: %s", esp_err_to_name(ret));
+                M5IOE1_LOG_E(TAG_I2C, "i2c_param_config (400K) failed: %s", esp_err_to_name(ret));
                 i2c_driver_delete(port);
                 return M5IOE1_ERR_I2C_CONFIG;
             }
@@ -753,7 +784,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint
             if (!_initDevice()) {
                 // 步骤 4: 都失败，初始化失败
                 // Step 4: All attempts failed, initialization failed
-                M5IOE1_LOG_E(TAG, "Failed at 100KHz (twice) and 400KHz");
+                M5IOE1_LOG_E(TAG_I2C, "Failed at 100KHz (twice) and 400KHz");
                 i2c_driver_delete(port);
                 return M5IOE1_ERR_I2C_COMM;
             }
@@ -778,19 +809,19 @@ m5ioe1_err_t M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint
     m5ioe1_i2c_speed_t currentSpeed;
     if (getI2cSpeed(&currentSpeed) == M5IOE1_OK) {
         if (currentSpeed == targetSpeed) {
-            M5IOE1_LOG_I(TAG, "Current I2C speed matches user request (%s)",
+            M5IOE1_LOG_I(TAG_I2C, "Current I2C speed matches user request (%s)",
                          (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
         } else {
-            M5IOE1_LOG_I(TAG, "Current I2C speed differs from user request (Current: %s, Requested: %s)",
+            M5IOE1_LOG_I(TAG_I2C, "Current I2C speed differs from user request (Current: %s, Requested: %s)",
                          (currentSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K",
                          (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
         }
     } else {
-        M5IOE1_LOG_W(TAG, "Failed to read current I2C speed");
+        M5IOE1_LOG_W(TAG_I2C, "Failed to read current I2C speed");
     }
 
     if (setI2cConfig(0, targetSpeed, M5IOE1_WAKE_EDGE_FALLING, M5IOE1_PULL_ENABLED) != M5IOE1_OK) {
-        M5IOE1_LOG_W(TAG, "Failed to set I2C config");
+        M5IOE1_LOG_W(TAG_I2C, "Failed to set I2C config");
     }
 
     // 步骤 6: 快照
@@ -800,8 +831,9 @@ m5ioe1_err_t M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint
     _snapshotAdcState();
     _snapshotAw8737a();
     _snapshotI2cConfig();
+    M5IOE1_LOG_D(TAG_I2C, "Snapshot completed (pins/pwm/adc/aw8737a/i2c)");
 
-    M5IOE1_LOG_I(TAG, "M5IOE1 initialized at address 0x%02X (I2C: %lu Hz)", _addr, _requestedSpeed);
+    M5IOE1_LOG_I(TAG_I2C, "M5IOE1 initialized at address 0x%02X (I2C: %lu Hz)", _addr, _requestedSpeed);
 
     // 如果未禁用，设置中断模式
     // Set interrupt mode if not disabled
@@ -829,7 +861,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint
 
     _intPin = intPin;
     if (intMode == M5IOE1_INT_MODE_HARDWARE && _intPin < 0) {
-        M5IOE1_LOG_E(TAG, "Hardware interrupt mode requires interrupt pin");
+        M5IOE1_LOG_E(TAG_I2C, "Hardware interrupt mode requires interrupt pin");
         return M5IOE1_ERR_INVALID_ARG;
     }
     if (intMode != M5IOE1_INT_MODE_DISABLED) {
@@ -858,20 +890,20 @@ m5ioe1_err_t M5IOE1::begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t s
     _scl = -1;
 
     if (intMode == M5IOE1_INT_MODE_HARDWARE) {
-        M5IOE1_LOG_E(TAG, "Hardware interrupt mode requires interrupt pin");
+        M5IOE1_LOG_E(TAG_I2C, "Hardware interrupt mode requires interrupt pin");
         return M5IOE1_ERR_INVALID_ARG;
     }
 
     // 验证 I2C 频率
     // Validate I2C frequency
     if (!_isValidI2cFrequency(speed)) {
-        M5IOE1_LOG_W(TAG, "Invalid I2C frequency: %lu Hz. Falling back to 100KHz.", speed);
+        M5IOE1_LOG_W(TAG_I2C, "Invalid I2C frequency: %lu Hz. Falling back to 100KHz.", speed);
         _requestedSpeed = M5IOE1_I2C_FREQ_100K;
     } else {
         _requestedSpeed = speed;
     }
 
-    M5IOE1_LOG_I(TAG, "Initializing M5IOE1 with 100KHz (device default)");
+    M5IOE1_LOG_I(TAG_I2C, "Initializing M5IOE1 with 100KHz (device default)");
 
     // 在 100KHz 创建设备句柄
     // Create device handle at 100KHz
@@ -890,7 +922,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t s
     // Create device handle at 100KHz
     esp_err_t ret = i2c_master_bus_add_device(_i2c_master_bus, &dev_config, &_i2c_master_dev);
     if (ret != ESP_OK) {
-        M5IOE1_LOG_E(TAG, "Failed to add I2C device: %s", esp_err_to_name(ret));
+        M5IOE1_LOG_E(TAG_I2C, "Failed to add I2C device: %s", esp_err_to_name(ret));
         return M5IOE1_ERR_I2C_CONFIG;
     }
 
@@ -906,7 +938,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t s
     if (!_initDevice()) {
         // 步骤 2: 100K失败，等待800ms后再尝试一次100K
         // Step 2: 100K failed, wait 800ms and retry 100K
-        M5IOE1_LOG_W(TAG, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
+        M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
         M5IOE1_DELAY_MS(800);
 
         M5IOE1_I2C_MASTER_SEND_WAKE(_i2c_master_bus, _addr);
@@ -915,7 +947,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t s
         if (!_initDevice()) {
             // 步骤 3: 100K第二次失败，尝试400K
             // Step 3: 100K failed again, try 400K
-            M5IOE1_LOG_W(TAG, "Failed at 100KHz (retry), trying 400KHz...");
+            M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz (retry), trying 400KHz...");
 
             // 删除当前100K设备句柄
             // Remove current 100K device handle
@@ -937,7 +969,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t s
 
             ret = i2c_master_bus_add_device(_i2c_master_bus, &dev_config_400k, &_i2c_master_dev);
             if (ret != ESP_OK) {
-                M5IOE1_LOG_E(TAG, "Failed to add I2C device at 400KHz: %s", esp_err_to_name(ret));
+                M5IOE1_LOG_E(TAG_I2C, "Failed to add I2C device at 400KHz: %s", esp_err_to_name(ret));
                 return M5IOE1_ERR_I2C_CONFIG;
             }
 
@@ -947,7 +979,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t s
             if (!_initDevice()) {
                 // 步骤 4: 都失败，初始化失败
                 // Step 4: All attempts failed, initialization failed
-                M5IOE1_LOG_E(TAG, "Failed at 100KHz (twice) and 400KHz");
+                M5IOE1_LOG_E(TAG_I2C, "Failed at 100KHz (twice) and 400KHz");
                 i2c_master_bus_rm_device(_i2c_master_dev);
                 _i2c_master_dev = nullptr;
                 return M5IOE1_ERR_I2C_COMM;
@@ -971,19 +1003,19 @@ m5ioe1_err_t M5IOE1::begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t s
     m5ioe1_i2c_speed_t currentSpeed;
     if (getI2cSpeed(&currentSpeed) == M5IOE1_OK) {
         if (currentSpeed == targetSpeed) {
-            M5IOE1_LOG_I(TAG, "Current I2C speed matches user request (%s)",
+            M5IOE1_LOG_I(TAG_I2C, "Current I2C speed matches user request (%s)",
                          (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
         } else {
-            M5IOE1_LOG_I(TAG, "Current I2C speed differs from user request (Current: %s, Requested: %s)",
+            M5IOE1_LOG_I(TAG_I2C, "Current I2C speed differs from user request (Current: %s, Requested: %s)",
                          (currentSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K",
                          (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
         }
     } else {
-        M5IOE1_LOG_W(TAG, "Failed to read current I2C speed");
+        M5IOE1_LOG_W(TAG_I2C, "Failed to read current I2C speed");
     }
 
     if (setI2cConfig(0, targetSpeed, M5IOE1_WAKE_EDGE_FALLING, M5IOE1_PULL_ENABLED) != M5IOE1_OK) {
-        M5IOE1_LOG_W(TAG, "Failed to set I2C config");
+        M5IOE1_LOG_W(TAG_I2C, "Failed to set I2C config");
     }
 
     // 步骤 6: 快照
@@ -993,8 +1025,9 @@ m5ioe1_err_t M5IOE1::begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t s
     _snapshotAdcState();
     _snapshotAw8737a();
     _snapshotI2cConfig();
+    M5IOE1_LOG_D(TAG_I2C, "Snapshot completed (pins/pwm/adc/aw8737a/i2c)");
 
-    M5IOE1_LOG_I(TAG, "M5IOE1 initialized at address 0x%02X (I2C: %lu Hz)", _addr, _requestedSpeed);
+    M5IOE1_LOG_I(TAG_I2C, "M5IOE1 initialized at address 0x%02X (I2C: %lu Hz)", _addr, _requestedSpeed);
 
     if (intMode != M5IOE1_INT_MODE_DISABLED) {
         m5ioe1_err_t err = setInterruptMode(intMode);
@@ -1020,7 +1053,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t s
 
     _intPin = intPin;
     if (intMode == M5IOE1_INT_MODE_HARDWARE && _intPin < 0) {
-        M5IOE1_LOG_E(TAG, "Hardware interrupt mode requires interrupt pin");
+        M5IOE1_LOG_E(TAG_I2C, "Hardware interrupt mode requires interrupt pin");
         return M5IOE1_ERR_INVALID_ARG;
     }
     if (intMode != M5IOE1_INT_MODE_DISABLED) {
@@ -1050,26 +1083,26 @@ m5ioe1_err_t M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, m
     _scl = -1;
 
     if (intMode == M5IOE1_INT_MODE_HARDWARE) {
-        M5IOE1_LOG_E(TAG, "Hardware interrupt mode requires interrupt pin");
+        M5IOE1_LOG_E(TAG_I2C, "Hardware interrupt mode requires interrupt pin");
         return M5IOE1_ERR_INVALID_ARG;
     }
 
     // 验证 I2C 频率
     // Validate I2C frequency
     if (!_isValidI2cFrequency(speed)) {
-        M5IOE1_LOG_W(TAG, "Invalid I2C frequency: %lu Hz. Falling back to 100KHz.", speed);
+        M5IOE1_LOG_W(TAG_I2C, "Invalid I2C frequency: %lu Hz. Falling back to 100KHz.", speed);
         _requestedSpeed = M5IOE1_I2C_FREQ_100K;
     } else {
         _requestedSpeed = speed;
     }
 
-    M5IOE1_LOG_I(TAG, "Initializing M5IOE1 with 100KHz (device default)");
+    M5IOE1_LOG_I(TAG_I2C, "Initializing M5IOE1 with 100KHz (device default)");
 
     // 在 100KHz 创建设备句柄
     // Create device handle at 100KHz
     _i2c_device = i2c_bus_device_create(_i2c_bus, _addr, M5IOE1_I2C_FREQ_100K);
     if (_i2c_device == nullptr) {
-        M5IOE1_LOG_E(TAG, "Failed to create I2C device");
+        M5IOE1_LOG_E(TAG_I2C, "Failed to create I2C device");
         return M5IOE1_ERR_I2C_CONFIG;
     }
 
@@ -1085,7 +1118,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, m
     if (!_initDevice()) {
         // 步骤 2: 100K失败，等待800ms后再尝试一次100K
         // Step 2: 100K failed, wait 800ms and retry 100K
-        M5IOE1_LOG_W(TAG, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
+        M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
         M5IOE1_DELAY_MS(800);
 
         M5IOE1_I2C_BUS_SEND_WAKE(_i2c_device, M5IOE1_REG_REV);
@@ -1094,7 +1127,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, m
         if (!_initDevice()) {
             // 步骤 3: 100K第二次失败，尝试400K
             // Step 3: 100K failed again, try 400K
-            M5IOE1_LOG_W(TAG, "Failed at 100KHz (retry), trying 400KHz...");
+            M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz (retry), trying 400KHz...");
 
             // 删除当前100K设备句柄
             // Remove current 100K device handle
@@ -1105,7 +1138,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, m
             // Recreate device handle at 400K
             _i2c_device = i2c_bus_device_create(_i2c_bus, _addr, M5IOE1_I2C_FREQ_400K);
             if (_i2c_device == nullptr) {
-                M5IOE1_LOG_E(TAG, "Failed to create I2C device at 400KHz");
+                M5IOE1_LOG_E(TAG_I2C, "Failed to create I2C device at 400KHz");
                 return M5IOE1_ERR_I2C_CONFIG;
             }
 
@@ -1115,7 +1148,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, m
             if (!_initDevice()) {
                 // 步骤 4: 都失败，初始化失败
                 // Step 4: All attempts failed, initialization failed
-                M5IOE1_LOG_E(TAG, "Failed at 100KHz (twice) and 400KHz");
+                M5IOE1_LOG_E(TAG_I2C, "Failed at 100KHz (twice) and 400KHz");
                 i2c_bus_device_delete(&_i2c_device);
                 _i2c_device = nullptr;
                 return M5IOE1_ERR_I2C_COMM;
@@ -1139,19 +1172,19 @@ m5ioe1_err_t M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, m
     m5ioe1_i2c_speed_t currentSpeed;
     if (getI2cSpeed(&currentSpeed) == M5IOE1_OK) {
         if (currentSpeed == targetSpeed) {
-            M5IOE1_LOG_I(TAG, "Current I2C speed matches user request (%s)",
+            M5IOE1_LOG_I(TAG_I2C, "Current I2C speed matches user request (%s)",
                          (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
         } else {
-            M5IOE1_LOG_I(TAG, "Current I2C speed differs from user request (Current: %s, Requested: %s)",
+            M5IOE1_LOG_I(TAG_I2C, "Current I2C speed differs from user request (Current: %s, Requested: %s)",
                          (currentSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K",
                          (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
         }
     } else {
-        M5IOE1_LOG_W(TAG, "Failed to read current I2C speed");
+        M5IOE1_LOG_W(TAG_I2C, "Failed to read current I2C speed");
     }
 
     if (setI2cConfig(0, targetSpeed, M5IOE1_WAKE_EDGE_FALLING, M5IOE1_PULL_ENABLED) != M5IOE1_OK) {
-        M5IOE1_LOG_W(TAG, "Failed to set I2C config");
+        M5IOE1_LOG_W(TAG_I2C, "Failed to set I2C config");
     }
 
     // 步骤 6: 快照
@@ -1161,8 +1194,9 @@ m5ioe1_err_t M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, m
     _snapshotAdcState();
     _snapshotAw8737a();
     _snapshotI2cConfig();
+    M5IOE1_LOG_D(TAG_I2C, "Snapshot completed (pins/pwm/adc/aw8737a/i2c)");
 
-    M5IOE1_LOG_I(TAG, "M5IOE1 initialized at address 0x%02X (I2C: %lu Hz)", _addr, _requestedSpeed);
+    M5IOE1_LOG_I(TAG_I2C, "M5IOE1 initialized at address 0x%02X (I2C: %lu Hz)", _addr, _requestedSpeed);
 
     if (intMode != M5IOE1_INT_MODE_DISABLED) {
         m5ioe1_err_t err = setInterruptMode(intMode);
@@ -1187,7 +1221,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, i
 
     _intPin = intPin;
     if (intMode == M5IOE1_INT_MODE_HARDWARE && _intPin < 0) {
-        M5IOE1_LOG_E(TAG, "Hardware interrupt mode requires interrupt pin");
+        M5IOE1_LOG_E(TAG_I2C, "Hardware interrupt mode requires interrupt pin");
         return M5IOE1_ERR_INVALID_ARG;
     }
     if (intMode != M5IOE1_INT_MODE_DISABLED) {
@@ -1209,7 +1243,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, i
 m5ioe1_err_t M5IOE1::begin(m5::I2C_Class* i2c, uint8_t addr, uint32_t speed, m5ioe1_int_mode_t intMode)
 {
     if (!i2c || !i2c->isEnabled()) {
-        M5IOE1_LOG_E(TAG, "M5Unified I2C_Class not initialized");
+        M5IOE1_LOG_E(TAG_I2C, "M5Unified I2C_Class not initialized");
         return M5IOE1_ERR_INVALID_ARG;
     }
 
@@ -1222,20 +1256,20 @@ m5ioe1_err_t M5IOE1::begin(m5::I2C_Class* i2c, uint8_t addr, uint32_t speed, m5i
     _scl           = -1;
 
     if (intMode == M5IOE1_INT_MODE_HARDWARE) {
-        M5IOE1_LOG_E(TAG, "Hardware interrupt mode requires interrupt pin");
+        M5IOE1_LOG_E(TAG_I2C, "Hardware interrupt mode requires interrupt pin");
         return M5IOE1_ERR_INVALID_ARG;
     }
 
     // 验证 I2C 频率
     // Validate I2C frequency
     if (!_isValidI2cFrequency(speed)) {
-        M5IOE1_LOG_W(TAG, "Invalid I2C frequency: %lu Hz. Falling back to 100KHz.", speed);
+        M5IOE1_LOG_W(TAG_I2C, "Invalid I2C frequency: %lu Hz. Falling back to 100KHz.", speed);
         _requestedSpeed = M5IOE1_I2C_FREQ_100K;
     } else {
         _requestedSpeed = speed;
     }
 
-    M5IOE1_LOG_I(TAG, "Initializing M5IOE1 with 100KHz (device default)");
+    M5IOE1_LOG_I(TAG_I2C, "Initializing M5IOE1 with 100KHz (device default)");
 
     // 步骤 1: 尝试唤醒设备
     // Step 1: Try to wake up the device
@@ -1248,7 +1282,7 @@ m5ioe1_err_t M5IOE1::begin(m5::I2C_Class* i2c, uint8_t addr, uint32_t speed, m5i
     if (!_initDevice()) {
         // 步骤 3: 100K失败，等待800ms后再尝试一次100K
         // Step 3: 100K failed, wait 800ms and retry 100K
-        M5IOE1_LOG_W(TAG, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
+        M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
         M5IOE1_DELAY_MS(800);
 
         M5IOE1_M5UNIFIED_SEND_WAKE(_m5_i2c, _addr, _commFreq);
@@ -1257,7 +1291,7 @@ m5ioe1_err_t M5IOE1::begin(m5::I2C_Class* i2c, uint8_t addr, uint32_t speed, m5i
         if (!_initDevice()) {
             // 步骤 4: 100K第二次失败，尝试400K
             // Step 4: 100K failed again, try 400K
-            M5IOE1_LOG_W(TAG, "Failed at 100KHz (retry), trying 400KHz...");
+            M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz (retry), trying 400KHz...");
             _commFreq = M5IOE1_I2C_FREQ_400K;
 
             M5IOE1_M5UNIFIED_SEND_WAKE(_m5_i2c, _addr, _commFreq);
@@ -1266,7 +1300,7 @@ m5ioe1_err_t M5IOE1::begin(m5::I2C_Class* i2c, uint8_t addr, uint32_t speed, m5i
             if (!_initDevice()) {
                 // 步骤 5: 都失败，初始化失败
                 // Step 5: All attempts failed, initialization failed
-                M5IOE1_LOG_E(TAG, "Failed at 100KHz (twice) and 400KHz");
+                M5IOE1_LOG_E(TAG_I2C, "Failed at 100KHz (twice) and 400KHz");
                 _m5_i2c = nullptr;
                 return M5IOE1_ERR_I2C_COMM;
             }
@@ -1287,19 +1321,19 @@ m5ioe1_err_t M5IOE1::begin(m5::I2C_Class* i2c, uint8_t addr, uint32_t speed, m5i
     m5ioe1_i2c_speed_t currentSpeed;
     if (getI2cSpeed(&currentSpeed) == M5IOE1_OK) {
         if (currentSpeed == targetSpeed) {
-            M5IOE1_LOG_I(TAG, "Current I2C speed matches user request (%s)",
+            M5IOE1_LOG_I(TAG_I2C, "Current I2C speed matches user request (%s)",
                          (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
         } else {
-            M5IOE1_LOG_I(TAG, "Current I2C speed differs from user request (Current: %s, Requested: %s)",
+            M5IOE1_LOG_I(TAG_I2C, "Current I2C speed differs from user request (Current: %s, Requested: %s)",
                          (currentSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K",
                          (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
         }
     } else {
-        M5IOE1_LOG_W(TAG, "Failed to read current I2C speed");
+        M5IOE1_LOG_W(TAG_I2C, "Failed to read current I2C speed");
     }
 
     if (setI2cConfig(0, targetSpeed, M5IOE1_WAKE_EDGE_FALLING, M5IOE1_PULL_ENABLED) != M5IOE1_OK) {
-        M5IOE1_LOG_W(TAG, "Failed to set I2C config");
+        M5IOE1_LOG_W(TAG_I2C, "Failed to set I2C config");
     }
 
     // 切换到目标频率
@@ -1313,8 +1347,9 @@ m5ioe1_err_t M5IOE1::begin(m5::I2C_Class* i2c, uint8_t addr, uint32_t speed, m5i
     _snapshotAdcState();
     _snapshotAw8737a();
     _snapshotI2cConfig();
+    M5IOE1_LOG_D(TAG_I2C, "Snapshot completed (pins/pwm/adc/aw8737a/i2c)");
 
-    M5IOE1_LOG_I(TAG, "M5IOE1 initialized at address 0x%02X (I2C: %lu Hz)", _addr, _requestedSpeed);
+    M5IOE1_LOG_I(TAG_I2C, "M5IOE1 initialized at address 0x%02X (I2C: %lu Hz)", _addr, _requestedSpeed);
 
     if (intMode != M5IOE1_INT_MODE_DISABLED) {
         m5ioe1_err_t err = setInterruptMode(intMode);
@@ -1339,7 +1374,7 @@ m5ioe1_err_t M5IOE1::begin(m5::I2C_Class* i2c, uint8_t addr, uint32_t speed, int
 
     _intPin = intPin;
     if (intMode == M5IOE1_INT_MODE_HARDWARE && _intPin < 0) {
-        M5IOE1_LOG_E(TAG, "Hardware interrupt mode requires interrupt pin");
+        M5IOE1_LOG_E(TAG_I2C, "Hardware interrupt mode requires interrupt pin");
         return M5IOE1_ERR_INVALID_ARG;
     }
     if (intMode != M5IOE1_INT_MODE_DISABLED) {
@@ -1367,9 +1402,9 @@ m5ioe1_err_t M5IOE1::setInterruptMode(m5ioe1_int_mode_t intMode, uint32_t pollin
     }
 
     if (intMode == M5IOE1_INT_MODE_POLLING) {
-        M5IOE1_LOG_I(TAG, "Interrupt mode -> %s (pause if I2C sleep on; resume when off)", modeName);
+        M5IOE1_LOG_I(TAG_IRQ, "Interrupt mode -> %s (pause if I2C sleep on; resume when off)", modeName);
     } else {
-        M5IOE1_LOG_I(TAG, "Interrupt mode -> %s", modeName);
+        M5IOE1_LOG_I(TAG_IRQ, "Interrupt mode -> %s", modeName);
     }
 
     _intMode         = intMode;
@@ -1413,7 +1448,7 @@ m5ioe1_err_t M5IOE1::setInterruptMode(m5ioe1_int_mode_t intMode, uint32_t pollin
 m5ioe1_err_t M5IOE1::setPollingInterval(float seconds)
 {
     if (seconds < 0.001f || seconds > 3600.0f) {
-        M5IOE1_LOG_E(TAG, "Invalid polling interval: %.3f seconds (valid range: 0.001-3600)", seconds);
+        M5IOE1_LOG_E(TAG_IRQ, "Invalid polling interval: %.3f seconds (valid range: 0.001-3600)", seconds);
         return M5IOE1_ERR_INVALID_ARG;
     }
 
@@ -1440,7 +1475,7 @@ m5ioe1_err_t M5IOE1::setPollingInterval(float seconds)
 #endif
     }
 
-    M5IOE1_LOG_I(TAG, "Polling interval set to %.3f seconds (%u ms)", seconds, intervalMs);
+    M5IOE1_LOG_I(TAG_IRQ, "Polling interval set to %.3f seconds (%u ms)", seconds, intervalMs);
     return M5IOE1_OK;
 }
 
@@ -1478,30 +1513,32 @@ m5ioe1_err_t M5IOE1::getRefVoltage(uint16_t* voltage_mv)
 m5ioe1_err_t M5IOE1::_pinModeWithErr(uint8_t pin, uint8_t mode)
 {
     if (!_isValidPin(pin)) {
-        M5IOE1_LOG_E(TAG, "Invalid pin");
+        M5IOE1_LOG_E(TAG_GPIO, "Invalid pin");
         return M5IOE1_ERR_INVALID_ARG;
     }
     if (!_initialized) {
-        M5IOE1_LOG_E(TAG, "Not initialized");
+        M5IOE1_LOG_E(TAG_GPIO, "Not initialized");
         return M5IOE1_ERR_NOT_INIT;
     }
 
     uint16_t modeReg = 0, puReg = 0, pdReg = 0, drvReg = 0;
 
+    M5IOE1_LOG_D(TAG_GPIO, "_pinModeWithErr: pin=%d mode=0x%02X", pin, mode);
+
     if (!_readReg16(M5IOE1_REG_GPIO_MODE_L, &modeReg)) {
-        M5IOE1_LOG_E(TAG, "Failed to read GPIO_MODE register");
+        M5IOE1_LOG_E(TAG_GPIO, "Failed to read GPIO_MODE register");
         return M5IOE1_ERR_I2C_COMM;
     }
     if (!_readReg16(M5IOE1_REG_GPIO_PU_L, &puReg)) {
-        M5IOE1_LOG_E(TAG, "Failed to read GPIO_PU register");
+        M5IOE1_LOG_E(TAG_GPIO, "Failed to read GPIO_PU register");
         return M5IOE1_ERR_I2C_COMM;
     }
     if (!_readReg16(M5IOE1_REG_GPIO_PD_L, &pdReg)) {
-        M5IOE1_LOG_E(TAG, "Failed to read GPIO_PD register");
+        M5IOE1_LOG_E(TAG_GPIO, "Failed to read GPIO_PD register");
         return M5IOE1_ERR_I2C_COMM;
     }
     if (!_readReg16(M5IOE1_REG_GPIO_DRV_L, &drvReg)) {
-        M5IOE1_LOG_E(TAG, "Failed to read GPIO_DRV register");
+        M5IOE1_LOG_E(TAG_GPIO, "Failed to read GPIO_DRV register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -1584,26 +1621,26 @@ m5ioe1_err_t M5IOE1::_pinModeWithErr(uint8_t pin, uint8_t mode)
             _pinStates[pin].pull     = 0;
             break;
         default:
-            M5IOE1_LOG_E(TAG, "Invalid mode: %d", mode);
+            M5IOE1_LOG_E(TAG_GPIO, "Invalid mode: %d", mode);
             return M5IOE1_ERR_INVALID_ARG;
     }
 
     // 步骤 1: 写入寄存器
     // Step 1: Write registers
     if (!_writeReg16(M5IOE1_REG_GPIO_PU_L, puReg)) {
-        M5IOE1_LOG_E(TAG, "Failed to write GPIO_PU register");
+        M5IOE1_LOG_E(TAG_GPIO, "Failed to write GPIO_PU register");
         return M5IOE1_ERR_I2C_COMM;
     }
     if (!_writeReg16(M5IOE1_REG_GPIO_PD_L, pdReg)) {
-        M5IOE1_LOG_E(TAG, "Failed to write GPIO_PD register");
+        M5IOE1_LOG_E(TAG_GPIO, "Failed to write GPIO_PD register");
         return M5IOE1_ERR_I2C_COMM;
     }
     if (!_writeReg16(M5IOE1_REG_GPIO_DRV_L, drvReg)) {
-        M5IOE1_LOG_E(TAG, "Failed to write GPIO_DRV register");
+        M5IOE1_LOG_E(TAG_GPIO, "Failed to write GPIO_DRV register");
         return M5IOE1_ERR_I2C_COMM;
     }
     if (!_writeReg16(M5IOE1_REG_GPIO_MODE_L, modeReg)) {
-        M5IOE1_LOG_E(TAG, "Failed to write GPIO_MODE register");
+        M5IOE1_LOG_E(TAG_GPIO, "Failed to write GPIO_MODE register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -1611,19 +1648,19 @@ m5ioe1_err_t M5IOE1::_pinModeWithErr(uint8_t pin, uint8_t mode)
     // Step 2: Read-back verification
     uint16_t actualPu = 0, actualPd = 0, actualDrv = 0, actualMode = 0;
     if (!_readReg16(M5IOE1_REG_GPIO_PU_L, &actualPu)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back GPIO_PU register");
+        M5IOE1_LOG_E(TAG_GPIO, "Failed to read back GPIO_PU register");
         return M5IOE1_ERR_I2C_COMM;
     }
     if (!_readReg16(M5IOE1_REG_GPIO_PD_L, &actualPd)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back GPIO_PD register");
+        M5IOE1_LOG_E(TAG_GPIO, "Failed to read back GPIO_PD register");
         return M5IOE1_ERR_I2C_COMM;
     }
     if (!_readReg16(M5IOE1_REG_GPIO_DRV_L, &actualDrv)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back GPIO_DRV register");
+        M5IOE1_LOG_E(TAG_GPIO, "Failed to read back GPIO_DRV register");
         return M5IOE1_ERR_I2C_COMM;
     }
     if (!_readReg16(M5IOE1_REG_GPIO_MODE_L, &actualMode)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back GPIO_MODE register");
+        M5IOE1_LOG_E(TAG_GPIO, "Failed to read back GPIO_MODE register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -1635,7 +1672,7 @@ m5ioe1_err_t M5IOE1::_pinModeWithErr(uint8_t pin, uint8_t mode)
     bool modeMatch = ((actualMode & (1 << pin)) == (modeReg & (1 << pin)));
 
     if (!puMatch || !pdMatch || !drvMatch || !modeMatch) {
-        M5IOE1_LOG_E(TAG, "Pin %d mode verification failed: PU=%c, PD=%c, DRV=%c, MODE=%c", pin, puMatch ? 'Y' : 'N',
+        M5IOE1_LOG_E(TAG_GPIO, "Pin %d mode verification failed: PU=%c, PD=%c, DRV=%c, MODE=%c", pin, puMatch ? 'Y' : 'N',
                      pdMatch ? 'Y' : 'N', drvMatch ? 'Y' : 'N', modeMatch ? 'Y' : 'N');
         return M5IOE1_FAIL;
     }
@@ -1644,7 +1681,10 @@ m5ioe1_err_t M5IOE1::_pinModeWithErr(uint8_t pin, uint8_t mode)
     // Step 4: Verification passed, update cache
     _autoSnapshotUpdate(M5IOE1_SNAPSHOT_DOMAIN_GPIO);
 
-    M5IOE1_LOG_I(TAG, "Pin %d mode set and verified: 0x%02X", pin, mode);
+    const char* modeName = (mode == INPUT) ? "INPUT" : (mode == OUTPUT) ? "OUTPUT" :
+                           (mode == INPUT_PULLUP) ? "INPUT_PULLUP" : (mode == INPUT_PULLDOWN) ? "INPUT_PULLDOWN" :
+                           (mode == OPEN_DRAIN) ? "OPEN_DRAIN" : (mode == OUTPUT_OPEN_DRAIN) ? "OUTPUT_OPEN_DRAIN" : "UNKNOWN";
+    M5IOE1_LOG_I(TAG_GPIO, "Pin %d mode set and verified: %s (0x%02X)", pin, modeName, mode);
     return M5IOE1_OK;
 }
 
@@ -1656,7 +1696,7 @@ void M5IOE1::pinMode(uint8_t pin, uint8_t mode)
 void M5IOE1::pinModeWithRes(uint8_t pin, uint8_t mode, m5ioe1_err_t* err)
 {
     if (err == nullptr) {
-        M5IOE1_LOG_E(TAG, "pinModeWithRes err is null");
+        M5IOE1_LOG_E(TAG_GPIO, "pinModeWithRes err is null");
         return;
     }
     *err = _pinModeWithErr(pin, mode);
@@ -1665,17 +1705,18 @@ void M5IOE1::pinModeWithRes(uint8_t pin, uint8_t mode, m5ioe1_err_t* err)
 m5ioe1_err_t M5IOE1::_digitalWriteWithErr(uint8_t pin, uint8_t value)
 {
     if (!_isValidPin(pin)) {
-        M5IOE1_LOG_E(TAG, "Invalid pin");
+        M5IOE1_LOG_E(TAG_GPIO, "Invalid pin");
         return M5IOE1_ERR_INVALID_ARG;
     }
     if (!_initialized) {
-        M5IOE1_LOG_E(TAG, "Not initialized");
+        M5IOE1_LOG_E(TAG_GPIO, "Not initialized");
         return M5IOE1_ERR_NOT_INIT;
     }
 
     uint16_t outReg = 0;
+    M5IOE1_LOG_D(TAG_GPIO, "_digitalWriteWithErr: pin=%d val=%d", pin, value);
     if (!_readReg16(M5IOE1_REG_GPIO_OUT_L, &outReg)) {
-        M5IOE1_LOG_E(TAG, "Failed to read GPIO_OUT register");
+        M5IOE1_LOG_E(TAG_GPIO, "Failed to read GPIO_OUT register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -1688,7 +1729,7 @@ m5ioe1_err_t M5IOE1::_digitalWriteWithErr(uint8_t pin, uint8_t value)
     // 步骤 1: 写入寄存器
     // Step 1: Write register
     if (!_writeReg16(M5IOE1_REG_GPIO_OUT_L, outReg)) {
-        M5IOE1_LOG_E(TAG, "Failed to write GPIO_OUT register");
+        M5IOE1_LOG_E(TAG_GPIO, "Failed to write GPIO_OUT register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -1696,7 +1737,7 @@ m5ioe1_err_t M5IOE1::_digitalWriteWithErr(uint8_t pin, uint8_t value)
     // Step 2: Read-back verification
     uint16_t actualOut = 0;
     if (!_readReg16(M5IOE1_REG_GPIO_OUT_L, &actualOut)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back GPIO_OUT register");
+        M5IOE1_LOG_E(TAG_GPIO, "Failed to read back GPIO_OUT register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -1705,7 +1746,7 @@ m5ioe1_err_t M5IOE1::_digitalWriteWithErr(uint8_t pin, uint8_t value)
     bool outMatch = ((actualOut & (1 << pin)) == (outReg & (1 << pin)));
 
     if (!outMatch) {
-        M5IOE1_LOG_E(TAG, "Pin %d write verification failed: expected %d, actual %d", pin, value ? HIGH : LOW,
+        M5IOE1_LOG_E(TAG_GPIO, "Pin %d write verification failed: expected %d, actual %d", pin, value ? HIGH : LOW,
                      (actualOut & (1 << pin)) ? HIGH : LOW);
         return M5IOE1_FAIL;
     }
@@ -1716,7 +1757,7 @@ m5ioe1_err_t M5IOE1::_digitalWriteWithErr(uint8_t pin, uint8_t value)
 
     // 步骤 5: 打印日志
     // Step 5: Log
-    M5IOE1_LOG_I(TAG, "Pin %d digital write and verified: %d", pin, value ? HIGH : LOW);
+    M5IOE1_LOG_I(TAG_GPIO, "Pin %d digital write and verified: %d", pin, value ? HIGH : LOW);
 
     return M5IOE1_OK;
 }
@@ -1729,7 +1770,7 @@ void M5IOE1::digitalWrite(uint8_t pin, uint8_t value)
 void M5IOE1::digitalWriteWithRes(uint8_t pin, uint8_t value, m5ioe1_err_t* err)
 {
     if (err == nullptr) {
-        M5IOE1_LOG_E(TAG, "digitalWriteWithRes err is null");
+        M5IOE1_LOG_E(TAG_GPIO, "digitalWriteWithRes err is null");
         return;
     }
     *err = _digitalWriteWithErr(pin, value);
@@ -1741,21 +1782,22 @@ m5ioe1_err_t M5IOE1::_digitalReadWithErr(uint8_t pin, int* value)
         return M5IOE1_ERR_INVALID_ARG;
     }
     if (!_isValidPin(pin)) {
-        M5IOE1_LOG_E(TAG, "Invalid pin");
+        M5IOE1_LOG_E(TAG_GPIO, "Invalid pin");
         return M5IOE1_ERR_INVALID_ARG;
     }
     if (!_initialized) {
-        M5IOE1_LOG_E(TAG, "Not initialized");
+        M5IOE1_LOG_E(TAG_GPIO, "Not initialized");
         return M5IOE1_ERR_NOT_INIT;
     }
 
     uint16_t inReg = 0;
     if (!_readReg16(M5IOE1_REG_GPIO_IN_L, &inReg)) {
-        M5IOE1_LOG_E(TAG, "Failed to read GPIO_IN register");
+        M5IOE1_LOG_E(TAG_GPIO, "Failed to read GPIO_IN register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
     *value = (inReg & (1 << pin)) ? HIGH : LOW;
+    M5IOE1_LOG_D(TAG_GPIO, "_digitalReadWithErr: pin=%d -> %d", pin, *value);
     return M5IOE1_OK;
 }
 
@@ -1771,7 +1813,7 @@ int M5IOE1::digitalRead(uint8_t pin)
 int M5IOE1::digitalReadWithRes(uint8_t pin, m5ioe1_err_t* err)
 {
     if (err == nullptr) {
-        M5IOE1_LOG_E(TAG, "digitalReadWithRes err is null");
+        M5IOE1_LOG_E(TAG_GPIO, "digitalReadWithRes err is null");
         return -1;
     }
 
@@ -1790,13 +1832,15 @@ m5ioe1_err_t M5IOE1::setPullMode(uint8_t pin, uint8_t pullMode)
     if (!_isValidPin(pin)) return M5IOE1_ERR_INVALID_ARG;
     if (!_initialized) return M5IOE1_FAIL;
 
+    M5IOE1_LOG_D(TAG_GPIO, "setPullMode: pin=%d pull=%d", pin, pullMode);
+
     uint16_t puReg = 0, pdReg = 0;
     if (!_readReg16(M5IOE1_REG_GPIO_PU_L, &puReg)) {
-        M5IOE1_LOG_E(TAG, "Failed to read GPIO_PU register");
+        M5IOE1_LOG_E(TAG_GPIO, "Failed to read GPIO_PU register");
         return M5IOE1_ERR_I2C_COMM;
     }
     if (!_readReg16(M5IOE1_REG_GPIO_PD_L, &pdReg)) {
-        M5IOE1_LOG_E(TAG, "Failed to read GPIO_PD register");
+        M5IOE1_LOG_E(TAG_GPIO, "Failed to read GPIO_PD register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -1816,11 +1860,11 @@ m5ioe1_err_t M5IOE1::setPullMode(uint8_t pin, uint8_t pullMode)
     // 步骤 1: 写入寄存器
     // Step 1: Write registers
     if (!_writeReg16(M5IOE1_REG_GPIO_PU_L, puReg)) {
-        M5IOE1_LOG_E(TAG, "Failed to write GPIO_PU register");
+        M5IOE1_LOG_E(TAG_GPIO, "Failed to write GPIO_PU register");
         return M5IOE1_ERR_I2C_COMM;
     }
     if (!_writeReg16(M5IOE1_REG_GPIO_PD_L, pdReg)) {
-        M5IOE1_LOG_E(TAG, "Failed to write GPIO_PD register");
+        M5IOE1_LOG_E(TAG_GPIO, "Failed to write GPIO_PD register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -1828,11 +1872,11 @@ m5ioe1_err_t M5IOE1::setPullMode(uint8_t pin, uint8_t pullMode)
     // Step 2: Read-back verification
     uint16_t actualPu = 0, actualPd = 0;
     if (!_readReg16(M5IOE1_REG_GPIO_PU_L, &actualPu)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back GPIO_PU register");
+        M5IOE1_LOG_E(TAG_GPIO, "Failed to read back GPIO_PU register");
         return M5IOE1_ERR_I2C_COMM;
     }
     if (!_readReg16(M5IOE1_REG_GPIO_PD_L, &actualPd)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back GPIO_PD register");
+        M5IOE1_LOG_E(TAG_GPIO, "Failed to read back GPIO_PD register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -1842,7 +1886,7 @@ m5ioe1_err_t M5IOE1::setPullMode(uint8_t pin, uint8_t pullMode)
     bool pdMatch = ((actualPd & (1 << pin)) == (pdReg & (1 << pin)));
 
     if (!puMatch || !pdMatch) {
-        M5IOE1_LOG_E(TAG, "Pin %d pull mode verification failed: PU=%c, PD=%c", pin, puMatch ? 'Y' : 'N',
+        M5IOE1_LOG_E(TAG_GPIO, "Pin %d pull mode verification failed: PU=%c, PD=%c", pin, puMatch ? 'Y' : 'N',
                      pdMatch ? 'Y' : 'N');
         return M5IOE1_FAIL;
     }
@@ -1851,7 +1895,10 @@ m5ioe1_err_t M5IOE1::setPullMode(uint8_t pin, uint8_t pullMode)
     // Step 4: Verification passed, update cache
     _autoSnapshotUpdate(M5IOE1_SNAPSHOT_DOMAIN_GPIO);
 
-    M5IOE1_LOG_I(TAG, "Pin %d pull mode set and verified: %d", pin, pullMode);
+    const char* pullName = (pullMode == M5IOE1_PULL_NONE) ? "NONE" :
+                           (pullMode == M5IOE1_PULL_UP) ? "PULL_UP" :
+                           (pullMode == M5IOE1_PULL_DOWN) ? "PULL_DOWN" : "UNKNOWN";
+    M5IOE1_LOG_I(TAG_GPIO, "Pin %d pull mode set and verified: %s", pin, pullName);
     return M5IOE1_OK;
 }
 
@@ -1860,9 +1907,11 @@ m5ioe1_err_t M5IOE1::setDriveMode(uint8_t pin, uint8_t driveMode)
     if (!_isValidPin(pin)) return M5IOE1_ERR_INVALID_ARG;
     if (!_initialized) return M5IOE1_FAIL;
 
+    M5IOE1_LOG_D(TAG_GPIO, "setDriveMode: pin=%d drive=%d", pin, driveMode);
+
     uint16_t drvReg = 0;
     if (!_readReg16(M5IOE1_REG_GPIO_DRV_L, &drvReg)) {
-        M5IOE1_LOG_E(TAG, "Failed to read GPIO_DRV register");
+        M5IOE1_LOG_E(TAG_GPIO, "Failed to read GPIO_DRV register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -1877,7 +1926,7 @@ m5ioe1_err_t M5IOE1::setDriveMode(uint8_t pin, uint8_t driveMode)
     // 步骤 1: 写入寄存器
     // Step 1: Write register
     if (!_writeReg16(M5IOE1_REG_GPIO_DRV_L, drvReg)) {
-        M5IOE1_LOG_E(TAG, "Failed to write GPIO_DRV register");
+        M5IOE1_LOG_E(TAG_GPIO, "Failed to write GPIO_DRV register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -1885,7 +1934,7 @@ m5ioe1_err_t M5IOE1::setDriveMode(uint8_t pin, uint8_t driveMode)
     // Step 2: Read-back verification
     uint16_t actualDrv = 0;
     if (!_readReg16(M5IOE1_REG_GPIO_DRV_L, &actualDrv)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back GPIO_DRV register");
+        M5IOE1_LOG_E(TAG_GPIO, "Failed to read back GPIO_DRV register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -1894,7 +1943,7 @@ m5ioe1_err_t M5IOE1::setDriveMode(uint8_t pin, uint8_t driveMode)
     bool drvMatch = ((actualDrv & (1 << pin)) == (drvReg & (1 << pin)));
 
     if (!drvMatch) {
-        M5IOE1_LOG_E(TAG, "Pin %d drive mode verification failed: DRV=%c", pin, drvMatch ? 'Y' : 'N');
+        M5IOE1_LOG_E(TAG_GPIO, "Pin %d drive mode verification failed: DRV=%c", pin, drvMatch ? 'Y' : 'N');
         return M5IOE1_FAIL;
     }
 
@@ -1902,7 +1951,8 @@ m5ioe1_err_t M5IOE1::setDriveMode(uint8_t pin, uint8_t driveMode)
     // Step 4: Verification passed, update cache
     _autoSnapshotUpdate(M5IOE1_SNAPSHOT_DOMAIN_GPIO);
 
-    M5IOE1_LOG_I(TAG, "Pin %d drive mode set and verified: %d", pin, driveMode);
+    M5IOE1_LOG_I(TAG_GPIO, "Pin %d drive mode set and verified: %s", pin,
+                 (driveMode == M5IOE1_DRIVE_OPENDRAIN) ? "OpenDrain" : "PushPull");
     return M5IOE1_OK;
 }
 
@@ -1931,7 +1981,7 @@ void M5IOE1::attachInterrupt(uint8_t pin, m5ioe1_callback_t callback, uint8_t mo
     // 检查冲突的中断
     // Check for conflicting interrupts
     if (_hasConflictingInterrupt(pin)) {
-        M5IOE1_LOG_E(TAG, "Interrupt conflict on pin %d", pin);
+        M5IOE1_LOG_E(TAG_IRQ, "Interrupt conflict on pin %d", pin);
         return;
     }
 
@@ -1950,7 +2000,7 @@ void M5IOE1::attachInterrupt(uint8_t pin, m5ioe1_callback_t callback, uint8_t mo
     // 步骤 1: 写入 GPIO_MODE 寄存器
     // Step 1: Write GPIO_MODE register
     if (!_writeReg16(M5IOE1_REG_GPIO_MODE_L, modeReg)) {
-        M5IOE1_LOG_E(TAG, "Failed to write GPIO_MODE register for interrupt");
+        M5IOE1_LOG_E(TAG_IRQ, "Failed to write GPIO_MODE register for interrupt");
         return;
     }
 
@@ -1970,11 +2020,11 @@ void M5IOE1::attachInterrupt(uint8_t pin, m5ioe1_callback_t callback, uint8_t mo
     // 步骤 2: 写入中断寄存器
     // Step 2: Write interrupt registers
     if (!_writeReg16(M5IOE1_REG_GPIO_IE_L, ieReg)) {
-        M5IOE1_LOG_E(TAG, "Failed to write GPIO_IE register");
+        M5IOE1_LOG_E(TAG_IRQ, "Failed to write GPIO_IE register");
         return;
     }
     if (!_writeReg16(M5IOE1_REG_GPIO_IP_L, itReg)) {
-        M5IOE1_LOG_E(TAG, "Failed to write GPIO_IP register");
+        M5IOE1_LOG_E(TAG_IRQ, "Failed to write GPIO_IP register");
         return;
     }
 
@@ -1982,15 +2032,15 @@ void M5IOE1::attachInterrupt(uint8_t pin, m5ioe1_callback_t callback, uint8_t mo
     // Step 3: Read-back verification
     uint16_t actualMode = 0, actualIe = 0, actualIt = 0;
     if (!_readReg16(M5IOE1_REG_GPIO_MODE_L, &actualMode)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back GPIO_MODE register");
+        M5IOE1_LOG_E(TAG_IRQ, "Failed to read back GPIO_MODE register");
         return;
     }
     if (!_readReg16(M5IOE1_REG_GPIO_IE_L, &actualIe)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back GPIO_IE register");
+        M5IOE1_LOG_E(TAG_IRQ, "Failed to read back GPIO_IE register");
         return;
     }
     if (!_readReg16(M5IOE1_REG_GPIO_IP_L, &actualIt)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back GPIO_IP register");
+        M5IOE1_LOG_E(TAG_IRQ, "Failed to read back GPIO_IP register");
         return;
     }
 
@@ -2001,7 +2051,7 @@ void M5IOE1::attachInterrupt(uint8_t pin, m5ioe1_callback_t callback, uint8_t mo
     bool itMatch   = ((actualIt & (1 << pin)) == (itReg & (1 << pin)));  // 触发方式
 
     if (!modeMatch || !ieMatch || !itMatch) {
-        M5IOE1_LOG_E(TAG, "Pin %d interrupt verification failed: MODE=%c, IE=%c, IT=%c", pin, modeMatch ? 'Y' : 'N',
+        M5IOE1_LOG_E(TAG_IRQ, "Pin %d interrupt verification failed: MODE=%c, IE=%c, IT=%c", pin, modeMatch ? 'Y' : 'N',
                      ieMatch ? 'Y' : 'N', itMatch ? 'Y' : 'N');
         return;
     }
@@ -2011,7 +2061,7 @@ void M5IOE1::attachInterrupt(uint8_t pin, m5ioe1_callback_t callback, uint8_t mo
     _pinStates[pin].intrEnabled = true;
     _pinStates[pin].intrRising  = (mode == RISING);
 
-    M5IOE1_LOG_I(TAG, "Pin %d interrupt attached and verified: mode=%s", pin, mode == RISING ? "RISING" : "FALLING");
+    M5IOE1_LOG_I(TAG_IRQ, "Pin %d interrupt attached and verified: mode=%s", pin, mode == RISING ? "RISING" : "FALLING");
 }
 
 void M5IOE1::attachInterruptArg(uint8_t pin, m5ioe1_callback_arg_t callback, void* arg, uint8_t mode)
@@ -2019,7 +2069,7 @@ void M5IOE1::attachInterruptArg(uint8_t pin, m5ioe1_callback_arg_t callback, voi
     if (!_isValidPin(pin) || callback == nullptr || !_initialized) return;
 
     if (_hasConflictingInterrupt(pin)) {
-        M5IOE1_LOG_E(TAG, "Interrupt conflict on pin %d", pin);
+        M5IOE1_LOG_E(TAG_IRQ, "Interrupt conflict on pin %d", pin);
         return;
     }
 
@@ -2051,15 +2101,15 @@ void M5IOE1::attachInterruptArg(uint8_t pin, m5ioe1_callback_arg_t callback, voi
     // 步骤 1: 写入寄存器
     // Step 1: Write registers
     if (!_writeReg16(M5IOE1_REG_GPIO_MODE_L, modeReg)) {
-        M5IOE1_LOG_E(TAG, "Failed to write GPIO_MODE register");
+        M5IOE1_LOG_E(TAG_IRQ, "Failed to write GPIO_MODE register");
         return;
     }
     if (!_writeReg16(M5IOE1_REG_GPIO_IE_L, ieReg)) {
-        M5IOE1_LOG_E(TAG, "Failed to write GPIO_IE register");
+        M5IOE1_LOG_E(TAG_IRQ, "Failed to write GPIO_IE register");
         return;
     }
     if (!_writeReg16(M5IOE1_REG_GPIO_IP_L, itReg)) {
-        M5IOE1_LOG_E(TAG, "Failed to write GPIO_IP register");
+        M5IOE1_LOG_E(TAG_IRQ, "Failed to write GPIO_IP register");
         return;
     }
 
@@ -2067,15 +2117,15 @@ void M5IOE1::attachInterruptArg(uint8_t pin, m5ioe1_callback_arg_t callback, voi
     // Step 2: Read-back verification
     uint16_t actualMode = 0, actualIe = 0, actualIt = 0;
     if (!_readReg16(M5IOE1_REG_GPIO_MODE_L, &actualMode)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back GPIO_MODE register");
+        M5IOE1_LOG_E(TAG_IRQ, "Failed to read back GPIO_MODE register");
         return;
     }
     if (!_readReg16(M5IOE1_REG_GPIO_IE_L, &actualIe)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back GPIO_IE register");
+        M5IOE1_LOG_E(TAG_IRQ, "Failed to read back GPIO_IE register");
         return;
     }
     if (!_readReg16(M5IOE1_REG_GPIO_IP_L, &actualIt)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back GPIO_IP register");
+        M5IOE1_LOG_E(TAG_IRQ, "Failed to read back GPIO_IP register");
         return;
     }
 
@@ -2086,7 +2136,7 @@ void M5IOE1::attachInterruptArg(uint8_t pin, m5ioe1_callback_arg_t callback, voi
     bool itMatch   = ((actualIt & (1 << pin)) == (itReg & (1 << pin)));  // 触发方式
 
     if (!modeMatch || !ieMatch || !itMatch) {
-        M5IOE1_LOG_E(TAG, "Pin %d interrupt verification failed: MODE=%c, IE=%c, IT=%c", pin, modeMatch ? 'Y' : 'N',
+        M5IOE1_LOG_E(TAG_IRQ, "Pin %d interrupt verification failed: MODE=%c, IE=%c, IT=%c", pin, modeMatch ? 'Y' : 'N',
                      ieMatch ? 'Y' : 'N', itMatch ? 'Y' : 'N');
         return;
     }
@@ -2096,7 +2146,7 @@ void M5IOE1::attachInterruptArg(uint8_t pin, m5ioe1_callback_arg_t callback, voi
     _pinStates[pin].intrEnabled = true;
     _pinStates[pin].intrRising  = (mode == RISING);
 
-    M5IOE1_LOG_I(TAG, "Pin %d interrupt attached and verified: mode=%s", pin, mode == RISING ? "RISING" : "FALLING");
+    M5IOE1_LOG_I(TAG_IRQ, "Pin %d interrupt attached and verified: mode=%s", pin, mode == RISING ? "RISING" : "FALLING");
 }
 
 void M5IOE1::detachInterrupt(uint8_t pin)
@@ -2110,7 +2160,7 @@ void M5IOE1::detachInterrupt(uint8_t pin)
     // 步骤 1: 写入寄存器
     // Step 1: Write register
     if (!_writeReg16(M5IOE1_REG_GPIO_IE_L, ieReg)) {
-        M5IOE1_LOG_E(TAG, "Failed to write GPIO_IE register for detach");
+        M5IOE1_LOG_E(TAG_IRQ, "Failed to write GPIO_IE register for detach");
         return;
     }
 
@@ -2118,7 +2168,7 @@ void M5IOE1::detachInterrupt(uint8_t pin)
     // Step 2: Read-back verification
     uint16_t actualIe = 0;
     if (!_readReg16(M5IOE1_REG_GPIO_IE_L, &actualIe)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back GPIO_IE register for detach");
+        M5IOE1_LOG_E(TAG_IRQ, "Failed to read back GPIO_IE register for detach");
         return;
     }
 
@@ -2127,7 +2177,7 @@ void M5IOE1::detachInterrupt(uint8_t pin)
     bool ieMatch = ((actualIe & (1 << pin)) == 0);  // 中断已禁用
 
     if (!ieMatch) {
-        M5IOE1_LOG_E(TAG, "Pin %d interrupt detach verification failed: IE=%c", pin, ieMatch ? 'Y' : 'N');
+        M5IOE1_LOG_E(TAG_IRQ, "Pin %d interrupt detach verification failed: IE=%c", pin, ieMatch ? 'Y' : 'N');
         return;
     }
 
@@ -2139,7 +2189,7 @@ void M5IOE1::detachInterrupt(uint8_t pin)
     _callbacks[pin].enabled     = false;
     _pinStates[pin].intrEnabled = false;
 
-    M5IOE1_LOG_I(TAG, "Pin %d interrupt detached and verified", pin);
+    M5IOE1_LOG_I(TAG_IRQ, "Pin %d interrupt detached and verified", pin);
 }
 
 void M5IOE1::enableInterrupt(uint8_t pin)
@@ -2162,6 +2212,7 @@ m5ioe1_err_t M5IOE1::getInterruptStatus(uint16_t* status)
     if (!_readReg16(M5IOE1_REG_GPIO_IS_L, status)) {
         return M5IOE1_ERR_I2C_COMM;
     }
+    M5IOE1_LOG_D(TAG_IRQ, "IRQ status: 0x%04X", *status);
     return M5IOE1_OK;
 }
 
@@ -2172,11 +2223,11 @@ m5ioe1_err_t M5IOE1::clearInterrupt()
     // GPIO_IS 寄存器是"写0清除"语义，必须写入0来清除所有中断
     // GPIO_IS register uses "write 0 to clear" semantics, must write 0 to clear all interrupts
     if (!_writeReg16(M5IOE1_REG_GPIO_IS_L, 0)) {
-        M5IOE1_LOG_E(TAG, "Failed to write GPIO_IS register for clear");
+        M5IOE1_LOG_E(TAG_IRQ, "Failed to write GPIO_IS register for clear");
         return M5IOE1_ERR_I2C_COMM;
     }
 
-    M5IOE1_LOG_I(TAG, "Interrupt cleared (all pins)");
+    M5IOE1_LOG_I(TAG_IRQ, "Interrupt cleared (all pins)");
     return M5IOE1_OK;
 }
 
@@ -2188,15 +2239,15 @@ m5ioe1_err_t M5IOE1::clearInterrupt()
 m5ioe1_err_t M5IOE1::analogRead(uint8_t channel, uint16_t* result)
 {
     if (result == nullptr) {
-        M5IOE1_LOG_E(TAG, "analogRead result is null");
+        M5IOE1_LOG_E(TAG_ADC, "analogRead result is null");
         return M5IOE1_ERR_INVALID_ARG;
     }
     if (channel < 1 || channel > 4) {
-        M5IOE1_LOG_E(TAG, "Invalid ADC channel: %d", channel);
+        M5IOE1_LOG_E(TAG_ADC, "Invalid ADC channel: %d", channel);
         return M5IOE1_ERR_INVALID_ARG;
     }
     if (!_initialized) {
-        M5IOE1_LOG_E(TAG, "Not initialized");
+        M5IOE1_LOG_E(TAG_ADC, "Not initialized");
         return M5IOE1_ERR_NOT_INIT;
     }
 
@@ -2204,7 +2255,7 @@ m5ioe1_err_t M5IOE1::analogRead(uint8_t channel, uint16_t* result)
     // Start conversion
     uint8_t ctrl = (channel & M5IOE1_ADC_CH_MASK) | M5IOE1_ADC_START;
     if (!_writeReg(M5IOE1_REG_ADC_CTRL, ctrl)) {
-        M5IOE1_LOG_E(TAG, "Failed to write ADC_CTRL register");
+        M5IOE1_LOG_E(TAG_ADC, "Failed to write ADC_CTRL register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -2215,21 +2266,23 @@ m5ioe1_err_t M5IOE1::analogRead(uint8_t channel, uint16_t* result)
     do {
         M5IOE1_DELAY_MS(1);
         if (!_readReg(M5IOE1_REG_ADC_CTRL, &reg)) {
-            M5IOE1_LOG_E(TAG, "Failed to read ADC_CTRL register");
+            M5IOE1_LOG_E(TAG_ADC, "Failed to read ADC_CTRL register");
             return M5IOE1_ERR_I2C_COMM;
         }
+        M5IOE1_LOG_V(TAG_ADC, "ADC ch%d waiting... tries=%d status=0x%02X", channel, tries, reg);
         tries++;
     } while ((reg & M5IOE1_ADC_BUSY) && tries < 20);
 
     if (reg & M5IOE1_ADC_BUSY) {
-        M5IOE1_LOG_E(TAG, "ADC conversion timeout on channel %d", channel);
+        M5IOE1_LOG_E(TAG_ADC, "ADC conversion timeout on channel %d", channel);
         return M5IOE1_ERR_TIMEOUT;
     }
 
     if (!_readReg16(M5IOE1_REG_ADC_DATA_L, result)) {
-        M5IOE1_LOG_E(TAG, "Failed to read ADC_DATA register");
+        M5IOE1_LOG_E(TAG_ADC, "Failed to read ADC_DATA register");
         return M5IOE1_ERR_I2C_COMM;
     }
+    M5IOE1_LOG_D(TAG_ADC, "ADC ch%d: raw=%u (tries=%d)", channel, *result, tries);
     _autoSnapshotUpdate(M5IOE1_SNAPSHOT_DOMAIN_ADC);
     return M5IOE1_OK;
 }
@@ -2237,17 +2290,17 @@ m5ioe1_err_t M5IOE1::analogRead(uint8_t channel, uint16_t* result)
 m5ioe1_err_t M5IOE1::isAdcBusy(bool* busy)
 {
     if (busy == nullptr) {
-        M5IOE1_LOG_E(TAG, "isAdcBusy busy is null");
+        M5IOE1_LOG_E(TAG_ADC, "isAdcBusy busy is null");
         return M5IOE1_ERR_INVALID_ARG;
     }
     if (!_initialized) {
-        M5IOE1_LOG_E(TAG, "Not initialized");
+        M5IOE1_LOG_E(TAG_ADC, "Not initialized");
         return M5IOE1_ERR_NOT_INIT;
     }
 
     uint8_t ctrl = 0;
     if (!_readReg(M5IOE1_REG_ADC_CTRL, &ctrl)) {
-        M5IOE1_LOG_E(TAG, "Failed to read ADC_CTRL register");
+        M5IOE1_LOG_E(TAG_ADC, "Failed to read ADC_CTRL register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -2262,7 +2315,7 @@ m5ioe1_err_t M5IOE1::disableAdc()
     // 步骤 1: 写入寄存器
     // Step 1: Write register
     if (!_writeReg(M5IOE1_REG_ADC_CTRL, 0)) {
-        M5IOE1_LOG_E(TAG, "Failed to write ADC_CTRL register for disable");
+        M5IOE1_LOG_E(TAG_ADC, "Failed to write ADC_CTRL register for disable");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -2270,7 +2323,7 @@ m5ioe1_err_t M5IOE1::disableAdc()
     // Step 2: Read-back verification
     uint8_t actualCtrl = 0;
     if (!_readReg(M5IOE1_REG_ADC_CTRL, &actualCtrl)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back ADC_CTRL register for disable");
+        M5IOE1_LOG_E(TAG_ADC, "Failed to read back ADC_CTRL register for disable");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -2279,7 +2332,7 @@ m5ioe1_err_t M5IOE1::disableAdc()
     // START/BUSY 位应该清零，通道位也应该为 0
     // START/BUSY bits should be cleared, channel bits should also be 0
     if (actualCtrl != 0) {
-        M5IOE1_LOG_E(TAG, "ADC disable verification failed: expected=0, actual=0x%02X", actualCtrl);
+        M5IOE1_LOG_E(TAG_ADC, "ADC disable verification failed: expected=0, actual=0x%02X", actualCtrl);
         return M5IOE1_FAIL;
     }
 
@@ -2287,7 +2340,7 @@ m5ioe1_err_t M5IOE1::disableAdc()
     // Step 4: Verification passed, update cache
     _autoSnapshotUpdate(M5IOE1_SNAPSHOT_DOMAIN_ADC);
 
-    M5IOE1_LOG_I(TAG, "ADC disabled and verified");
+    M5IOE1_LOG_I(TAG_ADC, "ADC disabled and verified");
     return M5IOE1_OK;
 }
 
@@ -2299,16 +2352,16 @@ m5ioe1_err_t M5IOE1::disableAdc()
 m5ioe1_err_t M5IOE1::readTemperature(uint16_t* temperature)
 {
     if (temperature == nullptr) {
-        M5IOE1_LOG_E(TAG, "readTemperature temperature is null");
+        M5IOE1_LOG_E(TAG_ADC, "readTemperature temperature is null");
         return M5IOE1_ERR_INVALID_ARG;
     }
     if (!_initialized) {
-        M5IOE1_LOG_E(TAG, "Not initialized");
+        M5IOE1_LOG_E(TAG_ADC, "Not initialized");
         return M5IOE1_ERR_NOT_INIT;
     }
 
     if (!_writeReg(M5IOE1_REG_TEMP_CTRL, M5IOE1_TEMP_START)) {
-        M5IOE1_LOG_E(TAG, "Failed to write TEMP_CTRL register");
+        M5IOE1_LOG_E(TAG_ADC, "Failed to write TEMP_CTRL register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -2317,19 +2370,19 @@ m5ioe1_err_t M5IOE1::readTemperature(uint16_t* temperature)
     do {
         M5IOE1_DELAY_MS(1);
         if (!_readReg(M5IOE1_REG_TEMP_CTRL, &ctrl)) {
-            M5IOE1_LOG_E(TAG, "Failed to read TEMP_CTRL register");
+            M5IOE1_LOG_E(TAG_ADC, "Failed to read TEMP_CTRL register");
             return M5IOE1_ERR_I2C_COMM;
         }
         tries++;
     } while ((ctrl & M5IOE1_TEMP_BUSY) && tries < 20);
 
     if (ctrl & M5IOE1_TEMP_BUSY) {
-        M5IOE1_LOG_E(TAG, "Temperature conversion timeout");
+        M5IOE1_LOG_E(TAG_ADC, "Temperature conversion timeout");
         return M5IOE1_ERR_TIMEOUT;
     }
 
     if (!_readReg16(M5IOE1_REG_TEMP_DATA_L, temperature)) {
-        M5IOE1_LOG_E(TAG, "Failed to read TEMP_DATA register");
+        M5IOE1_LOG_E(TAG_ADC, "Failed to read TEMP_DATA register");
         return M5IOE1_ERR_I2C_COMM;
     }
     return M5IOE1_OK;
@@ -2338,17 +2391,17 @@ m5ioe1_err_t M5IOE1::readTemperature(uint16_t* temperature)
 m5ioe1_err_t M5IOE1::isTemperatureBusy(bool* busy)
 {
     if (busy == nullptr) {
-        M5IOE1_LOG_E(TAG, "isTemperatureBusy busy is null");
+        M5IOE1_LOG_E(TAG_ADC, "isTemperatureBusy busy is null");
         return M5IOE1_ERR_INVALID_ARG;
     }
     if (!_initialized) {
-        M5IOE1_LOG_E(TAG, "Not initialized");
+        M5IOE1_LOG_E(TAG_ADC, "Not initialized");
         return M5IOE1_ERR_NOT_INIT;
     }
 
     uint8_t ctrl = 0;
     if (!_readReg(M5IOE1_REG_TEMP_CTRL, &ctrl)) {
-        M5IOE1_LOG_E(TAG, "Failed to read TEMP_CTRL register");
+        M5IOE1_LOG_E(TAG_ADC, "Failed to read TEMP_CTRL register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -2365,10 +2418,12 @@ m5ioe1_err_t M5IOE1::setPwmFrequency(uint16_t frequency)
 {
     if (!_initialized) return M5IOE1_ERR_NOT_INIT;
 
+    M5IOE1_LOG_D(TAG_PWM, "setPwmFrequency: %d Hz", frequency);
+
     // 步骤 1: 写入寄存器
     // Step 1: Write register
     if (!_writeReg16(M5IOE1_REG_PWM_FREQ_L, frequency)) {
-        M5IOE1_LOG_E(TAG, "Failed to write PWM_FREQ register");
+        M5IOE1_LOG_E(TAG_PWM, "Failed to write PWM_FREQ register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -2376,14 +2431,14 @@ m5ioe1_err_t M5IOE1::setPwmFrequency(uint16_t frequency)
     // Step 2: Read-back verification
     uint16_t actualFreq = 0;
     if (!_readReg16(M5IOE1_REG_PWM_FREQ_L, &actualFreq)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back PWM_FREQ register");
+        M5IOE1_LOG_E(TAG_PWM, "Failed to read back PWM_FREQ register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
     // 步骤 3: 验证关键位是否匹配
     // Step 3: Verify critical bits match
     if (actualFreq != frequency) {
-        M5IOE1_LOG_E(TAG, "PWM frequency verification failed: expected=%d, actual=%d", frequency, actualFreq);
+        M5IOE1_LOG_E(TAG_PWM, "PWM frequency verification failed: expected=%d, actual=%d", frequency, actualFreq);
         return M5IOE1_FAIL;
     }
 
@@ -2392,23 +2447,23 @@ m5ioe1_err_t M5IOE1::setPwmFrequency(uint16_t frequency)
     _pwmFrequency = frequency;
     _autoSnapshotUpdate(M5IOE1_SNAPSHOT_DOMAIN_PWM);
 
-    M5IOE1_LOG_I(TAG, "PWM frequency set and verified: %d Hz", frequency);
+    M5IOE1_LOG_I(TAG_PWM, "PWM frequency set and verified: %d Hz", frequency);
     return M5IOE1_OK;
 }
 
 m5ioe1_err_t M5IOE1::getPwmFrequency(uint16_t* frequency)
 {
     if (frequency == nullptr) {
-        M5IOE1_LOG_E(TAG, "getPwmFrequency frequency is null");
+        M5IOE1_LOG_E(TAG_PWM, "getPwmFrequency frequency is null");
         return M5IOE1_ERR_INVALID_ARG;
     }
     if (!_initialized) {
-        M5IOE1_LOG_E(TAG, "Not initialized");
+        M5IOE1_LOG_E(TAG_PWM, "Not initialized");
         return M5IOE1_ERR_NOT_INIT;
     }
 
     if (!_readReg16(M5IOE1_REG_PWM_FREQ_L, frequency)) {
-        M5IOE1_LOG_E(TAG, "Failed to read PWM_FREQ register");
+        M5IOE1_LOG_E(TAG_PWM, "Failed to read PWM_FREQ register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -2433,22 +2488,22 @@ m5ioe1_err_t M5IOE1::setPwmDuty(uint8_t channel, uint8_t duty, bool polarity, bo
 m5ioe1_err_t M5IOE1::getPwmDuty(uint8_t channel, uint8_t* duty, bool* polarity, bool* enable)
 {
     if (channel > 3) {
-        M5IOE1_LOG_E(TAG, "Invalid PWM channel: %d", channel);
+        M5IOE1_LOG_E(TAG_PWM, "Invalid PWM channel: %d", channel);
         return M5IOE1_ERR_INVALID_ARG;
     }
     if (duty == nullptr || polarity == nullptr || enable == nullptr) {
-        M5IOE1_LOG_E(TAG, "getPwmDuty output pointer is null");
+        M5IOE1_LOG_E(TAG_PWM, "getPwmDuty output pointer is null");
         return M5IOE1_ERR_INVALID_ARG;
     }
     if (!_initialized) {
-        M5IOE1_LOG_E(TAG, "Not initialized");
+        M5IOE1_LOG_E(TAG_PWM, "Not initialized");
         return M5IOE1_ERR_NOT_INIT;
     }
 
     uint8_t regL  = M5IOE1_REG_PWM1_DUTY_L + (channel * 2);
     uint16_t data = 0;
     if (!_readReg16(regL, &data)) {
-        M5IOE1_LOG_E(TAG, "Failed to read PWM channel %d duty register", channel);
+        M5IOE1_LOG_E(TAG_PWM, "Failed to read PWM channel %d duty register", channel);
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -2471,6 +2526,8 @@ m5ioe1_err_t M5IOE1::setPwmDuty12bit(uint8_t channel, uint16_t duty12, bool pola
     if (channel > 3 || duty12 > 0x0FFF) return M5IOE1_ERR_INVALID_ARG;
     if (!_initialized) return M5IOE1_ERR_NOT_INIT;
 
+    M5IOE1_LOG_D(TAG_PWM, "setPwmDuty12bit: ch=%d duty=%d pol=%s en=%s", channel, duty12, polarity ? "Inv" : "Norm", enable ? "On" : "Off");
+
     // 获取对应的引脚
     // Get corresponding pin
     uint8_t pin = (channel == 0) ? 8 : (channel == 1) ? 7 : (channel == 2) ? 10 : 9;
@@ -2487,7 +2544,7 @@ m5ioe1_err_t M5IOE1::setPwmDuty12bit(uint8_t channel, uint16_t duty12, bool pola
     // 步骤 1: 写入寄存器
     // Step 1: Write register
     if (!_writeBytes(regL, buf, 2)) {
-        M5IOE1_LOG_E(TAG, "Failed to write PWM channel %d duty register", channel);
+        M5IOE1_LOG_E(TAG_PWM, "Failed to write PWM channel %d duty register", channel);
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -2495,7 +2552,7 @@ m5ioe1_err_t M5IOE1::setPwmDuty12bit(uint8_t channel, uint16_t duty12, bool pola
     // Step 2: Read-back verification
     uint16_t actualData = 0;
     if (!_readReg16(regL, &actualData)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back PWM channel %d duty register", channel);
+        M5IOE1_LOG_E(TAG_PWM, "Failed to read back PWM channel %d duty register", channel);
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -2506,7 +2563,7 @@ m5ioe1_err_t M5IOE1::setPwmDuty12bit(uint8_t channel, uint16_t duty12, bool pola
     bool actualEnable     = (actualData & ((uint16_t)M5IOE1_PWM_ENABLE << 8)) != 0;
 
     if (actualDuty12 != duty12 || actualPolarity != polarity || actualEnable != enable) {
-        M5IOE1_LOG_E(TAG, "PWM channel %d verification failed: duty=%d/%d, pol=%d/%d, en=%d/%d", channel, duty12,
+        M5IOE1_LOG_E(TAG_PWM, "PWM channel %d verification failed: duty=%d/%d, pol=%d/%d, en=%d/%d", channel, duty12,
                      actualDuty12, polarity, actualPolarity, enable, actualEnable);
         return M5IOE1_FAIL;
     }
@@ -2518,7 +2575,7 @@ m5ioe1_err_t M5IOE1::setPwmDuty12bit(uint8_t channel, uint16_t duty12, bool pola
         if (_readReg16(M5IOE1_REG_GPIO_MODE_L, &modeReg)) {
             modeReg |= (1 << pin);
             if (!_writeReg16(M5IOE1_REG_GPIO_MODE_L, modeReg)) {
-                M5IOE1_LOG_W(TAG, "Failed to set pin %d to output mode for PWM", pin);
+                M5IOE1_LOG_W(TAG_PWM, "Failed to set pin %d to output mode for PWM", pin);
             }
         }
     }
@@ -2531,7 +2588,7 @@ m5ioe1_err_t M5IOE1::setPwmDuty12bit(uint8_t channel, uint16_t duty12, bool pola
 
     _autoSnapshotUpdate(M5IOE1_SNAPSHOT_DOMAIN_PWM | M5IOE1_SNAPSHOT_DOMAIN_GPIO);
 
-    M5IOE1_LOG_I(TAG, "PWM channel %d set and verified: duty=%d, pol=%d, en=%d", channel, duty12, polarity, enable);
+    M5IOE1_LOG_I(TAG_PWM, "PWM ch%d verified: duty=%d pol=%s en=%s", channel, duty12, polarity ? "Inv" : "Norm", enable ? "On" : "Off");
 
     return M5IOE1_OK;
 }
@@ -2539,11 +2596,11 @@ m5ioe1_err_t M5IOE1::setPwmDuty12bit(uint8_t channel, uint16_t duty12, bool pola
 m5ioe1_err_t M5IOE1::setPwmConfig(uint8_t channel, bool enable, bool polarity, uint16_t frequency, uint16_t duty12)
 {
     if (channel > 3 || duty12 > 0x0FFF) {
-        M5IOE1_LOG_E(TAG, "Invalid PWM config: ch=%d duty12=%d", channel, duty12);
+        M5IOE1_LOG_E(TAG_PWM, "Invalid PWM config: ch=%d duty12=%d", channel, duty12);
         return M5IOE1_ERR_INVALID_ARG;
     }
     if (!_initialized) {
-        M5IOE1_LOG_E(TAG, "Not initialized");
+        M5IOE1_LOG_E(TAG_PWM, "Not initialized");
         return M5IOE1_ERR_NOT_INIT;
     }
 
@@ -2552,18 +2609,18 @@ m5ioe1_err_t M5IOE1::setPwmConfig(uint8_t channel, bool enable, bool polarity, u
 
     m5ioe1_validation_t validation = validateConfig(pin, M5IOE1_CONFIG_PWM, enable);
     if (!validation.valid) {
-        M5IOE1_LOG_W(TAG, "PWM config warning on IO%d: %s", pin + 1, validation.error_msg);
+        M5IOE1_LOG_W(TAG_PWM, "PWM config warning on IO%d: %s", pin + 1, validation.error_msg);
     }
 
     if (_pinStatesValid && _pinStates[pin].intrEnabled) {
-        M5IOE1_LOG_W(TAG, "PWM pin IO%d has interrupt enabled", pin + 1);
+        M5IOE1_LOG_W(TAG_PWM, "PWM pin IO%d has interrupt enabled", pin + 1);
     }
 
     if (_pwmStatesValid && _pwmFrequency != frequency) {
         for (uint8_t other = 0; other < M5IOE1_MAX_PWM_CHANNELS; other++) {
             if (other == channel) continue;
             if (_pwmStates[other].enabled) {
-                M5IOE1_LOG_W(TAG, "PWM frequency change affects other channels: %d -> %d", _pwmFrequency, frequency);
+                M5IOE1_LOG_W(TAG_PWM, "PWM frequency change affects other channels: %d -> %d", _pwmFrequency, frequency);
                 break;
             }
         }
@@ -2608,11 +2665,11 @@ m5ioe1_err_t M5IOE1::getPwmDuty12bit(uint8_t channel, uint16_t* duty12, bool* po
 m5ioe1_err_t M5IOE1::analogWrite(uint8_t channel, uint8_t value)
 {
     if (channel > 3) {
-        M5IOE1_LOG_E(TAG, "Invalid channel: ch=%d", channel);
+        M5IOE1_LOG_E(TAG_PWM, "Invalid channel: ch=%d", channel);
         return M5IOE1_ERR_INVALID_ARG;
     }
     if (!_initialized) {
-        M5IOE1_LOG_E(TAG, "Not initialized");
+        M5IOE1_LOG_E(TAG_PWM, "Not initialized");
         return M5IOE1_ERR_NOT_INIT;
     }
 
@@ -2648,7 +2705,7 @@ m5ioe1_err_t M5IOE1::setLedCount(uint8_t count)
     // 步骤 1: 写入寄存器
     // Step 1: Write register
     if (!_writeReg(M5IOE1_REG_LED_CFG, cfg)) {
-        M5IOE1_LOG_E(TAG, "Failed to write LED_CFG register");
+        M5IOE1_LOG_E(TAG_LED, "Failed to write LED_CFG register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -2656,7 +2713,7 @@ m5ioe1_err_t M5IOE1::setLedCount(uint8_t count)
     // Step 2: Read-back verification
     uint8_t actualCfg = 0;
     if (!_readReg(M5IOE1_REG_LED_CFG, &actualCfg)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back LED_CFG register");
+        M5IOE1_LOG_E(TAG_LED, "Failed to read back LED_CFG register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -2667,7 +2724,7 @@ m5ioe1_err_t M5IOE1::setLedCount(uint8_t count)
     bool countMatch = ((actualCfg & M5IOE1_LED_NUM_MASK) == (cfg & M5IOE1_LED_NUM_MASK));
 
     if (!countMatch) {
-        M5IOE1_LOG_E(TAG, "LED count verification failed: expected=%d, actual=%d", count,
+        M5IOE1_LOG_E(TAG_LED, "LED count verification failed: expected=%d, actual=%d", count,
                      actualCfg & M5IOE1_LED_NUM_MASK);
         return M5IOE1_FAIL;
     }
@@ -2675,7 +2732,7 @@ m5ioe1_err_t M5IOE1::setLedCount(uint8_t count)
     // 步骤 4: 验证成功，更新缓存
     // Step 4: Verification passed, update cache
 
-    M5IOE1_LOG_I(TAG, "LED count set and verified: %d", count);
+    M5IOE1_LOG_I(TAG_LED, "LED count set and verified: %d", count);
     return M5IOE1_OK;
 }
 
@@ -2683,6 +2740,8 @@ m5ioe1_err_t M5IOE1::setLedColor(uint8_t index, uint8_t r, uint8_t g, uint8_t b)
 {
     if (index >= M5IOE1_MAX_LED_COUNT) return M5IOE1_ERR_INVALID_ARG;
     if (!_initialized) return M5IOE1_ERR_NOT_INIT;
+
+    M5IOE1_LOG_D(TAG_LED, "setLedColor: idx=%d RGB(%d,%d,%d)", index, r, g, b);
 
     // 转换为 RGB565
     // Convert to RGB565
@@ -2697,7 +2756,7 @@ m5ioe1_err_t M5IOE1::setLedColor(uint8_t index, uint8_t r, uint8_t g, uint8_t b)
     // 步骤 1: 写入寄存器
     // Step 1: Write register
     if (!_writeBytes(regAddr, data, 2)) {
-        M5IOE1_LOG_E(TAG, "Failed to write LED_RAM register for index %d", index);
+        M5IOE1_LOG_E(TAG_LED, "Failed to write LED_RAM register for index %d", index);
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -2706,7 +2765,7 @@ m5ioe1_err_t M5IOE1::setLedColor(uint8_t index, uint8_t r, uint8_t g, uint8_t b)
     uint16_t actualRgb565 = 0;
     uint8_t actualData[2];
     if (!_readBytes(regAddr, actualData, 2)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back LED_RAM register for index %d", index);
+        M5IOE1_LOG_E(TAG_LED, "Failed to read back LED_RAM register for index %d", index);
         return M5IOE1_ERR_I2C_COMM;
     }
     actualRgb565 = ((uint16_t)actualData[1] << 8) | actualData[0];
@@ -2714,12 +2773,12 @@ m5ioe1_err_t M5IOE1::setLedColor(uint8_t index, uint8_t r, uint8_t g, uint8_t b)
     // 步骤 3: 验证关键位是否匹配
     // Step 3: Verify critical bits match
     if (actualRgb565 != rgb565) {
-        M5IOE1_LOG_E(TAG, "LED color verification failed for index %d: expected=0x%04X, actual=0x%04X", index, rgb565,
+        M5IOE1_LOG_E(TAG_LED, "LED color verification failed for index %d: expected=0x%04X, actual=0x%04X", index, rgb565,
                      actualRgb565);
         return M5IOE1_FAIL;
     }
 
-    M5IOE1_LOG_I(TAG, "LED color set and verified for index %d: RGB(%d,%d,%d)", index, r, g, b);
+    M5IOE1_LOG_I(TAG_LED, "LED color set and verified for index %d: RGB(%d,%d,%d)", index, r, g, b);
     return M5IOE1_OK;
 }
 
@@ -2731,19 +2790,19 @@ m5ioe1_err_t M5IOE1::setLedColor(uint8_t index, m5ioe1_rgb_t color)
 m5ioe1_err_t M5IOE1::refreshLeds()
 {
     if (!_initialized) {
-        M5IOE1_LOG_E(TAG, "Not initialized");
+        M5IOE1_LOG_E(TAG_LED, "Not initialized");
         return M5IOE1_ERR_NOT_INIT;
     }
 
     uint8_t cfg = 0;
     if (!_readReg(M5IOE1_REG_LED_CFG, &cfg)) {
-        M5IOE1_LOG_E(TAG, "Failed to read LED_CFG register");
+        M5IOE1_LOG_E(TAG_LED, "Failed to read LED_CFG register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
     cfg |= M5IOE1_LED_REFRESH;
     if (!_writeReg(M5IOE1_REG_LED_CFG, cfg)) {
-        M5IOE1_LOG_E(TAG, "Failed to write LED_CFG register");
+        M5IOE1_LOG_E(TAG_LED, "Failed to write LED_CFG register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -2757,7 +2816,7 @@ m5ioe1_err_t M5IOE1::disableLeds()
     // 步骤 1: 写入寄存器
     // Step 1: Write register
     if (!_writeReg(M5IOE1_REG_LED_CFG, 0)) {
-        M5IOE1_LOG_E(TAG, "Failed to write LED_CFG register for disable");
+        M5IOE1_LOG_E(TAG_LED, "Failed to write LED_CFG register for disable");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -2765,7 +2824,7 @@ m5ioe1_err_t M5IOE1::disableLeds()
     // Step 2: Read-back verification
     uint8_t actualCfg = 0;
     if (!_readReg(M5IOE1_REG_LED_CFG, &actualCfg)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back LED_CFG register for disable");
+        M5IOE1_LOG_E(TAG_LED, "Failed to read back LED_CFG register for disable");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -2774,21 +2833,22 @@ m5ioe1_err_t M5IOE1::disableLeds()
     // LED 数量为 0 且 REFRESH 位为 0
     // LED count is 0 and REFRESH bit is 0
     if (actualCfg != 0) {
-        M5IOE1_LOG_E(TAG, "LED disable verification failed: expected=0, actual=0x%02X", actualCfg);
+        M5IOE1_LOG_E(TAG_LED, "LED disable verification failed: expected=0, actual=0x%02X", actualCfg);
         return M5IOE1_FAIL;
     }
 
     // 步骤 4: 验证成功，更新缓存
     // Step 4: Verification passed, update cache
 
-    M5IOE1_LOG_I(TAG, "LEDs disabled and verified");
+    M5IOE1_LOG_I(TAG_LED, "LEDs disabled and verified");
     return M5IOE1_OK;
 }
 
 m5ioe1_err_t M5IOE1::clearLedRam()
 {
+    M5IOE1_LOG_D(TAG_LED, "clearLedRam");
     if (!_initialized) {
-        M5IOE1_LOG_E(TAG, "Device not initialized");
+        M5IOE1_LOG_E(TAG_LED, "Device not initialized");
         return M5IOE1_ERR_NOT_INIT;
     }
 
@@ -2796,14 +2856,14 @@ m5ioe1_err_t M5IOE1::clearLedRam()
     // Clear all LED RAM (0x30 - 0x6F, 64 bytes total, supports 32 LEDs)
     uint8_t zeroData[64] = {0};
 
-    M5IOE1_LOG_I(TAG, "Clearing LED RAM...");
+    M5IOE1_LOG_I(TAG_LED, "Clearing LED RAM...");
 
     // 分块写入，每次写入 8 字节，避免 I2C 缓冲区溢出
     // Write in chunks of 8 bytes to avoid I2C buffer overflow
     for (uint8_t offset = 0; offset < 64; offset += 8) {
         uint8_t regAddr = M5IOE1_REG_LED_RAM_START + offset;
         if (!_writeBytes(regAddr, zeroData, 8)) {
-            M5IOE1_LOG_E(TAG, "Failed to clear LED RAM at offset %d", offset);
+            M5IOE1_LOG_E(TAG_LED, "Failed to clear LED RAM at offset %d", offset);
             return M5IOE1_ERR_I2C_COMM;
         }
         // 每次写入后增加延迟，确保设备有时间处理
@@ -2811,7 +2871,7 @@ m5ioe1_err_t M5IOE1::clearLedRam()
         M5IOE1_DELAY_MS(2);
     }
 
-    M5IOE1_LOG_I(TAG, "LED RAM cleared successfully");
+    M5IOE1_LOG_I(TAG_LED, "LED RAM cleared successfully");
     return M5IOE1_OK;
 }
 
@@ -2820,29 +2880,29 @@ m5ioe1_err_t M5IOE1::setLeds(const m5ioe1_rgb_t* colors, uint8_t count, uint8_t 
     // 步骤 1: 参数验证
     // Step 1: Parameter validation
     if (!_initialized) {
-        M5IOE1_LOG_E(TAG, "Device not initialized");
+        M5IOE1_LOG_E(TAG_LED, "Device not initialized");
         return M5IOE1_ERR_NOT_INIT;
     }
 
     if (colors == nullptr) {
-        M5IOE1_LOG_E(TAG, "Colors array is null");
+        M5IOE1_LOG_E(TAG_LED, "Colors array is null");
         return M5IOE1_ERR_INVALID_ARG;
     }
 
     if (count == 0) {
-        M5IOE1_LOG_E(TAG, "LED count cannot be 0");
+        M5IOE1_LOG_E(TAG_LED, "LED count cannot be 0");
         return M5IOE1_ERR_INVALID_ARG;
     }
 
     if (count > M5IOE1_MAX_LED_COUNT) {
-        M5IOE1_LOG_E(TAG, "LED count %d exceeds maximum %d", count, M5IOE1_MAX_LED_COUNT);
+        M5IOE1_LOG_E(TAG_LED, "LED count %d exceeds maximum %d", count, M5IOE1_MAX_LED_COUNT);
         return M5IOE1_ERR_INVALID_ARG;
     }
 
     // 边界检查：确保不会越界访问数组
     // Bounds check: ensure no out-of-bounds array access
     if (count > arraySize) {
-        M5IOE1_LOG_E(TAG, "LED count %d exceeds array size %d (would cause out-of-bounds access)", count, arraySize);
+        M5IOE1_LOG_E(TAG_LED, "LED count %d exceeds array size %d (would cause out-of-bounds access)", count, arraySize);
         return M5IOE1_ERR_INVALID_ARG;
     }
 
@@ -2850,7 +2910,7 @@ m5ioe1_err_t M5IOE1::setLeds(const m5ioe1_rgb_t* colors, uint8_t count, uint8_t 
     // Step 2: Set LED count
     uint8_t cfg = count & M5IOE1_LED_NUM_MASK;
     if (!_writeReg(M5IOE1_REG_LED_CFG, cfg)) {
-        M5IOE1_LOG_E(TAG, "Failed to write LED_CFG register");
+        M5IOE1_LOG_E(TAG_LED, "Failed to write LED_CFG register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -2858,12 +2918,12 @@ m5ioe1_err_t M5IOE1::setLeds(const m5ioe1_rgb_t* colors, uint8_t count, uint8_t 
     // Verify LED count setting
     uint8_t actualCfg = 0;
     if (!_readReg(M5IOE1_REG_LED_CFG, &actualCfg)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back LED_CFG register");
+        M5IOE1_LOG_E(TAG_LED, "Failed to read back LED_CFG register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
     if ((actualCfg & M5IOE1_LED_NUM_MASK) != cfg) {
-        M5IOE1_LOG_E(TAG, "LED count verification failed: expected=%d, actual=%d", cfg,
+        M5IOE1_LOG_E(TAG_LED, "LED count verification failed: expected=%d, actual=%d", cfg,
                      actualCfg & M5IOE1_LED_NUM_MASK);
         return M5IOE1_FAIL;
     }
@@ -2882,7 +2942,7 @@ m5ioe1_err_t M5IOE1::setLeds(const m5ioe1_rgb_t* colors, uint8_t count, uint8_t 
         uint8_t data[2] = {(uint8_t)(rgb565 & 0xFF), (uint8_t)((rgb565 >> 8) & 0xFF)};
 
         if (!_writeBytes(regAddr, data, 2)) {
-            M5IOE1_LOG_E(TAG, "Failed to write LED_RAM for index %d", i);
+            M5IOE1_LOG_E(TAG_LED, "Failed to write LED_RAM for index %d", i);
             return M5IOE1_ERR_I2C_COMM;
         }
 
@@ -2890,12 +2950,12 @@ m5ioe1_err_t M5IOE1::setLeds(const m5ioe1_rgb_t* colors, uint8_t count, uint8_t 
         // Read-back verification for color data
         uint8_t actualData[2];
         if (!_readBytes(regAddr, actualData, 2)) {
-            M5IOE1_LOG_E(TAG, "Failed to read back LED_RAM for index %d", i);
+            M5IOE1_LOG_E(TAG_LED, "Failed to read back LED_RAM for index %d", i);
             return M5IOE1_ERR_I2C_COMM;
         }
         uint16_t actualRgb565 = ((uint16_t)actualData[1] << 8) | actualData[0];
         if (actualRgb565 != rgb565) {
-            M5IOE1_LOG_E(TAG, "LED color verification failed for index %d: expected=0x%04X, actual=0x%04X", i, rgb565,
+            M5IOE1_LOG_E(TAG_LED, "LED color verification failed for index %d: expected=0x%04X, actual=0x%04X", i, rgb565,
                          actualRgb565);
             return M5IOE1_FAIL;
         }
@@ -2908,17 +2968,17 @@ m5ioe1_err_t M5IOE1::setLeds(const m5ioe1_rgb_t* colors, uint8_t count, uint8_t 
     // Step 5: Optional refresh
     if (autoRefresh) {
         if (!_readReg(M5IOE1_REG_LED_CFG, &actualCfg)) {
-            M5IOE1_LOG_E(TAG, "Failed to read LED_CFG for refresh");
+            M5IOE1_LOG_E(TAG_LED, "Failed to read LED_CFG for refresh");
             return M5IOE1_ERR_I2C_COMM;
         }
         actualCfg |= M5IOE1_LED_REFRESH;
         if (!_writeReg(M5IOE1_REG_LED_CFG, actualCfg)) {
-            M5IOE1_LOG_E(TAG, "Failed to trigger LED refresh");
+            M5IOE1_LOG_E(TAG_LED, "Failed to trigger LED refresh");
             return M5IOE1_ERR_I2C_COMM;
         }
     }
 
-    M5IOE1_LOG_I(TAG, "Set %d LEDs successfully%s", count, autoRefresh ? " (refreshed)" : "");
+    M5IOE1_LOG_I(TAG_LED, "Set %d LEDs successfully%s", count, autoRefresh ? " (refreshed)" : "");
     return M5IOE1_OK;
 }
 
@@ -2930,28 +2990,28 @@ m5ioe1_err_t M5IOE1::setLeds(const m5ioe1_rgb_t* colors, uint8_t count, uint8_t 
 m5ioe1_err_t M5IOE1::setAw8737aPulse(uint8_t pin, m5ioe1_aw8737a_pulse_t pulseNum, m5ioe1_aw8737a_refresh_t refresh)
 {
     if (!_initialized) {
-        M5IOE1_LOG_E(TAG, "Device not initialized");
+        M5IOE1_LOG_E(TAG_AMP, "Device not initialized");
         return M5IOE1_ERR_NOT_INIT;
     }
 
     // 验证引脚范围 (0-13)
     // Validate pin range (0-13)
     if (pin >= M5IOE1_MAX_GPIO_PINS) {
-        M5IOE1_LOG_E(TAG, "Invalid pin number: %d (valid range: 0-%d)", pin, M5IOE1_MAX_GPIO_PINS - 1);
+        M5IOE1_LOG_E(TAG_AMP, "Invalid pin number: %d (valid range: 0-%d)", pin, M5IOE1_MAX_GPIO_PINS - 1);
         return M5IOE1_ERR_INVALID_ARG;
     }
 
     // 验证脉冲编号 (0-3)
     // Validate pulse number (0-3)
     if (pulseNum > M5IOE1_AW8737A_PULSE_3) {
-        M5IOE1_LOG_E(TAG, "Invalid pulse number: %d (valid range: 0-3)", pulseNum);
+        M5IOE1_LOG_E(TAG_AMP, "Invalid pulse number: %d (valid range: 0-3)", pulseNum);
         return M5IOE1_ERR_INVALID_ARG;
     }
 
     // 检查引脚是否为输出模式，如果不是则自动配置为推挽输出
     // Check if pin is output mode, if not auto-configure as push-pull output
     if (!_pinStates[pin].isOutput) {
-        M5IOE1_LOG_I(TAG, "AW8737A: Pin %d not output mode, auto-configuring as push-pull output", pin);
+        M5IOE1_LOG_I(TAG_AMP, "AW8737A: Pin %d not output mode, auto-configuring as push-pull output", pin);
         pinMode(pin, OUTPUT);
     }
 
@@ -2973,7 +3033,7 @@ m5ioe1_err_t M5IOE1::setAw8737aPulse(uint8_t pin, m5ioe1_aw8737a_pulse_t pulseNu
     // 写入寄存器（不含 REFRESH 位）
     // Write register (without REFRESH bit)
     if (!_writeReg(M5IOE1_REG_AW8737A_PULSE, regValue)) {
-        M5IOE1_LOG_E(TAG, "Failed to set AW8737A pulse config");
+        M5IOE1_LOG_E(TAG_AMP, "Failed to set AW8737A pulse config");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -2986,7 +3046,7 @@ m5ioe1_err_t M5IOE1::setAw8737aPulse(uint8_t pin, m5ioe1_aw8737a_pulse_t pulseNu
     // Read-back verification
     uint8_t actualReg = 0;
     if (!_readReg(M5IOE1_REG_AW8737A_PULSE, &actualReg)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back AW8737A pulse register");
+        M5IOE1_LOG_E(TAG_AMP, "Failed to read back AW8737A pulse register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -2994,11 +3054,11 @@ m5ioe1_err_t M5IOE1::setAw8737aPulse(uint8_t pin, m5ioe1_aw8737a_pulse_t pulseNu
     // Verify critical bits match
     uint8_t actualValue = actualReg & 0x7F;
     if (actualValue != regValue) {
-        M5IOE1_LOG_E(TAG, "AW8737A pulse verification failed: expected=0x%02X, actual=0x%02X", regValue, actualValue);
+        M5IOE1_LOG_E(TAG_AMP, "AW8737A pulse verification failed: expected=0x%02X, actual=0x%02X", regValue, actualValue);
         return M5IOE1_FAIL;
     }
 
-    M5IOE1_LOG_I(TAG, "AW8737A pulse configured: pin=%d, num=%d (reg=0x%02X)", pin, pulseNum, regValue);
+    M5IOE1_LOG_I(TAG_AMP, "AW8737A pulse configured: pin=%d, num=%d (reg=0x%02X)", pin, pulseNum, regValue);
 
     // 如果需要立即刷新，调用 refreshAw8737aPulse
     // If immediate refresh needed, call refreshAw8737aPulse
@@ -3013,20 +3073,20 @@ m5ioe1_err_t M5IOE1::setAw8737aPulse(uint8_t pin, m5ioe1_aw8737a_pulse_t pulseNu
 m5ioe1_err_t M5IOE1::refreshAw8737aPulse()
 {
     if (!_initialized) {
-        M5IOE1_LOG_E(TAG, "Device not initialized");
+        M5IOE1_LOG_E(TAG_AMP, "Device not initialized");
         return M5IOE1_ERR_NOT_INIT;
     }
 
     // 检查是否已配置
     // Check if configured
     if (!_aw8737aConfigured) {
-        M5IOE1_LOG_W(TAG, "AW8737A pulse not configured, executing anyway");
+        M5IOE1_LOG_W(TAG_AMP, "AW8737A pulse not configured, executing anyway");
     }
 
     // 检查引脚是否为输出模式，如果不是则自动配置为推挽输出
     // Check if pin is output mode, if not auto-configure as push-pull output
     if (!_pinStates[_aw8737aPin].isOutput) {
-        M5IOE1_LOG_I(TAG, "AW8737A: Pin %d not output mode, auto-configuring as push-pull output", _aw8737aPin);
+        M5IOE1_LOG_I(TAG_AMP, "AW8737A: Pin %d not output mode, auto-configuring as push-pull output", _aw8737aPin);
         pinMode(_aw8737aPin, OUTPUT);
     }
 
@@ -3034,7 +3094,7 @@ m5ioe1_err_t M5IOE1::refreshAw8737aPulse()
     // Read current register value
     uint8_t regValue = 0;
     if (!_readReg(M5IOE1_REG_AW8737A_PULSE, &regValue)) {
-        M5IOE1_LOG_E(TAG, "Failed to read AW8737A pulse register");
+        M5IOE1_LOG_E(TAG_AMP, "Failed to read AW8737A pulse register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -3043,14 +3103,14 @@ m5ioe1_err_t M5IOE1::refreshAw8737aPulse()
     regValue |= M5IOE1_AW8737A_REFRESH;
 
     if (!_writeReg(M5IOE1_REG_AW8737A_PULSE, regValue)) {
-        M5IOE1_LOG_E(TAG, "Failed to refresh AW8737A pulse");
+        M5IOE1_LOG_E(TAG_AMP, "Failed to refresh AW8737A pulse");
         return M5IOE1_ERR_I2C_COMM;
     }
 
     // 输出详细日志
     // Output detailed log
     const char* driveStr = (_pinStates[_aw8737aPin].drive == M5IOE1_DRIVE_PUSHPULL) ? "PUSH-PULL" : "OPEN-DRAIN";
-    M5IOE1_LOG_I(TAG, "AW8737A pulse refresh: pin=%d, pulseNum=%d, mode=OUTPUT, drive=%s", _aw8737aPin,
+    M5IOE1_LOG_I(TAG_AMP, "AW8737A pulse refresh: pin=%d, pulseNum=%d, mode=OUTPUT, drive=%s", _aw8737aPin,
                  _aw8737aPulseNum, driveStr);
 
     // 写入位 7 后等待 20ms，因为它会影响 I2C 通信
@@ -3066,7 +3126,7 @@ m5ioe1_err_t M5IOE1::setAw8737aMode(uint8_t pin, m5ioe1_aw8737a_mode_t mode, m5i
     // Mode 直接映射到 Pulse (MODE_1=0pulse, MODE_2=1pulse, MODE_3=2pulses, MODE_4=3pulses)
     // Mode directly maps to Pulse
     if (mode > M5IOE1_AW8737A_MODE_4) {
-        M5IOE1_LOG_E(TAG, "Invalid AW8737A mode: %d (valid range: 0-3)", mode);
+        M5IOE1_LOG_E(TAG_AMP, "Invalid AW8737A mode: %d (valid range: 0-3)", mode);
         return M5IOE1_ERR_INVALID_ARG;
     }
 
@@ -3097,7 +3157,7 @@ m5ioe1_err_t M5IOE1::writeRtcRAM(uint8_t offset, const uint8_t* data, uint8_t le
     // 步骤 1: 写入寄存器
     // Step 1: Write register
     if (!_writeBytes(regAddr, data, length)) {
-        M5IOE1_LOG_E(TAG, "Failed to write RTC_RAM register at offset %d", offset);
+        M5IOE1_LOG_E(TAG_SYS, "Failed to write RTC_RAM register at offset %d", offset);
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -3105,7 +3165,7 @@ m5ioe1_err_t M5IOE1::writeRtcRAM(uint8_t offset, const uint8_t* data, uint8_t le
     // Step 2: Read-back verification
     uint8_t actualData[M5IOE1_RTC_RAM_SIZE];
     if (!_readBytes(regAddr, actualData, length)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back RTC_RAM register at offset %d", offset);
+        M5IOE1_LOG_E(TAG_SYS, "Failed to read back RTC_RAM register at offset %d", offset);
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -3117,7 +3177,7 @@ m5ioe1_err_t M5IOE1::writeRtcRAM(uint8_t offset, const uint8_t* data, uint8_t le
     for (uint8_t i = 0; i < length; i++) {
         if (actualData[i] != data[i]) {
             allMatch = false;
-            M5IOE1_LOG_E(TAG, "RTC_RAM verification failed at offset %d: expected=0x%02X, actual=0x%02X", offset + i,
+            M5IOE1_LOG_E(TAG_SYS, "RTC_RAM verification failed at offset %d: expected=0x%02X, actual=0x%02X", offset + i,
                          data[i], actualData[i]);
             break;
         }
@@ -3127,7 +3187,7 @@ m5ioe1_err_t M5IOE1::writeRtcRAM(uint8_t offset, const uint8_t* data, uint8_t le
         return M5IOE1_FAIL;
     }
 
-    M5IOE1_LOG_I(TAG, "RTC_RAM write and verified: offset=%d, length=%d", offset, length);
+    M5IOE1_LOG_I(TAG_SYS, "RTC_RAM write and verified: offset=%d, length=%d", offset, length);
     return M5IOE1_OK;
 }
 
@@ -3153,11 +3213,11 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
                                   m5ioe1_pull_config_t pullConfig)
 {
     if (sleepTime > 15) {
-        M5IOE1_LOG_E(TAG, "Invalid I2C sleep time: %d", sleepTime);
+        M5IOE1_LOG_E(TAG_I2C, "Invalid I2C sleep time: %d", sleepTime);
         return M5IOE1_ERR_INVALID_ARG;
     }
     if (!_initialized) {
-        M5IOE1_LOG_E(TAG, "Not initialized");
+        M5IOE1_LOG_E(TAG_I2C, "Not initialized");
         return M5IOE1_ERR_NOT_INIT;
     }
 
@@ -3172,7 +3232,7 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
     // 步骤 1: 写入寄存器
     // Step 1: Write register
     if (!_writeReg(M5IOE1_REG_I2C_CFG, cfg)) {
-        M5IOE1_LOG_E(TAG, "Failed to write I2C_CFG register");
+        M5IOE1_LOG_E(TAG_I2C, "Failed to write I2C_CFG register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -3180,7 +3240,7 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
     // Step 2: Read-back verification
     uint8_t actualCfg = 0;
     if (!_readReg(M5IOE1_REG_I2C_CFG, &actualCfg)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back I2C_CFG register");
+        M5IOE1_LOG_E(TAG_I2C, "Failed to read back I2C_CFG register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -3195,27 +3255,27 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
     if (actualSleep != expectedSleep || actualSpeed400k != (speed == M5IOE1_I2C_SPEED_400K) ||
         actualWakeRising != (wakeEdge == M5IOE1_WAKE_EDGE_RISING) ||
         actualPullOff != (pullConfig == M5IOE1_PULL_DISABLED)) {
-        M5IOE1_LOG_E(TAG, "I2C_CFG verification failed: expected=0x%02X, actual=0x%02X", cfg, actualCfg);
+        M5IOE1_LOG_E(TAG_I2C, "I2C_CFG verification failed: expected=0x%02X, actual=0x%02X", cfg, actualCfg);
         return M5IOE1_FAIL;
     }
 
     // 步骤 4: 如果速度改变，切换主机 I2C 总线
     // Step 4: If speed changed, switch host I2C bus
     if (speedChanged) {
-        M5IOE1_LOG_I(TAG, "Switching host I2C bus from %lu Hz to %lu Hz", _requestedSpeed, targetFreq);
+        M5IOE1_LOG_D(TAG_I2C, "Switching host I2C bus from %lu Hz to %lu Hz", _requestedSpeed, targetFreq);
 
 #ifdef ARDUINO
 #if M5IOE1_HAS_M5UNIFIED_I2C
         if (_m5_i2c) {
             _commFreq = targetFreq;
-            M5IOE1_LOG_I(TAG, "M5Unified I2C frequency updated to %lu Hz", targetFreq);
+            M5IOE1_LOG_D(TAG_I2C, "M5Unified I2C frequency updated to %lu Hz", targetFreq);
         } else
 #endif
             if (_wire != nullptr) {
             _wire->end();
             M5IOE1_DELAY_MS(10);
             if (!_wire->begin(_sda, _scl, targetFreq)) {
-                M5IOE1_LOG_E(TAG, "Failed to reinitialize I2C bus at %lu Hz", targetFreq);
+                M5IOE1_LOG_E(TAG_I2C, "Failed to reinitialize I2C bus at %lu Hz", targetFreq);
                 // 回滚设备配置
                 // Rollback device config
                 uint8_t rollbackCfg = actualCfg;
@@ -3238,7 +3298,7 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
                 if (_i2c_master_dev != nullptr) {
                     ret = i2c_master_bus_rm_device(_i2c_master_dev);
                     if (ret != ESP_OK) {
-                        M5IOE1_LOG_E(TAG, "Failed to remove I2C device: %s", esp_err_to_name(ret));
+                        M5IOE1_LOG_E(TAG_I2C, "Failed to remove I2C device: %s", esp_err_to_name(ret));
                         return M5IOE1_ERR_I2C_CONFIG;
                     }
                     _i2c_master_dev = nullptr;
@@ -3253,7 +3313,7 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
 
                     ret = i2c_master_bus_add_device(_i2c_master_bus, &dev_config, &_i2c_master_dev);
                     if (ret != ESP_OK) {
-                        M5IOE1_LOG_E(TAG, "Failed to add I2C device at %lu Hz: %s", targetFreq, esp_err_to_name(ret));
+                        M5IOE1_LOG_E(TAG_I2C, "Failed to add I2C device at %lu Hz: %s", targetFreq, esp_err_to_name(ret));
                         return M5IOE1_ERR_I2C_CONFIG;
                     }
                 }
@@ -3265,13 +3325,13 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
                 if (_i2c_device != nullptr) {
                     ret = i2c_bus_device_delete(&_i2c_device);
                     if (ret != ESP_OK) {
-                        M5IOE1_LOG_E(TAG, "Failed to delete I2C device: %s", esp_err_to_name(ret));
+                        M5IOE1_LOG_E(TAG_I2C, "Failed to delete I2C device: %s", esp_err_to_name(ret));
                         return M5IOE1_ERR_I2C_CONFIG;
                     }
 
                     _i2c_device = i2c_bus_device_create(_i2c_bus, _addr, targetFreq);
                     if (_i2c_device == nullptr) {
-                        M5IOE1_LOG_E(TAG, "Failed to create I2C device at %lu Hz", targetFreq);
+                        M5IOE1_LOG_E(TAG_I2C, "Failed to create I2C device at %lu Hz", targetFreq);
                         return M5IOE1_ERR_I2C_CONFIG;
                     }
                 }
@@ -3289,7 +3349,7 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
                 i2c_conf.master.clk_speed = targetFreq;
                 ret                       = i2c_param_config(_port, &i2c_conf);
                 if (ret != ESP_OK) {
-                    M5IOE1_LOG_E(TAG, "i2c_param_config failed: %s", esp_err_to_name(ret));
+                    M5IOE1_LOG_E(TAG_I2C, "i2c_param_config failed: %s", esp_err_to_name(ret));
                     return M5IOE1_ERR_I2C_CONFIG;
                 }
                 break;
@@ -3299,7 +3359,7 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
 #if M5IOE1_HAS_M5UNIFIED_I2C
             case M5IOE1_I2C_DRIVER_M5UNIFIED:
                 _commFreq = targetFreq;
-                M5IOE1_LOG_I(TAG, "M5Unified I2C frequency updated to %lu Hz", targetFreq);
+                M5IOE1_LOG_D(TAG_I2C, "M5Unified I2C frequency updated to %lu Hz", targetFreq);
                 break;
 #endif
             default:
@@ -3311,7 +3371,7 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
         // Step 5: Verify communication still works
         uint16_t uid = 0;
         if (!_readReg16(M5IOE1_REG_UID_L, &uid)) {
-            M5IOE1_LOG_E(TAG, "Communication failed after switching to %lu Hz", targetFreq);
+            M5IOE1_LOG_E(TAG_I2C, "Communication failed after switching to %lu Hz", targetFreq);
             // 回滚
             // Rollback
             uint32_t originalFreq = _requestedSpeed;
@@ -3390,7 +3450,7 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
         // 更新请求的速度
         // Update requested speed
         _requestedSpeed = targetFreq;
-        M5IOE1_LOG_I(TAG, "Host I2C bus switched to %lu Hz", targetFreq);
+        M5IOE1_LOG_D(TAG_I2C, "Host I2C bus switched to %lu Hz", targetFreq);
     }
 
     // 步骤 6: 验证成功，更新缓存
@@ -3405,12 +3465,12 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
     // If sleep time is configured, auto-enable autoWake to prevent data loss
     if (sleepTime > 0 && !_autoWakeEnabled) {
         setAutoWakeEnable(true);
-        M5IOE1_LOG_W(TAG, "I2C sleep enabled (sleepTime=%d), auto-wake automatically enabled", sleepTime);
+        M5IOE1_LOG_W(TAG_I2C, "I2C sleep enabled (sleepTime=%d), auto-wake automatically enabled", sleepTime);
     }
 
     _updatePollingForI2cSleep(sleepTime);
 
-    M5IOE1_LOG_I(TAG, "I2C config set and verified: sleep=%d, speed=%s, wake=%s, pull=%s", sleepTime,
+    M5IOE1_LOG_I(TAG_I2C, "I2C config set and verified: sleep=%d, speed=%s, wake=%s, pull=%s", sleepTime,
                  speed == M5IOE1_I2C_SPEED_400K ? "400K" : "100K",
                  wakeEdge == M5IOE1_WAKE_EDGE_RISING ? "rising" : "falling",
                  pullConfig == M5IOE1_PULL_DISABLED ? "off" : "on");
@@ -3421,17 +3481,17 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
 m5ioe1_err_t M5IOE1::setI2cSleepTime(uint8_t sleepTime)
 {
     if (sleepTime > 15) {
-        M5IOE1_LOG_E(TAG, "Invalid I2C sleep time: %d", sleepTime);
+        M5IOE1_LOG_E(TAG_I2C, "Invalid I2C sleep time: %d", sleepTime);
         return M5IOE1_ERR_INVALID_ARG;
     }
     if (!_initialized) {
-        M5IOE1_LOG_E(TAG, "Not initialized");
+        M5IOE1_LOG_E(TAG_I2C, "Not initialized");
         return M5IOE1_ERR_NOT_INIT;
     }
 
     uint8_t cfg = 0;
     if (!_readReg(M5IOE1_REG_I2C_CFG, &cfg)) {
-        M5IOE1_LOG_E(TAG, "Failed to read I2C_CFG register");
+        M5IOE1_LOG_E(TAG_I2C, "Failed to read I2C_CFG register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -3442,7 +3502,7 @@ m5ioe1_err_t M5IOE1::setI2cSleepTime(uint8_t sleepTime)
     // 步骤 1: 写入寄存器
     // Step 1: Write register
     if (!_writeReg(M5IOE1_REG_I2C_CFG, cfg)) {
-        M5IOE1_LOG_E(TAG, "Failed to write I2C_CFG register");
+        M5IOE1_LOG_E(TAG_I2C, "Failed to write I2C_CFG register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -3450,7 +3510,7 @@ m5ioe1_err_t M5IOE1::setI2cSleepTime(uint8_t sleepTime)
     // Step 2: Read-back verification
     uint8_t actualCfg = 0;
     if (!_readReg(M5IOE1_REG_I2C_CFG, &actualCfg)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back I2C_CFG register");
+        M5IOE1_LOG_E(TAG_I2C, "Failed to read back I2C_CFG register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -3458,7 +3518,7 @@ m5ioe1_err_t M5IOE1::setI2cSleepTime(uint8_t sleepTime)
     // Step 3: Verify SLEEP bits match
     uint8_t actualSleep = actualCfg & M5IOE1_I2C_SLEEP_MASK;
     if (actualSleep != sleepTime) {
-        M5IOE1_LOG_E(TAG, "I2C_CFG sleep time verification failed: expected=%d, actual=%d", sleepTime, actualSleep);
+        M5IOE1_LOG_E(TAG_I2C, "I2C_CFG sleep time verification failed: expected=%d, actual=%d", sleepTime, actualSleep);
         return M5IOE1_FAIL;
     }
 
@@ -3467,13 +3527,13 @@ m5ioe1_err_t M5IOE1::setI2cSleepTime(uint8_t sleepTime)
     _i2cConfig.sleepTime = sleepTime;
     _i2cConfigValid      = true;
 
-    M5IOE1_LOG_I(TAG, "I2C sleep time set and verified to %d", sleepTime);
+    M5IOE1_LOG_I(TAG_I2C, "I2C sleep time set and verified to %d", sleepTime);
 
     // 若配置了休眠时间，自动启用 autoWake 防止数据丢失
     // If sleep time is configured, auto-enable autoWake to prevent data loss
     if (sleepTime > 0 && !_autoWakeEnabled) {
         setAutoWakeEnable(true);
-        M5IOE1_LOG_W(TAG, "I2C sleep enabled, auto-wake automatically enabled");
+        M5IOE1_LOG_W(TAG_I2C, "I2C sleep enabled, auto-wake automatically enabled");
     }
 
     _updatePollingForI2cSleep(sleepTime);
@@ -3484,17 +3544,17 @@ m5ioe1_err_t M5IOE1::setI2cSleepTime(uint8_t sleepTime)
 m5ioe1_err_t M5IOE1::getI2cSleepTime(uint8_t* sleepTime)
 {
     if (sleepTime == nullptr) {
-        M5IOE1_LOG_E(TAG, "getI2cSleepTime sleepTime is null");
+        M5IOE1_LOG_E(TAG_I2C, "getI2cSleepTime sleepTime is null");
         return M5IOE1_ERR_INVALID_ARG;
     }
     if (!_initialized) {
-        M5IOE1_LOG_E(TAG, "Not initialized");
+        M5IOE1_LOG_E(TAG_I2C, "Not initialized");
         return M5IOE1_ERR_NOT_INIT;
     }
 
     uint8_t cfg = 0;
     if (!_readReg(M5IOE1_REG_I2C_CFG, &cfg)) {
-        M5IOE1_LOG_E(TAG, "Failed to read I2C_CFG register");
+        M5IOE1_LOG_E(TAG_I2C, "Failed to read I2C_CFG register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -3510,13 +3570,13 @@ m5ioe1_err_t M5IOE1::getI2cSleepTime(uint8_t* sleepTime)
 m5ioe1_err_t M5IOE1::setI2cWakeEdge(m5ioe1_wake_edge_t edge)
 {
     if (!_initialized) {
-        M5IOE1_LOG_E(TAG, "Not initialized");
+        M5IOE1_LOG_E(TAG_I2C, "Not initialized");
         return M5IOE1_ERR_NOT_INIT;
     }
 
     uint8_t cfg = 0;
     if (!_readReg(M5IOE1_REG_I2C_CFG, &cfg)) {
-        M5IOE1_LOG_E(TAG, "Failed to read I2C_CFG register");
+        M5IOE1_LOG_E(TAG_I2C, "Failed to read I2C_CFG register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -3531,7 +3591,7 @@ m5ioe1_err_t M5IOE1::setI2cWakeEdge(m5ioe1_wake_edge_t edge)
     // 步骤 1: 写入寄存器
     // Step 1: Write register
     if (!_writeReg(M5IOE1_REG_I2C_CFG, cfg)) {
-        M5IOE1_LOG_E(TAG, "Failed to write I2C_CFG register");
+        M5IOE1_LOG_E(TAG_I2C, "Failed to write I2C_CFG register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -3539,7 +3599,7 @@ m5ioe1_err_t M5IOE1::setI2cWakeEdge(m5ioe1_wake_edge_t edge)
     // Step 2: Read-back verification
     uint8_t actualCfg = 0;
     if (!_readReg(M5IOE1_REG_I2C_CFG, &actualCfg)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back I2C_CFG register");
+        M5IOE1_LOG_E(TAG_I2C, "Failed to read back I2C_CFG register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -3548,7 +3608,7 @@ m5ioe1_err_t M5IOE1::setI2cWakeEdge(m5ioe1_wake_edge_t edge)
     bool actualWakeRising   = (actualCfg & M5IOE1_I2C_WAKE_RISING) != 0;
     bool expectedWakeRising = (edge == M5IOE1_WAKE_EDGE_RISING);
     if (actualWakeRising != expectedWakeRising) {
-        M5IOE1_LOG_E(TAG, "I2C_CFG wake edge verification failed: expected=%s, actual=%s",
+        M5IOE1_LOG_E(TAG_I2C, "I2C_CFG wake edge verification failed: expected=%s, actual=%s",
                      expectedWakeRising ? "rising" : "falling", actualWakeRising ? "rising" : "falling");
         return M5IOE1_FAIL;
     }
@@ -3558,7 +3618,7 @@ m5ioe1_err_t M5IOE1::setI2cWakeEdge(m5ioe1_wake_edge_t edge)
     _i2cConfig.wakeRising = expectedWakeRising;
     _i2cConfigValid       = true;
 
-    M5IOE1_LOG_I(TAG, "I2C wake edge set and verified to %s", expectedWakeRising ? "rising" : "falling");
+    M5IOE1_LOG_I(TAG_I2C, "I2C wake edge set and verified to %s", expectedWakeRising ? "rising" : "falling");
 
     return M5IOE1_OK;
 }
@@ -3566,17 +3626,17 @@ m5ioe1_err_t M5IOE1::setI2cWakeEdge(m5ioe1_wake_edge_t edge)
 m5ioe1_err_t M5IOE1::getI2cWakeEdge(m5ioe1_wake_edge_t* edge)
 {
     if (edge == nullptr) {
-        M5IOE1_LOG_E(TAG, "getI2cWakeEdge edge is null");
+        M5IOE1_LOG_E(TAG_I2C, "getI2cWakeEdge edge is null");
         return M5IOE1_ERR_INVALID_ARG;
     }
     if (!_initialized) {
-        M5IOE1_LOG_E(TAG, "Not initialized");
+        M5IOE1_LOG_E(TAG_I2C, "Not initialized");
         return M5IOE1_ERR_NOT_INIT;
     }
 
     uint8_t cfg = 0;
     if (!_readReg(M5IOE1_REG_I2C_CFG, &cfg)) {
-        M5IOE1_LOG_E(TAG, "Failed to read I2C_CFG register");
+        M5IOE1_LOG_E(TAG_I2C, "Failed to read I2C_CFG register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -3592,13 +3652,13 @@ m5ioe1_err_t M5IOE1::getI2cWakeEdge(m5ioe1_wake_edge_t* edge)
 m5ioe1_err_t M5IOE1::setI2cPullConfig(m5ioe1_pull_config_t config)
 {
     if (!_initialized) {
-        M5IOE1_LOG_E(TAG, "Not initialized");
+        M5IOE1_LOG_E(TAG_I2C, "Not initialized");
         return M5IOE1_ERR_NOT_INIT;
     }
 
     uint8_t cfg = 0;
     if (!_readReg(M5IOE1_REG_I2C_CFG, &cfg)) {
-        M5IOE1_LOG_E(TAG, "Failed to read I2C_CFG register");
+        M5IOE1_LOG_E(TAG_I2C, "Failed to read I2C_CFG register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -3613,7 +3673,7 @@ m5ioe1_err_t M5IOE1::setI2cPullConfig(m5ioe1_pull_config_t config)
     // 步骤 1: 写入寄存器
     // Step 1: Write register
     if (!_writeReg(M5IOE1_REG_I2C_CFG, cfg)) {
-        M5IOE1_LOG_E(TAG, "Failed to write I2C_CFG register");
+        M5IOE1_LOG_E(TAG_I2C, "Failed to write I2C_CFG register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -3621,7 +3681,7 @@ m5ioe1_err_t M5IOE1::setI2cPullConfig(m5ioe1_pull_config_t config)
     // Step 2: Read-back verification
     uint8_t actualCfg = 0;
     if (!_readReg(M5IOE1_REG_I2C_CFG, &actualCfg)) {
-        M5IOE1_LOG_E(TAG, "Failed to read back I2C_CFG register");
+        M5IOE1_LOG_E(TAG_I2C, "Failed to read back I2C_CFG register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -3630,7 +3690,7 @@ m5ioe1_err_t M5IOE1::setI2cPullConfig(m5ioe1_pull_config_t config)
     bool actualPullOff   = (actualCfg & M5IOE1_I2C_PULL_OFF) != 0;
     bool expectedPullOff = (config == M5IOE1_PULL_DISABLED);
     if (actualPullOff != expectedPullOff) {
-        M5IOE1_LOG_E(TAG, "I2C_CFG pull config verification failed: expected=%s, actual=%s",
+        M5IOE1_LOG_E(TAG_I2C, "I2C_CFG pull config verification failed: expected=%s, actual=%s",
                      expectedPullOff ? "disabled" : "enabled", actualPullOff ? "disabled" : "enabled");
         return M5IOE1_FAIL;
     }
@@ -3640,7 +3700,7 @@ m5ioe1_err_t M5IOE1::setI2cPullConfig(m5ioe1_pull_config_t config)
     _i2cConfig.pullOff = expectedPullOff;
     _i2cConfigValid    = true;
 
-    M5IOE1_LOG_I(TAG, "I2C internal pull-up set and verified to %s", expectedPullOff ? "disabled" : "enabled");
+    M5IOE1_LOG_I(TAG_I2C, "I2C internal pull-up set and verified to %s", expectedPullOff ? "disabled" : "enabled");
 
     return M5IOE1_OK;
 }
@@ -3648,17 +3708,17 @@ m5ioe1_err_t M5IOE1::setI2cPullConfig(m5ioe1_pull_config_t config)
 m5ioe1_err_t M5IOE1::getI2cPullConfig(m5ioe1_pull_config_t* config)
 {
     if (config == nullptr) {
-        M5IOE1_LOG_E(TAG, "getI2cPullConfig config is null");
+        M5IOE1_LOG_E(TAG_I2C, "getI2cPullConfig config is null");
         return M5IOE1_ERR_INVALID_ARG;
     }
     if (!_initialized) {
-        M5IOE1_LOG_E(TAG, "Not initialized");
+        M5IOE1_LOG_E(TAG_I2C, "Not initialized");
         return M5IOE1_ERR_NOT_INIT;
     }
 
     uint8_t cfg = 0;
     if (!_readReg(M5IOE1_REG_I2C_CFG, &cfg)) {
-        M5IOE1_LOG_E(TAG, "Failed to read I2C_CFG register");
+        M5IOE1_LOG_E(TAG_I2C, "Failed to read I2C_CFG register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -3687,7 +3747,7 @@ m5ioe1_err_t M5IOE1::factoryReset()
     _clearPinStates();
     _clearPwmStates();
     _clearAdcState();
-    M5IOE1_LOG_W(TAG, "Factory reset complete. Call begin() to reinitialize.");
+    M5IOE1_LOG_W(TAG_SYS, "Factory reset complete. Call begin() to reinitialize.");
 
     return M5IOE1_OK;
 }
@@ -3703,7 +3763,7 @@ void M5IOE1::setAutoWakeEnable(bool enable)
     if (enable) {
         _lastCommTime = M5IOE1_GET_TIME_MS();
     }
-    M5IOE1_LOG_I(TAG, "Auto wake %s", enable ? "enabled" : "disabled");
+    M5IOE1_LOG_I(TAG_I2C, "Auto wake %s", enable ? "enabled" : "disabled");
 }
 
 bool M5IOE1::isAutoWakeEnabled() const
@@ -4017,11 +4077,13 @@ bool M5IOE1::_writeReg(uint8_t reg, uint8_t value)
 #if M5IOE1_HAS_M5UNIFIED_I2C
         if (_m5_i2c) {
             if (M5IOE1_M5UNIFIED_WRITE_BYTE(_m5_i2c, _addr, reg, value, _commFreq)) {
+                M5IOE1_LOG_D(TAG_I2C, "Write Reg[0x%02X] <- 0x%02X", reg, value);
                 return true;
             }
         } else
 #endif
             if (M5IOE1_I2C_ARDUINO_WRITE_BYTE(_wire, _addr, reg, value)) {
+            M5IOE1_LOG_D(TAG_I2C, "Write Reg[0x%02X] <- 0x%02X", reg, value);
             return true;
         }
 #else
@@ -4053,6 +4115,7 @@ bool M5IOE1::_writeReg(uint8_t reg, uint8_t value)
                 break;
         }
         if (ok) {
+            M5IOE1_LOG_D(TAG_I2C, "Write Reg[0x%02X] <- 0x%02X", reg, value);
             return true;
         }
 #endif
@@ -4060,6 +4123,7 @@ bool M5IOE1::_writeReg(uint8_t reg, uint8_t value)
             M5IOE1_DELAY_MS(M5IOE1_I2C_RETRY_DELAY_MS);
         }
     }
+    M5IOE1_LOG_E(TAG_I2C, "Write Reg[0x%02X] failed", reg);
     return false;
 }
 
@@ -4071,11 +4135,13 @@ bool M5IOE1::_writeReg16(uint8_t reg, uint16_t value)
 #if M5IOE1_HAS_M5UNIFIED_I2C
         if (_m5_i2c) {
             if (M5IOE1_M5UNIFIED_WRITE_REG16(_m5_i2c, _addr, reg, value, _commFreq)) {
+                M5IOE1_LOG_D(TAG_I2C, "Write16 Reg[0x%02X] <- 0x%04X", reg, value);
                 return true;
             }
         } else
 #endif
             if (M5IOE1_I2C_ARDUINO_WRITE_REG16(_wire, _addr, reg, value)) {
+            M5IOE1_LOG_D(TAG_I2C, "Write16 Reg[0x%02X] <- 0x%04X", reg, value);
             return true;
         }
 #else
@@ -4107,6 +4173,7 @@ bool M5IOE1::_writeReg16(uint8_t reg, uint16_t value)
                 break;
         }
         if (ok) {
+            M5IOE1_LOG_D(TAG_I2C, "Write16 Reg[0x%02X] <- 0x%04X", reg, value);
             return true;
         }
 #endif
@@ -4114,6 +4181,7 @@ bool M5IOE1::_writeReg16(uint8_t reg, uint16_t value)
             M5IOE1_DELAY_MS(M5IOE1_I2C_RETRY_DELAY_MS);
         }
     }
+    M5IOE1_LOG_E(TAG_I2C, "Write16 Reg[0x%02X] failed", reg);
     return false;
 }
 
@@ -4125,11 +4193,13 @@ bool M5IOE1::_readReg(uint8_t reg, uint8_t* value)
 #if M5IOE1_HAS_M5UNIFIED_I2C
         if (_m5_i2c) {
             if (M5IOE1_M5UNIFIED_READ_BYTE(_m5_i2c, _addr, reg, value, _commFreq)) {
+                M5IOE1_LOG_D(TAG_I2C, "Read  Reg[0x%02X] -> 0x%02X", reg, *value);
                 return true;
             }
         } else
 #endif
             if (M5IOE1_I2C_ARDUINO_READ_BYTE(_wire, _addr, reg, value)) {
+            M5IOE1_LOG_D(TAG_I2C, "Read  Reg[0x%02X] -> 0x%02X", reg, *value);
             return true;
         }
 #else
@@ -4161,6 +4231,7 @@ bool M5IOE1::_readReg(uint8_t reg, uint8_t* value)
                 break;
         }
         if (ok) {
+            M5IOE1_LOG_D(TAG_I2C, "Read  Reg[0x%02X] -> 0x%02X", reg, *value);
             return true;
         }
 #endif
@@ -4168,6 +4239,7 @@ bool M5IOE1::_readReg(uint8_t reg, uint8_t* value)
             M5IOE1_DELAY_MS(M5IOE1_I2C_RETRY_DELAY_MS);
         }
     }
+    M5IOE1_LOG_E(TAG_I2C, "Read  Reg[0x%02X] failed", reg);
     return false;
 }
 
@@ -4179,11 +4251,13 @@ bool M5IOE1::_readReg16(uint8_t reg, uint16_t* value)
 #if M5IOE1_HAS_M5UNIFIED_I2C
         if (_m5_i2c) {
             if (M5IOE1_M5UNIFIED_READ_REG16(_m5_i2c, _addr, reg, value, _commFreq)) {
+                M5IOE1_LOG_D(TAG_I2C, "Read16 Reg[0x%02X] -> 0x%04X", reg, *value);
                 return true;
             }
         } else
 #endif
             if (M5IOE1_I2C_ARDUINO_READ_REG16(_wire, _addr, reg, value)) {
+            M5IOE1_LOG_D(TAG_I2C, "Read16 Reg[0x%02X] -> 0x%04X", reg, *value);
             return true;
         }
 #else
@@ -4215,6 +4289,7 @@ bool M5IOE1::_readReg16(uint8_t reg, uint16_t* value)
                 break;
         }
         if (ok) {
+            M5IOE1_LOG_D(TAG_I2C, "Read16 Reg[0x%02X] -> 0x%04X", reg, *value);
             return true;
         }
 #endif
@@ -4222,6 +4297,7 @@ bool M5IOE1::_readReg16(uint8_t reg, uint16_t* value)
             M5IOE1_DELAY_MS(M5IOE1_I2C_RETRY_DELAY_MS);
         }
     }
+    M5IOE1_LOG_E(TAG_I2C, "Read16 Reg[0x%02X] failed", reg);
     return false;
 }
 
@@ -4233,11 +4309,15 @@ bool M5IOE1::_writeBytes(uint8_t reg, const uint8_t* data, uint8_t len)
 #if M5IOE1_HAS_M5UNIFIED_I2C
         if (_m5_i2c) {
             if (M5IOE1_M5UNIFIED_WRITE_BYTES(_m5_i2c, _addr, reg, len, data, _commFreq)) {
+                M5IOE1_LOG_V(TAG_I2C, "WriteBytes Reg[0x%02X] len=%d: %02X %02X %02X...", reg, len,
+                             len > 0 ? data[0] : 0, len > 1 ? data[1] : 0, len > 2 ? data[2] : 0);
                 return true;
             }
         } else
 #endif
             if (M5IOE1_I2C_ARDUINO_WRITE_BYTES(_wire, _addr, reg, len, data)) {
+            M5IOE1_LOG_V(TAG_I2C, "WriteBytes Reg[0x%02X] len=%d: %02X %02X %02X...", reg, len,
+                         len > 0 ? data[0] : 0, len > 1 ? data[1] : 0, len > 2 ? data[2] : 0);
             return true;
         }
 #else
@@ -4269,6 +4349,8 @@ bool M5IOE1::_writeBytes(uint8_t reg, const uint8_t* data, uint8_t len)
                 break;
         }
         if (ok) {
+            M5IOE1_LOG_V(TAG_I2C, "WriteBytes Reg[0x%02X] len=%d: %02X %02X %02X...", reg, len,
+                         len > 0 ? data[0] : 0, len > 1 ? data[1] : 0, len > 2 ? data[2] : 0);
             return true;
         }
 #endif
@@ -4276,6 +4358,7 @@ bool M5IOE1::_writeBytes(uint8_t reg, const uint8_t* data, uint8_t len)
             M5IOE1_DELAY_MS(M5IOE1_I2C_RETRY_DELAY_MS);
         }
     }
+    M5IOE1_LOG_E(TAG_I2C, "WriteBytes Reg[0x%02X] len=%d failed", reg, len);
     return false;
 }
 
@@ -4287,11 +4370,15 @@ bool M5IOE1::_readBytes(uint8_t reg, uint8_t* data, uint8_t len)
 #if M5IOE1_HAS_M5UNIFIED_I2C
         if (_m5_i2c) {
             if (M5IOE1_M5UNIFIED_READ_BYTES(_m5_i2c, _addr, reg, len, data, _commFreq)) {
+                M5IOE1_LOG_V(TAG_I2C, "ReadBytes  Reg[0x%02X] len=%d: %02X %02X %02X...", reg, len,
+                             len > 0 ? data[0] : 0, len > 1 ? data[1] : 0, len > 2 ? data[2] : 0);
                 return true;
             }
         } else
 #endif
             if (M5IOE1_I2C_ARDUINO_READ_BYTES(_wire, _addr, reg, len, data)) {
+            M5IOE1_LOG_V(TAG_I2C, "ReadBytes  Reg[0x%02X] len=%d: %02X %02X %02X...", reg, len,
+                         len > 0 ? data[0] : 0, len > 1 ? data[1] : 0, len > 2 ? data[2] : 0);
             return true;
         }
 #else
@@ -4323,6 +4410,8 @@ bool M5IOE1::_readBytes(uint8_t reg, uint8_t* data, uint8_t len)
                 break;
         }
         if (ok) {
+            M5IOE1_LOG_V(TAG_I2C, "ReadBytes  Reg[0x%02X] len=%d: %02X %02X %02X...", reg, len,
+                         len > 0 ? data[0] : 0, len > 1 ? data[1] : 0, len > 2 ? data[2] : 0);
             return true;
         }
 #endif
@@ -4330,6 +4419,7 @@ bool M5IOE1::_readBytes(uint8_t reg, uint8_t* data, uint8_t len)
             M5IOE1_DELAY_MS(M5IOE1_I2C_RETRY_DELAY_MS);
         }
     }
+    M5IOE1_LOG_E(TAG_I2C, "ReadBytes  Reg[0x%02X] len=%d failed", reg, len);
     return false;
 }
 
@@ -4515,7 +4605,7 @@ m5ioe1_err_t M5IOE1::getI2cSpeed(m5ioe1_i2c_speed_t* speed)
 m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
 {
     if (!_initialized) {
-        M5IOE1_LOG_E(TAG, "Cannot switch I2C speed: device not initialized");
+        M5IOE1_LOG_E(TAG_I2C, "Cannot switch I2C speed: device not initialized");
         return M5IOE1_ERR_NOT_INIT;
     }
 
@@ -4524,7 +4614,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
     // 如果目标速度与当前速度相同，直接返回成功
     // If target speed is same as current, return success directly
     if (targetFreq == _requestedSpeed) {
-        M5IOE1_LOG_I(TAG, "I2C speed already at %lu Hz, no change needed", targetFreq);
+        M5IOE1_LOG_I(TAG_I2C, "I2C speed already at %lu Hz, no change needed", targetFreq);
         return M5IOE1_OK;
     }
 
@@ -4532,7 +4622,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
     // Step 1: Read current I2C config
     uint8_t i2cCfg = 0;
     if (!_readReg(M5IOE1_REG_I2C_CFG, &i2cCfg)) {
-        M5IOE1_LOG_E(TAG, "Failed to read I2C config register");
+        M5IOE1_LOG_E(TAG_I2C, "Failed to read I2C config register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
@@ -4545,11 +4635,11 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
     }
 
     if (!_writeReg(M5IOE1_REG_I2C_CFG, i2cCfg)) {
-        M5IOE1_LOG_E(TAG, "Failed to write I2C config register");
+        M5IOE1_LOG_E(TAG_I2C, "Failed to write I2C config register");
         return M5IOE1_ERR_I2C_COMM;
     }
 
-    M5IOE1_LOG_I(TAG, "M5IOE1 I2C config set to %lu Hz mode", targetFreq);
+    M5IOE1_LOG_D(TAG_I2C, "M5IOE1 I2C config set to %lu Hz mode", targetFreq);
 
     // 步骤 3: 短暂延迟以允许设备处理配置更改
     // Step 3: Small delay to allow device to process the configuration change
@@ -4561,7 +4651,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
 #if M5IOE1_HAS_M5UNIFIED_I2C
     if (_m5_i2c) {
         _commFreq = targetFreq;
-        M5IOE1_LOG_I(TAG, "M5Unified I2C frequency updated to %lu Hz", targetFreq);
+        M5IOE1_LOG_D(TAG_I2C, "M5Unified I2C frequency updated to %lu Hz", targetFreq);
     } else
 #endif
         if (_wire != nullptr) {
@@ -4570,7 +4660,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
         _wire->end();
         M5IOE1_DELAY_MS(10);
         if (!_wire->begin(_sda, _scl, targetFreq)) {
-            M5IOE1_LOG_E(TAG, "Failed to re-initialize I2C bus at %lu Hz", targetFreq);
+            M5IOE1_LOG_E(TAG_I2C, "Failed to re-initialize I2C bus at %lu Hz", targetFreq);
             // 尝试恢复到原来的速度
             // Try to recover with original speed
             uint32_t originalFreq = (speed == M5IOE1_I2C_SPEED_400K) ? M5IOE1_I2C_FREQ_100K : M5IOE1_I2C_FREQ_400K;
@@ -4586,7 +4676,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
             return M5IOE1_ERR_I2C_CONFIG;
         }
         M5IOE1_DELAY_MS(10);
-        M5IOE1_LOG_I(TAG, "Host I2C bus switched to %lu Hz", targetFreq);
+        M5IOE1_LOG_D(TAG_I2C, "Host I2C bus switched to %lu Hz", targetFreq);
     }
 #else
     // ESP-IDF：处理不同的驱动类型
@@ -4602,7 +4692,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
             if (_i2c_master_dev != nullptr) {
                 ret = i2c_master_bus_rm_device(_i2c_master_dev);
                 if (ret != ESP_OK) {
-                    M5IOE1_LOG_E(TAG, "Failed to remove I2C device: %s", esp_err_to_name(ret));
+                    M5IOE1_LOG_E(TAG_I2C, "Failed to remove I2C device: %s", esp_err_to_name(ret));
                     return M5IOE1_ERR_I2C_CONFIG;
                 }
                 _i2c_master_dev = nullptr;
@@ -4622,7 +4712,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
 
                 ret = i2c_master_bus_add_device(_i2c_master_bus, &dev_config, &_i2c_master_dev);
                 if (ret != ESP_OK) {
-                    M5IOE1_LOG_E(TAG, "Failed to add I2C device at %lu Hz: %s", targetFreq, esp_err_to_name(ret));
+                    M5IOE1_LOG_E(TAG_I2C, "Failed to add I2C device at %lu Hz: %s", targetFreq, esp_err_to_name(ret));
                     // 尝试恢复到原来的速度
                     // Try to recover with original speed
                     uint32_t originalFreq =
@@ -4631,7 +4721,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
                     i2c_master_bus_add_device(_i2c_master_bus, &dev_config, &_i2c_master_dev);
                     return M5IOE1_ERR_I2C_CONFIG;
                 }
-                M5IOE1_LOG_I(TAG, "I2C master device recreated at %lu Hz", targetFreq);
+                M5IOE1_LOG_D(TAG_I2C, "I2C master device recreated at %lu Hz", targetFreq);
             }
             break;
 #endif  // M5IOE1_HAS_I2C_MASTER
@@ -4643,7 +4733,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
             if (_i2c_device != nullptr) {
                 ret = i2c_bus_device_delete(&_i2c_device);
                 if (ret != ESP_OK) {
-                    M5IOE1_LOG_E(TAG, "Failed to delete I2C device: %s", esp_err_to_name(ret));
+                    M5IOE1_LOG_E(TAG_I2C, "Failed to delete I2C device: %s", esp_err_to_name(ret));
                     return M5IOE1_ERR_I2C_CONFIG;
                 }
 
@@ -4651,7 +4741,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
                 // Recreate device handle with target speed
                 _i2c_device = i2c_bus_device_create(_i2c_bus, _addr, targetFreq);
                 if (_i2c_device == nullptr) {
-                    M5IOE1_LOG_E(TAG, "Failed to create I2C device at %lu Hz", targetFreq);
+                    M5IOE1_LOG_E(TAG_I2C, "Failed to create I2C device at %lu Hz", targetFreq);
                     // 尝试恢复到原来的速度
                     // Try to recover with original speed
                     uint32_t originalFreq =
@@ -4659,7 +4749,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
                     _i2c_device = i2c_bus_device_create(_i2c_bus, _addr, originalFreq);
                     return M5IOE1_ERR_I2C_CONFIG;
                 }
-                M5IOE1_LOG_I(TAG, "I2C bus device recreated at %lu Hz", targetFreq);
+                M5IOE1_LOG_D(TAG_I2C, "I2C bus device recreated at %lu Hz", targetFreq);
             }
             break;
 #endif  // M5IOE1_HAS_I2C_BUS
@@ -4675,10 +4765,10 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
             i2c_conf.master.clk_speed = targetFreq;
             ret                       = i2c_param_config(_port, &i2c_conf);
             if (ret != ESP_OK) {
-                M5IOE1_LOG_E(TAG, "i2c_param_config failed: %s", esp_err_to_name(ret));
+                M5IOE1_LOG_E(TAG_I2C, "i2c_param_config failed: %s", esp_err_to_name(ret));
                 return M5IOE1_ERR_I2C_CONFIG;
             }
-            M5IOE1_LOG_I(TAG, "Legacy I2C reconfigured to %lu Hz", targetFreq);
+            M5IOE1_LOG_D(TAG_I2C, "Legacy I2C reconfigured to %lu Hz", targetFreq);
             break;
         }
 #endif  // !M5IOE1_HAS_I2C_MASTER && !M5IOE1_HAS_I2C_BUS
@@ -4686,11 +4776,11 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
 #if M5IOE1_HAS_M5UNIFIED_I2C
         case M5IOE1_I2C_DRIVER_M5UNIFIED:
             _commFreq = targetFreq;
-            M5IOE1_LOG_I(TAG, "M5Unified I2C frequency updated to %lu Hz", targetFreq);
+            M5IOE1_LOG_D(TAG_I2C, "M5Unified I2C frequency updated to %lu Hz", targetFreq);
             break;
 #endif
         default:
-            M5IOE1_LOG_E(TAG, "Unknown I2C driver type");
+            M5IOE1_LOG_E(TAG_I2C, "Unknown I2C driver type");
             return M5IOE1_ERR_INTERNAL;
     }
 #endif
@@ -4699,7 +4789,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
     // Step 5: Verify communication still works
     uint16_t uid = 0;
     if (!_readReg16(M5IOE1_REG_UID_L, &uid)) {
-        M5IOE1_LOG_E(TAG, "Communication failed after switching to %lu Hz, reverting", targetFreq);
+        M5IOE1_LOG_E(TAG_I2C, "Communication failed after switching to %lu Hz, reverting", targetFreq);
 
         // 恢复设备配置
         // Revert device config
@@ -4779,7 +4869,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
     _i2cConfig.speed400k = (speed == M5IOE1_I2C_SPEED_400K);
     _requestedSpeed      = targetFreq;
 
-    M5IOE1_LOG_I(TAG, "Successfully switched to %lu Hz I2C mode", targetFreq);
+    M5IOE1_LOG_I(TAG_I2C, "Successfully switched to %lu Hz I2C mode", targetFreq);
     return M5IOE1_OK;
 }
 
@@ -4791,16 +4881,16 @@ bool M5IOE1::_initDevice()
     uint8_t version = 0;
 
     if (!_readReg16(M5IOE1_REG_UID_L, &uid)) {
-        M5IOE1_LOG_E(TAG, "Failed to read device UID");
+        M5IOE1_LOG_E(TAG_SYS, "Failed to read device UID");
         return false;
     }
 
     if (!_readReg(M5IOE1_REG_REV, &version)) {
-        M5IOE1_LOG_E(TAG, "Failed to read device version");
+        M5IOE1_LOG_E(TAG_SYS, "Failed to read device version");
         return false;
     }
 
-    M5IOE1_LOG_I(TAG, "Device UID: 0x%04X, FW Version: %02X", uid, version);
+    M5IOE1_LOG_I(TAG_SYS, "Device UID: 0x%04X, FW Version: %02X", uid, version);
     return true;
 }
 
@@ -4822,7 +4912,7 @@ void M5IOE1::_handleInterrupt()
     for (uint8_t pin = 0; pin < M5IOE1_MAX_GPIO_PINS; pin++) {
         if ((status & (1 << pin)) && _callbacks[pin].enabled) {
             if (_enableDefaultIsrLog) {
-                M5IOE1_LOG_I(TAG, "Pin %d triggered by %s edge", pin, _callbacks[pin].rising ? "RISING" : "FALLING");
+                M5IOE1_LOG_I(TAG_IRQ, "Pin %d triggered by %s edge", pin, _callbacks[pin].rising ? "RISING" : "FALLING");
             }
 
             if (_callbacks[pin].callbackArg != nullptr) {
@@ -4983,7 +5073,7 @@ bool M5IOE1::_snapshotAw8737a()
 
     uint8_t regValue = 0;
     if (!_readReg(M5IOE1_REG_AW8737A_PULSE, &regValue)) {
-        M5IOE1_LOG_E(TAG, "Failed to read AW8737A pulse register");
+        M5IOE1_LOG_E(TAG_AMP, "Failed to read AW8737A pulse register");
         _aw8737aStateValid = false;
         return false;
     }
@@ -5228,7 +5318,7 @@ void M5IOE1::_intrTaskArduino(void* arg)
 bool M5IOE1::_setupHardwareInterruptArduino()
 {
     if (_intPin < 0) {
-        M5IOE1_LOG_E(TAG, "Hardware interrupt mode requires interrupt pin");
+        M5IOE1_LOG_E(TAG_IRQ, "Hardware interrupt mode requires interrupt pin");
         return false;
     }
 
@@ -5287,7 +5377,7 @@ void IRAM_ATTR M5IOE1::_isrHandler(void* arg)
 bool M5IOE1::_setupHardwareInterrupt()
 {
     if (_intPin < 0) {
-        M5IOE1_LOG_E(TAG, "Hardware interrupt mode requires interrupt pin");
+        M5IOE1_LOG_E(TAG_IRQ, "Hardware interrupt mode requires interrupt pin");
         return false;
     }
 
@@ -5374,7 +5464,7 @@ void M5IOE1::_cleanupHardwareInterrupt()
         // is expected behavior
         esp_err_t err = gpio_isr_handler_remove((gpio_num_t)_intPin);
         if (err != ESP_OK) {
-            M5IOE1_LOG_W(TAG, "gpio_isr_handler_remove failed (can be ignored if ISR service was not installed): %s",
+            M5IOE1_LOG_W(TAG_IRQ, "gpio_isr_handler_remove failed (can be ignored if ISR service was not installed): %s",
                          esp_err_to_name(err));
         }
     }
