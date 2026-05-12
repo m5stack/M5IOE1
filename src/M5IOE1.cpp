@@ -628,7 +628,9 @@ m5ioe1_err_t M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint
         .flags =
             {
                 .enable_internal_pullup = true,
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 4, 0)
                 .allow_pd               = false,
+#endif
             },
     };
 
@@ -1476,7 +1478,7 @@ m5ioe1_err_t M5IOE1::setPollingInterval(float seconds)
 #endif
     }
 
-    M5IOE1_LOG_I(TAG_IRQ, "Polling interval set to %.3f seconds (%u ms)", seconds, intervalMs);
+    M5IOE1_LOG_I(TAG_IRQ, "Polling interval set to %.3f seconds (%u ms)", seconds, static_cast<unsigned>(intervalMs));
     return M5IOE1_OK;
 }
 
@@ -5419,11 +5421,12 @@ bool M5IOE1::_setupHardwareInterrupt()
     _intrQueue = xQueueCreate(8, sizeof(uint32_t));
     if (_intrQueue == nullptr) return false;
 
-    gpio_config_t io_conf = {.pin_bit_mask = (1ULL << _intPin),
-                             .mode         = GPIO_MODE_INPUT,
-                             .pull_up_en   = GPIO_PULLUP_ENABLE,
-                             .pull_down_en = GPIO_PULLDOWN_DISABLE,
-                             .intr_type    = GPIO_INTR_LOW_LEVEL};
+    gpio_config_t io_conf = {};
+    io_conf.pin_bit_mask = (1ULL << _intPin);
+    io_conf.mode         = GPIO_MODE_INPUT;
+    io_conf.pull_up_en   = GPIO_PULLUP_ENABLE;
+    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io_conf.intr_type    = GPIO_INTR_LOW_LEVEL;
 
     if (gpio_config(&io_conf) != ESP_OK) {
         vQueueDelete(_intrQueue);

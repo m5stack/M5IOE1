@@ -5,6 +5,7 @@ idf_component_register(
         "src"
     REQUIRES 
         "driver"
+        "esp_driver_gpio"
         "espressif__i2c_bus"
 )
 
