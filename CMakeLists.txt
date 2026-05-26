@@ -3,9 +3,10 @@ idf_component_register(
         "src/M5IOE1.cpp"
     INCLUDE_DIRS 
         "src"
-    REQUIRES 
+    REQUIRES
         "driver"
         "esp_driver_gpio"
+        "esp_rom"
         "espressif__i2c_bus"
 )
 

@@ -11,21 +11,30 @@
 #include <stdbool.h>
 #include <string.h>
 
-#ifdef ARDUINO
-
-#include "Wire.h"
-
 // ============================
 // I2C 延迟配置 (可调整以解决总线冲突)
 // I2C Delay Configuration (adjustable to resolve bus conflicts)
+// 适用于所有平台和驱动 (Arduino Wire / M5Unified / i2c_master / i2c_bus / Legacy)
+// Applies to all platforms and drivers (Arduino Wire / M5Unified / i2c_master / i2c_bus / Legacy)
 // ============================
 #ifndef M5IOE1_I2C_WRITE_DELAY_US
 #define M5IOE1_I2C_WRITE_DELAY_US 500  // 写操作后延迟(微秒) / Delay after write (microseconds)
 #endif
 
 #ifndef M5IOE1_I2C_READ_DELAY_US
-#define M5IOE1_I2C_READ_DELAY_US 500  // 读操作前延迟(微秒) / Delay before read (microseconds)
+#define M5IOE1_I2C_READ_DELAY_US 500  // 读操作前/后延迟(微秒) / Delay around read (microseconds)
 #endif
+
+// 微秒级延迟宏 (平台无关) / Microsecond delay macro (platform-agnostic)
+#ifdef ARDUINO
+#define M5IOE1_I2C_DELAY_US(us) delayMicroseconds(us)
+#else
+#define M5IOE1_I2C_DELAY_US(us) esp_rom_delay_us(us)
+#endif
+
+#ifdef ARDUINO
+
+#include "Wire.h"
 
 // ============================
 // Arduino I2C 功能
@@ -40,7 +49,7 @@ static inline bool M5IOE1_I2C_ARDUINO_READ_BYTE(TwoWire *wire, uint8_t addr, uin
     if (wire->endTransmission(false) != 0) {
         return false;
     }
-    delayMicroseconds(M5IOE1_I2C_READ_DELAY_US);  // 增加延迟避免 I2C 总线冲突
+    delayMicroseconds(M5IOE1_I2C_READ_DELAY_US);  // 增加延迟避免 I2C 总线冲突 / extra delay to avoid bus conflicts
     if (wire->requestFrom(addr, (uint8_t)1) != 1) {
         return false;
     }
@@ -160,7 +169,9 @@ static inline void M5IOE1_I2C_ARDUINO_SEND_WAKE(TwoWire *wire, uint8_t addr)
 static inline bool M5IOE1_M5UNIFIED_READ_BYTE(m5::I2C_Class *i2c, uint8_t addr, uint8_t reg, uint8_t *data,
                                               uint32_t freq)
 {
-    return i2c->readRegister(addr, reg, data, 1, freq);
+    bool ok = i2c->readRegister(addr, reg, data, 1, freq);
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_READ_DELAY_US);
+    return ok;
 }
 #endif
 
@@ -168,7 +179,9 @@ static inline bool M5IOE1_M5UNIFIED_READ_BYTE(m5::I2C_Class *i2c, uint8_t addr, 
 static inline bool M5IOE1_M5UNIFIED_READ_BYTES(m5::I2C_Class *i2c, uint8_t addr, uint8_t reg, size_t len, uint8_t *data,
                                                uint32_t freq)
 {
-    return i2c->readRegister(addr, reg, data, len, freq);
+    bool ok = i2c->readRegister(addr, reg, data, len, freq);
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_READ_DELAY_US);
+    return ok;
 }
 #endif
 
@@ -178,6 +191,7 @@ static inline bool M5IOE1_M5UNIFIED_READ_REG16(m5::I2C_Class *i2c, uint8_t addr,
 {
     uint8_t buf[2];
     if (!i2c->readRegister(addr, reg, buf, 2, freq)) return false;
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_READ_DELAY_US);
     // 小端模式：低字节在前 / Little-endian: low byte first
     *data = (uint16_t)buf[0] | ((uint16_t)buf[1] << 8);
     return true;
@@ -188,7 +202,9 @@ static inline bool M5IOE1_M5UNIFIED_READ_REG16(m5::I2C_Class *i2c, uint8_t addr,
 static inline bool M5IOE1_M5UNIFIED_WRITE_BYTE(m5::I2C_Class *i2c, uint8_t addr, uint8_t reg, uint8_t data,
                                                uint32_t freq)
 {
-    return i2c->writeRegister8(addr, reg, data, freq);
+    bool ok = i2c->writeRegister8(addr, reg, data, freq);
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_WRITE_DELAY_US);
+    return ok;
 }
 #endif
 
@@ -196,7 +212,9 @@ static inline bool M5IOE1_M5UNIFIED_WRITE_BYTE(m5::I2C_Class *i2c, uint8_t addr,
 static inline bool M5IOE1_M5UNIFIED_WRITE_BYTES(m5::I2C_Class *i2c, uint8_t addr, uint8_t reg, size_t len,
                                                 const uint8_t *data, uint32_t freq)
 {
-    return i2c->writeRegister(addr, reg, data, len, freq);
+    bool ok = i2c->writeRegister(addr, reg, data, len, freq);
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_WRITE_DELAY_US);
+    return ok;
 }
 #endif
 
@@ -206,9 +224,11 @@ static inline bool M5IOE1_M5UNIFIED_WRITE_REG16(m5::I2C_Class *i2c, uint8_t addr
 {
     uint8_t buf[2];
     // 小端模式：低字节在前 / Little-endian: low byte first
-    buf[0] = (uint8_t)(data & 0xFF);
-    buf[1] = (uint8_t)((data >> 8) & 0xFF);
-    return i2c->writeRegister(addr, reg, buf, 2, freq);
+    buf[0]  = (uint8_t)(data & 0xFF);
+    buf[1]  = (uint8_t)((data >> 8) & 0xFF);
+    bool ok = i2c->writeRegister(addr, reg, buf, 2, freq);
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_WRITE_DELAY_US);
+    return ok;
 }
 #endif
 
@@ -229,6 +249,7 @@ static inline bool M5IOE1_M5UNIFIED_SEND_WAKE(m5::I2C_Class *i2c, uint8_t addr, 
 
 #include <esp_err.h>
 #include <esp_idf_version.h>
+#include <esp_rom_sys.h>  // esp_rom_delay_us
 
 // ============================
 // I2C 驱动检测
@@ -243,9 +264,13 @@ static inline bool M5IOE1_M5UNIFIED_SEND_WAKE(m5::I2C_Class *i2c, uint8_t addr, 
 //   With    BACKWARD_CONFIG: i2c_bus.h falls back to driver/i2c.h internally, safe to use.
 //
 // ESP-IDF >= 5.3.0
-//   [Highest priority] M5GFX or M5Unified is present:
-//     -> i2c_bus mode is NEVER safe (runtime conflict), disabled with #error if detected.
+//   [Highest priority] M5Unified is present:
+//     -> i2c_bus mode is not safe because M5Unified owns its I2C_Class bus.
 //     Fix: use ioe1.begin(&M5.In_I2C, addr, freq) instead.
+//   M5GFX alone:
+//     -> header presence is not enough to prove an I2C runtime conflict. Projects that use
+//        M5GFX only for display/SPI can still use espressif/i2c_bus for external devices.
+//        Do not call lgfx::i2c::init() on the same port while i2c_bus owns it.
 //   With    BACKWARD_CONFIG (no M5GFX/M5Unified): i2c_bus.h uses driver/i2c.h internally, safe.
 //   Without BACKWARD_CONFIG (no M5GFX/M5Unified):
 //     _DRIVER_I2C_H_ defined: i2c_config_t typedef conflict risk, disabled.
@@ -261,23 +286,25 @@ static inline bool M5IOE1_M5UNIFIED_SEND_WAKE(m5::I2C_Class *i2c, uint8_t addr, 
 // IDF >= 5.3.0
 //
 // Runtime conflict (highest priority):
-// M5GFX calls i2c_new_master_bus() (driver_ng) during global construction.
-// espressif__i2c_bus conflicts with it on both code paths:
+// M5Unified owns an I2C_Class instance. espressif__i2c_bus conflicts with it on both code paths:
 //   BACKWARD_CONFIG=y -> i2c_bus.c calls i2c_driver_install() (legacy) -> runtime abort()
 //   BACKWARD_CONFIG=n -> i2c_bus_v2.c calls i2c_new_master_bus() on the same port -> undefined behaviour
-// Therefore, i2c_bus mode MUST be disabled whenever M5GFX or M5Unified is in the project.
-#if __has_include(<M5GFX.h>) || __has_include(<M5Unified.h>)
+// Therefore, i2c_bus mode MUST be disabled whenever M5Unified is in the project.
+//
+// M5GFX alone is intentionally allowed here. The presence of M5GFX.h does not mean lgfx::i2c::init()
+// is used, and SPI/display-only M5GFX projects can share the project with espressif__i2c_bus safely.
+#if __has_include(<M5Unified.h>)
 #if defined(_I2C_BUS_H_)
 #error \
-    "[M5IOE1] i2c_bus cannot be used together with M5GFX/M5Unified. " \
-    "M5GFX registers driver_ng via i2c_new_master_bus() during global construction. " \
+    "[M5IOE1] i2c_bus cannot be used together with M5Unified. " \
+    "M5Unified owns its I2C_Class bus. " \
     "BACKWARD_CONFIG=y: i2c_bus.c calls i2c_driver_install() (legacy driver) -> runtime abort() in check_i2c_driver_conflict(). " \
     "BACKWARD_CONFIG=n: i2c_bus_v2.c calls i2c_new_master_bus() on the same port -> undefined behaviour. " \
     "Fix: use ioe1.begin(&M5.In_I2C, addr, freq) and set I2C_USE_MODE=0."
 #endif
 #define M5IOE1_HAS_I2C_BUS 0
 #elif defined(CONFIG_I2C_BUS_BACKWARD_CONFIG)
-#define M5IOE1_HAS_I2C_BUS 1  // BACKWARD_CONFIG, no M5GFX/M5Unified: compatible
+#define M5IOE1_HAS_I2C_BUS 1  // BACKWARD_CONFIG, no M5Unified: compatible
 #elif defined(_DRIVER_I2C_H_)
 #define M5IOE1_HAS_I2C_BUS 0  // driver/i2c.h already included -> i2c_config_t typedef conflict risk, disabled
 #else
@@ -376,7 +403,9 @@ typedef enum {
 #ifndef M5IOE1_I2C_BUS_READ_BYTE
 static inline esp_err_t M5IOE1_I2C_BUS_READ_BYTE(i2c_bus_device_handle_t dev, uint8_t reg, uint8_t *data)
 {
-    return i2c_bus_read_byte(dev, reg, data);
+    esp_err_t ret = i2c_bus_read_byte(dev, reg, data);
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_READ_DELAY_US);
+    return ret;
 }
 #endif
 
@@ -384,7 +413,9 @@ static inline esp_err_t M5IOE1_I2C_BUS_READ_BYTE(i2c_bus_device_handle_t dev, ui
 static inline esp_err_t M5IOE1_I2C_BUS_READ_BYTES(i2c_bus_device_handle_t dev, uint8_t start_reg, size_t len,
                                                   uint8_t *data)
 {
-    return i2c_bus_read_bytes(dev, start_reg, len, data);
+    esp_err_t ret = i2c_bus_read_bytes(dev, start_reg, len, data);
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_READ_DELAY_US);
+    return ret;
 }
 #endif
 
@@ -393,6 +424,7 @@ static inline esp_err_t M5IOE1_I2C_BUS_READ_REG16(i2c_bus_device_handle_t dev, u
 {
     uint8_t buf[2];
     esp_err_t ret = i2c_bus_read_bytes(dev, reg, 2, buf);
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_READ_DELAY_US);
     if (ret == ESP_OK) {
         // 小端模式：低字节在前
         // Little-endian: low byte first
@@ -405,7 +437,9 @@ static inline esp_err_t M5IOE1_I2C_BUS_READ_REG16(i2c_bus_device_handle_t dev, u
 #ifndef M5IOE1_I2C_BUS_WRITE_BYTE
 static inline esp_err_t M5IOE1_I2C_BUS_WRITE_BYTE(i2c_bus_device_handle_t dev, uint8_t reg, uint8_t data)
 {
-    return i2c_bus_write_byte(dev, reg, data);
+    esp_err_t ret = i2c_bus_write_byte(dev, reg, data);
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_WRITE_DELAY_US);
+    return ret;
 }
 #endif
 
@@ -413,7 +447,9 @@ static inline esp_err_t M5IOE1_I2C_BUS_WRITE_BYTE(i2c_bus_device_handle_t dev, u
 static inline esp_err_t M5IOE1_I2C_BUS_WRITE_BYTES(i2c_bus_device_handle_t dev, uint8_t start_reg, size_t len,
                                                    const uint8_t *data)
 {
-    return i2c_bus_write_bytes(dev, start_reg, len, (uint8_t *)data);
+    esp_err_t ret = i2c_bus_write_bytes(dev, start_reg, len, (uint8_t *)data);
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_WRITE_DELAY_US);
+    return ret;
 }
 #endif
 
@@ -423,9 +459,11 @@ static inline esp_err_t M5IOE1_I2C_BUS_WRITE_REG16(i2c_bus_device_handle_t dev, 
     uint8_t buf[2];
     // 小端模式：低字节在前
     // Little-endian: low byte first
-    buf[0] = (uint8_t)(data & 0xFF);
-    buf[1] = (uint8_t)((data >> 8) & 0xFF);
-    return i2c_bus_write_bytes(dev, reg, 2, buf);
+    buf[0]        = (uint8_t)(data & 0xFF);
+    buf[1]        = (uint8_t)((data >> 8) & 0xFF);
+    esp_err_t ret = i2c_bus_write_bytes(dev, reg, 2, buf);
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_WRITE_DELAY_US);
+    return ret;
 }
 #endif
 
@@ -461,7 +499,10 @@ static inline esp_err_t M5IOE1_I2C_BUS_SEND_WAKE(i2c_bus_device_handle_t dev, ui
 #ifndef M5IOE1_I2C_LEGACY_READ_BYTE
 static inline esp_err_t M5IOE1_I2C_LEGACY_READ_BYTE(i2c_port_t port, uint8_t addr, uint8_t reg, uint8_t *data)
 {
-    return i2c_master_write_read_device(port, addr, &reg, 1, data, 1, pdMS_TO_TICKS(M5IOE1_I2C_LEGACY_TIMEOUT_MS));
+    esp_err_t ret =
+        i2c_master_write_read_device(port, addr, &reg, 1, data, 1, pdMS_TO_TICKS(M5IOE1_I2C_LEGACY_TIMEOUT_MS));
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_READ_DELAY_US);
+    return ret;
 }
 #endif
 
@@ -469,8 +510,10 @@ static inline esp_err_t M5IOE1_I2C_LEGACY_READ_BYTE(i2c_port_t port, uint8_t add
 static inline esp_err_t M5IOE1_I2C_LEGACY_READ_BYTES(i2c_port_t port, uint8_t addr, uint8_t start_reg, size_t len,
                                                      uint8_t *data)
 {
-    return i2c_master_write_read_device(port, addr, &start_reg, 1, data, len,
-                                        pdMS_TO_TICKS(M5IOE1_I2C_LEGACY_TIMEOUT_MS));
+    esp_err_t ret =
+        i2c_master_write_read_device(port, addr, &start_reg, 1, data, len, pdMS_TO_TICKS(M5IOE1_I2C_LEGACY_TIMEOUT_MS));
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_READ_DELAY_US);
+    return ret;
 }
 #endif
 
@@ -480,6 +523,7 @@ static inline esp_err_t M5IOE1_I2C_LEGACY_READ_REG16(i2c_port_t port, uint8_t ad
     uint8_t buf[2];
     esp_err_t ret =
         i2c_master_write_read_device(port, addr, &reg, 1, buf, 2, pdMS_TO_TICKS(M5IOE1_I2C_LEGACY_TIMEOUT_MS));
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_READ_DELAY_US);
     if (ret == ESP_OK) {
         // 小端模式：低字节在前
         // Little-endian: low byte first
@@ -493,7 +537,9 @@ static inline esp_err_t M5IOE1_I2C_LEGACY_READ_REG16(i2c_port_t port, uint8_t ad
 static inline esp_err_t M5IOE1_I2C_LEGACY_WRITE_BYTE(i2c_port_t port, uint8_t addr, uint8_t reg, uint8_t data)
 {
     uint8_t buf[2] = {reg, data};
-    return i2c_master_write_to_device(port, addr, buf, 2, pdMS_TO_TICKS(M5IOE1_I2C_LEGACY_TIMEOUT_MS));
+    esp_err_t ret  = i2c_master_write_to_device(port, addr, buf, 2, pdMS_TO_TICKS(M5IOE1_I2C_LEGACY_TIMEOUT_MS));
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_WRITE_DELAY_US);
+    return ret;
 }
 #endif
 
@@ -509,6 +555,7 @@ static inline esp_err_t M5IOE1_I2C_LEGACY_WRITE_BYTES(i2c_port_t port, uint8_t a
     memcpy(buf + 1, data, len);
     esp_err_t ret = i2c_master_write_to_device(port, addr, buf, len + 1, pdMS_TO_TICKS(M5IOE1_I2C_LEGACY_TIMEOUT_MS));
     free(buf);
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_WRITE_DELAY_US);
     return ret;
 }
 #endif
@@ -520,9 +567,11 @@ static inline esp_err_t M5IOE1_I2C_LEGACY_WRITE_REG16(i2c_port_t port, uint8_t a
     buf[0] = reg;
     // 小端模式：低字节在前
     // Little-endian: low byte first
-    buf[1] = (uint8_t)(data & 0xFF);
-    buf[2] = (uint8_t)((data >> 8) & 0xFF);
-    return i2c_master_write_to_device(port, addr, buf, 3, pdMS_TO_TICKS(M5IOE1_I2C_LEGACY_TIMEOUT_MS));
+    buf[1]        = (uint8_t)(data & 0xFF);
+    buf[2]        = (uint8_t)((data >> 8) & 0xFF);
+    esp_err_t ret = i2c_master_write_to_device(port, addr, buf, 3, pdMS_TO_TICKS(M5IOE1_I2C_LEGACY_TIMEOUT_MS));
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_WRITE_DELAY_US);
+    return ret;
 }
 #endif
 
@@ -557,7 +606,9 @@ static inline esp_err_t M5IOE1_I2C_LEGACY_SEND_WAKE(i2c_port_t port, uint8_t add
 #ifndef M5IOE1_I2C_MASTER_READ_BYTE
 static inline esp_err_t M5IOE1_I2C_MASTER_READ_BYTE(i2c_master_dev_handle_t dev, uint8_t reg, uint8_t *data)
 {
-    return i2c_master_transmit_receive(dev, &reg, 1, data, 1, -1);
+    esp_err_t ret = i2c_master_transmit_receive(dev, &reg, 1, data, 1, -1);
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_READ_DELAY_US);
+    return ret;
 }
 #endif
 
@@ -565,7 +616,9 @@ static inline esp_err_t M5IOE1_I2C_MASTER_READ_BYTE(i2c_master_dev_handle_t dev,
 static inline esp_err_t M5IOE1_I2C_MASTER_READ_BYTES(i2c_master_dev_handle_t dev, uint8_t start_reg, size_t len,
                                                      uint8_t *data)
 {
-    return i2c_master_transmit_receive(dev, &start_reg, 1, data, len, -1);
+    esp_err_t ret = i2c_master_transmit_receive(dev, &start_reg, 1, data, len, -1);
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_READ_DELAY_US);
+    return ret;
 }
 #endif
 
@@ -574,6 +627,7 @@ static inline esp_err_t M5IOE1_I2C_MASTER_READ_REG16(i2c_master_dev_handle_t dev
 {
     uint8_t buf[2];
     esp_err_t ret = i2c_master_transmit_receive(dev, &reg, 1, buf, 2, -1);
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_READ_DELAY_US);
     if (ret == ESP_OK) {
         // 小端模式：低字节在前
         // Little-endian: low byte first
@@ -587,7 +641,9 @@ static inline esp_err_t M5IOE1_I2C_MASTER_READ_REG16(i2c_master_dev_handle_t dev
 static inline esp_err_t M5IOE1_I2C_MASTER_WRITE_BYTE(i2c_master_dev_handle_t dev, uint8_t reg, uint8_t data)
 {
     uint8_t buf[2] = {reg, data};
-    return i2c_master_transmit(dev, buf, 2, -1);
+    esp_err_t ret  = i2c_master_transmit(dev, buf, 2, -1);
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_WRITE_DELAY_US);
+    return ret;
 }
 #endif
 
@@ -603,6 +659,7 @@ static inline esp_err_t M5IOE1_I2C_MASTER_WRITE_BYTES(i2c_master_dev_handle_t de
     memcpy(buf + 1, data, len);
     esp_err_t ret = i2c_master_transmit(dev, buf, len + 1, -1);
     free(buf);
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_WRITE_DELAY_US);
     return ret;
 }
 #endif
@@ -614,9 +671,11 @@ static inline esp_err_t M5IOE1_I2C_MASTER_WRITE_REG16(i2c_master_dev_handle_t de
     buf[0] = reg;
     // 小端模式：低字节在前
     // Little-endian: low byte first
-    buf[1] = (uint8_t)(data & 0xFF);
-    buf[2] = (uint8_t)((data >> 8) & 0xFF);
-    return i2c_master_transmit(dev, buf, 3, -1);
+    buf[1]        = (uint8_t)(data & 0xFF);
+    buf[2]        = (uint8_t)((data >> 8) & 0xFF);
+    esp_err_t ret = i2c_master_transmit(dev, buf, 3, -1);
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_WRITE_DELAY_US);
+    return ret;
 }
 #endif
 
@@ -647,7 +706,9 @@ static inline esp_err_t M5IOE1_I2C_MASTER_SEND_WAKE(i2c_master_bus_handle_t bus,
 static inline bool M5IOE1_M5UNIFIED_READ_BYTE(m5::I2C_Class *i2c, uint8_t addr, uint8_t reg, uint8_t *data,
                                               uint32_t freq)
 {
-    return i2c->readRegister(addr, reg, data, 1, freq);
+    bool ok = i2c->readRegister(addr, reg, data, 1, freq);
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_READ_DELAY_US);
+    return ok;
 }
 #endif
 
@@ -655,7 +716,9 @@ static inline bool M5IOE1_M5UNIFIED_READ_BYTE(m5::I2C_Class *i2c, uint8_t addr, 
 static inline bool M5IOE1_M5UNIFIED_READ_BYTES(m5::I2C_Class *i2c, uint8_t addr, uint8_t reg, size_t len, uint8_t *data,
                                                uint32_t freq)
 {
-    return i2c->readRegister(addr, reg, data, len, freq);
+    bool ok = i2c->readRegister(addr, reg, data, len, freq);
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_READ_DELAY_US);
+    return ok;
 }
 #endif
 
@@ -665,6 +728,7 @@ static inline bool M5IOE1_M5UNIFIED_READ_REG16(m5::I2C_Class *i2c, uint8_t addr,
 {
     uint8_t buf[2];
     if (!i2c->readRegister(addr, reg, buf, 2, freq)) return false;
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_READ_DELAY_US);
     // 小端模式：低字节在前 / Little-endian: low byte first
     *data = (uint16_t)buf[0] | ((uint16_t)buf[1] << 8);
     return true;
@@ -675,7 +739,9 @@ static inline bool M5IOE1_M5UNIFIED_READ_REG16(m5::I2C_Class *i2c, uint8_t addr,
 static inline bool M5IOE1_M5UNIFIED_WRITE_BYTE(m5::I2C_Class *i2c, uint8_t addr, uint8_t reg, uint8_t data,
                                                uint32_t freq)
 {
-    return i2c->writeRegister8(addr, reg, data, freq);
+    bool ok = i2c->writeRegister8(addr, reg, data, freq);
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_WRITE_DELAY_US);
+    return ok;
 }
 #endif
 
@@ -683,7 +749,9 @@ static inline bool M5IOE1_M5UNIFIED_WRITE_BYTE(m5::I2C_Class *i2c, uint8_t addr,
 static inline bool M5IOE1_M5UNIFIED_WRITE_BYTES(m5::I2C_Class *i2c, uint8_t addr, uint8_t reg, size_t len,
                                                 const uint8_t *data, uint32_t freq)
 {
-    return i2c->writeRegister(addr, reg, data, len, freq);
+    bool ok = i2c->writeRegister(addr, reg, data, len, freq);
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_WRITE_DELAY_US);
+    return ok;
 }
 #endif
 
@@ -693,9 +761,11 @@ static inline bool M5IOE1_M5UNIFIED_WRITE_REG16(m5::I2C_Class *i2c, uint8_t addr
 {
     uint8_t buf[2];
     // 小端模式：低字节在前 / Little-endian: low byte first
-    buf[0] = (uint8_t)(data & 0xFF);
-    buf[1] = (uint8_t)((data >> 8) & 0xFF);
-    return i2c->writeRegister(addr, reg, buf, 2, freq);
+    buf[0]  = (uint8_t)(data & 0xFF);
+    buf[1]  = (uint8_t)((data >> 8) & 0xFF);
+    bool ok = i2c->writeRegister(addr, reg, buf, 2, freq);
+    M5IOE1_I2C_DELAY_US(M5IOE1_I2C_WRITE_DELAY_US);
+    return ok;
 }
 #endif
 
