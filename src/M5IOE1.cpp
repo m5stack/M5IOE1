@@ -6,6 +6,7 @@
 
 #include "M5IOE1.h"
 #include <string.h>
+#include <inttypes.h>
 
 static const char* TAG      = "M5IOE1";
 static const char* TAG_I2C  = "M5IOE1_I2C";
@@ -294,7 +295,8 @@ m5ioe1_err_t M5IOE1::begin(TwoWire* wire, uint8_t addr, uint8_t sda, uint8_t scl
     // Validate I2C frequency - M5IOE1 only supports 100KHz or 400KHz
     if (!_isValidI2cFrequency(speed)) {
         M5IOE1_LOG_W(TAG_I2C,
-                     "Invalid I2C frequency: %u Hz. M5IOE1 only supports 100KHz or 400KHz. Falling back to 100KHz.",
+                     "Invalid I2C frequency: %" PRIu32
+                     " Hz. M5IOE1 only supports 100KHz or 400KHz. Falling back to 100KHz.",
                      speed);
         _requestedSpeed = M5IOE1_I2C_FREQ_100K;
     } else {
@@ -354,7 +356,7 @@ m5ioe1_err_t M5IOE1::begin(m5::I2C_Class* i2c, uint8_t addr, uint32_t speed, m5i
     // 验证 I2C 频率
     // Validate I2C frequency
     if (!_isValidI2cFrequency(speed)) {
-        M5IOE1_LOG_W(TAG_I2C, "Invalid I2C frequency: %u Hz. Falling back to 100KHz.", speed);
+        M5IOE1_LOG_W(TAG_I2C, "Invalid I2C frequency: %" PRIu32 " Hz. Falling back to 100KHz.", speed);
         _requestedSpeed = M5IOE1_I2C_FREQ_100K;
     } else {
         _requestedSpeed = speed;
@@ -425,7 +427,8 @@ m5ioe1_err_t M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint
     // Validate I2C frequency - M5IOE1 only supports 100KHz or 400KHz
     if (!_isValidI2cFrequency(speed)) {
         M5IOE1_LOG_W(TAG_I2C,
-                     "Invalid I2C frequency: %u Hz. M5IOE1 only supports 100KHz or 400KHz. Falling back to 100KHz.",
+                     "Invalid I2C frequency: %" PRIu32
+                     " Hz. M5IOE1 only supports 100KHz or 400KHz. Falling back to 100KHz.",
                      speed);
         _requestedSpeed = M5IOE1_I2C_FREQ_100K;
     } else {
@@ -561,7 +564,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t s
     // 验证 I2C 频率
     // Validate I2C frequency
     if (!_isValidI2cFrequency(speed)) {
-        M5IOE1_LOG_W(TAG_I2C, "Invalid I2C frequency: %u Hz. Falling back to 100KHz.", speed);
+        M5IOE1_LOG_W(TAG_I2C, "Invalid I2C frequency: %" PRIu32 " Hz. Falling back to 100KHz.", speed);
         _requestedSpeed = M5IOE1_I2C_FREQ_100K;
     } else {
         _requestedSpeed = speed;
@@ -629,7 +632,7 @@ m5ioe1_err_t M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, m
     // 验证 I2C 频率
     // Validate I2C frequency
     if (!_isValidI2cFrequency(speed)) {
-        M5IOE1_LOG_W(TAG_I2C, "Invalid I2C frequency: %u Hz. Falling back to 100KHz.", speed);
+        M5IOE1_LOG_W(TAG_I2C, "Invalid I2C frequency: %" PRIu32 " Hz. Falling back to 100KHz.", speed);
         _requestedSpeed = M5IOE1_I2C_FREQ_100K;
     } else {
         _requestedSpeed = speed;
@@ -701,7 +704,7 @@ m5ioe1_err_t M5IOE1::begin(m5::I2C_Class* i2c, uint8_t addr, uint32_t speed, m5i
     // 验证 I2C 频率
     // Validate I2C frequency
     if (!_isValidI2cFrequency(speed)) {
-        M5IOE1_LOG_W(TAG_I2C, "Invalid I2C frequency: %u Hz. Falling back to 100KHz.", speed);
+        M5IOE1_LOG_W(TAG_I2C, "Invalid I2C frequency: %" PRIu32 " Hz. Falling back to 100KHz.", speed);
         _requestedSpeed = M5IOE1_I2C_FREQ_100K;
     } else {
         _requestedSpeed = speed;
@@ -2650,20 +2653,21 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
     // 步骤 4: 如果速度改变，切换主机 I2C 总线
     // Step 4: If speed changed, switch host I2C bus
     if (speedChanged) {
-        M5IOE1_LOG_D(TAG_I2C, "Switching host I2C bus from %u Hz to %u Hz", _requestedSpeed, targetFreq);
+        M5IOE1_LOG_D(TAG_I2C, "Switching host I2C bus from %" PRIu32 " Hz to %" PRIu32 " Hz", _requestedSpeed,
+                     targetFreq);
 
 #ifdef ARDUINO
 #if M5IOE1_HAS_M5UNIFIED_I2C
         if (_m5_i2c) {
             _commFreq = targetFreq;
-            M5IOE1_LOG_D(TAG_I2C, "M5Unified I2C frequency updated to %u Hz", targetFreq);
+            M5IOE1_LOG_D(TAG_I2C, "M5Unified I2C frequency updated to %" PRIu32 " Hz", targetFreq);
         } else
 #endif
             if (_wire != nullptr) {
             _wire->end();
             M5IOE1_DELAY_MS(10);
             if (!_wire->begin(_sda, _scl, targetFreq)) {
-                M5IOE1_LOG_E(TAG_I2C, "Failed to reinitialize I2C bus at %u Hz", targetFreq);
+                M5IOE1_LOG_E(TAG_I2C, "Failed to reinitialize I2C bus at %" PRIu32 " Hz", targetFreq);
                 // 回滚设备配置
                 // Rollback device config
                 uint8_t rollbackCfg = actualCfg;
@@ -2701,7 +2705,7 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
 
                     ret = i2c_master_bus_add_device(_i2c_master_bus, &dev_config, &_i2c_master_dev);
                     if (ret != ESP_OK) {
-                        M5IOE1_LOG_E(TAG_I2C, "Failed to add I2C device at %u Hz: %s", targetFreq,
+                        M5IOE1_LOG_E(TAG_I2C, "Failed to add I2C device at %" PRIu32 " Hz: %s", targetFreq,
                                      esp_err_to_name(ret));
                         return M5IOE1_ERR_I2C_CONFIG;
                     }
@@ -2720,7 +2724,7 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
 
                     _i2c_device = i2c_bus_device_create(_i2c_bus, _addr, targetFreq);
                     if (_i2c_device == nullptr) {
-                        M5IOE1_LOG_E(TAG_I2C, "Failed to create I2C device at %u Hz", targetFreq);
+                        M5IOE1_LOG_E(TAG_I2C, "Failed to create I2C device at %" PRIu32 " Hz", targetFreq);
                         return M5IOE1_ERR_I2C_CONFIG;
                     }
                 }
@@ -2748,7 +2752,7 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
 #if M5IOE1_HAS_M5UNIFIED_I2C
             case M5IOE1_I2C_DRIVER_M5UNIFIED:
                 _commFreq = targetFreq;
-                M5IOE1_LOG_D(TAG_I2C, "M5Unified I2C frequency updated to %u Hz", targetFreq);
+                M5IOE1_LOG_D(TAG_I2C, "M5Unified I2C frequency updated to %" PRIu32 " Hz", targetFreq);
                 break;
 #endif
             default:
@@ -2760,7 +2764,7 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
         // Step 5: Verify communication still works
         uint16_t uid = 0;
         if (!_readReg16(M5IOE1_REG_UID_L, &uid)) {
-            M5IOE1_LOG_E(TAG_I2C, "Communication failed after switching to %u Hz", targetFreq);
+            M5IOE1_LOG_E(TAG_I2C, "Communication failed after switching to %" PRIu32 " Hz", targetFreq);
             // 回滚
             // Rollback
             uint32_t originalFreq = _requestedSpeed;
@@ -2839,7 +2843,7 @@ m5ioe1_err_t M5IOE1::setI2cConfig(uint8_t sleepTime, m5ioe1_i2c_speed_t speed, m
         // 更新请求的速度
         // Update requested speed
         _requestedSpeed = targetFreq;
-        M5IOE1_LOG_D(TAG_I2C, "Host I2C bus switched to %u Hz", targetFreq);
+        M5IOE1_LOG_D(TAG_I2C, "Host I2C bus switched to %" PRIu32 " Hz", targetFreq);
     }
 
     // 步骤 6: 验证成功，更新缓存
@@ -4023,7 +4027,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
     // 如果目标速度与当前速度相同，直接返回成功
     // If target speed is same as current, return success directly
     if (targetFreq == _requestedSpeed) {
-        M5IOE1_LOG_I(TAG_I2C, "I2C speed already at %u Hz, no change needed", targetFreq);
+        M5IOE1_LOG_I(TAG_I2C, "I2C speed already at %" PRIu32 " Hz, no change needed", targetFreq);
         return M5IOE1_OK;
     }
 
@@ -4048,7 +4052,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
         return M5IOE1_ERR_I2C_COMM;
     }
 
-    M5IOE1_LOG_D(TAG_I2C, "M5IOE1 I2C config set to %u Hz mode", targetFreq);
+    M5IOE1_LOG_D(TAG_I2C, "M5IOE1 I2C config set to %" PRIu32 " Hz mode", targetFreq);
 
     // 步骤 3: 短暂延迟以允许设备处理配置更改
     // Step 3: Small delay to allow device to process the configuration change
@@ -4060,7 +4064,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
 #if M5IOE1_HAS_M5UNIFIED_I2C
     if (_m5_i2c) {
         _commFreq = targetFreq;
-        M5IOE1_LOG_D(TAG_I2C, "M5Unified I2C frequency updated to %u Hz", targetFreq);
+        M5IOE1_LOG_D(TAG_I2C, "M5Unified I2C frequency updated to %" PRIu32 " Hz", targetFreq);
     } else
 #endif
         if (_wire != nullptr) {
@@ -4069,7 +4073,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
         _wire->end();
         M5IOE1_DELAY_MS(10);
         if (!_wire->begin(_sda, _scl, targetFreq)) {
-            M5IOE1_LOG_E(TAG_I2C, "Failed to re-initialize I2C bus at %u Hz", targetFreq);
+            M5IOE1_LOG_E(TAG_I2C, "Failed to re-initialize I2C bus at %" PRIu32 " Hz", targetFreq);
             // 尝试恢复到原来的速度
             // Try to recover with original speed
             uint32_t originalFreq = (speed == M5IOE1_I2C_SPEED_400K) ? M5IOE1_I2C_FREQ_100K : M5IOE1_I2C_FREQ_400K;
@@ -4085,7 +4089,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
             return M5IOE1_ERR_I2C_CONFIG;
         }
         M5IOE1_DELAY_MS(10);
-        M5IOE1_LOG_D(TAG_I2C, "Host I2C bus switched to %u Hz", targetFreq);
+        M5IOE1_LOG_D(TAG_I2C, "Host I2C bus switched to %" PRIu32 " Hz", targetFreq);
     }
 #else
     // ESP-IDF：处理不同的驱动类型
@@ -4121,7 +4125,8 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
 
                 ret = i2c_master_bus_add_device(_i2c_master_bus, &dev_config, &_i2c_master_dev);
                 if (ret != ESP_OK) {
-                    M5IOE1_LOG_E(TAG_I2C, "Failed to add I2C device at %u Hz: %s", targetFreq, esp_err_to_name(ret));
+                    M5IOE1_LOG_E(TAG_I2C, "Failed to add I2C device at %" PRIu32 " Hz: %s", targetFreq,
+                                 esp_err_to_name(ret));
                     // 尝试恢复到原来的速度
                     // Try to recover with original speed
                     uint32_t originalFreq =
@@ -4130,7 +4135,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
                     i2c_master_bus_add_device(_i2c_master_bus, &dev_config, &_i2c_master_dev);
                     return M5IOE1_ERR_I2C_CONFIG;
                 }
-                M5IOE1_LOG_D(TAG_I2C, "I2C master device recreated at %u Hz", targetFreq);
+                M5IOE1_LOG_D(TAG_I2C, "I2C master device recreated at %" PRIu32 " Hz", targetFreq);
             }
             break;
 #endif  // M5IOE1_HAS_I2C_MASTER
@@ -4150,7 +4155,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
                 // Recreate device handle with target speed
                 _i2c_device = i2c_bus_device_create(_i2c_bus, _addr, targetFreq);
                 if (_i2c_device == nullptr) {
-                    M5IOE1_LOG_E(TAG_I2C, "Failed to create I2C device at %u Hz", targetFreq);
+                    M5IOE1_LOG_E(TAG_I2C, "Failed to create I2C device at %" PRIu32 " Hz", targetFreq);
                     // 尝试恢复到原来的速度
                     // Try to recover with original speed
                     uint32_t originalFreq =
@@ -4158,7 +4163,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
                     _i2c_device = i2c_bus_device_create(_i2c_bus, _addr, originalFreq);
                     return M5IOE1_ERR_I2C_CONFIG;
                 }
-                M5IOE1_LOG_D(TAG_I2C, "I2C bus device recreated at %u Hz", targetFreq);
+                M5IOE1_LOG_D(TAG_I2C, "I2C bus device recreated at %" PRIu32 " Hz", targetFreq);
             }
             break;
 #endif  // M5IOE1_HAS_I2C_BUS
@@ -4177,7 +4182,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
                 M5IOE1_LOG_E(TAG_I2C, "i2c_param_config failed: %s", esp_err_to_name(ret));
                 return M5IOE1_ERR_I2C_CONFIG;
             }
-            M5IOE1_LOG_D(TAG_I2C, "Legacy I2C reconfigured to %u Hz", targetFreq);
+            M5IOE1_LOG_D(TAG_I2C, "Legacy I2C reconfigured to %" PRIu32 " Hz", targetFreq);
             break;
         }
 #endif  // !M5IOE1_HAS_I2C_MASTER && !M5IOE1_HAS_I2C_BUS
@@ -4185,7 +4190,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
 #if M5IOE1_HAS_M5UNIFIED_I2C
         case M5IOE1_I2C_DRIVER_M5UNIFIED:
             _commFreq = targetFreq;
-            M5IOE1_LOG_D(TAG_I2C, "M5Unified I2C frequency updated to %u Hz", targetFreq);
+            M5IOE1_LOG_D(TAG_I2C, "M5Unified I2C frequency updated to %" PRIu32 " Hz", targetFreq);
             break;
 #endif
         default:
@@ -4198,7 +4203,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
     // Step 5: Verify communication still works
     uint16_t uid = 0;
     if (!_readReg16(M5IOE1_REG_UID_L, &uid)) {
-        M5IOE1_LOG_E(TAG_I2C, "Communication failed after switching to %u Hz, reverting", targetFreq);
+        M5IOE1_LOG_E(TAG_I2C, "Communication failed after switching to %" PRIu32 " Hz, reverting", targetFreq);
 
         // 恢复设备配置
         // Revert device config
@@ -4278,7 +4283,7 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
     _i2cConfig.speed400k = (speed == M5IOE1_I2C_SPEED_400K);
     _requestedSpeed      = targetFreq;
 
-    M5IOE1_LOG_I(TAG_I2C, "Successfully switched to %u Hz I2C mode", targetFreq);
+    M5IOE1_LOG_I(TAG_I2C, "Successfully switched to %" PRIu32 " Hz I2C mode", targetFreq);
     return M5IOE1_OK;
 }
 
@@ -4431,7 +4436,7 @@ m5ioe1_err_t M5IOE1::_applyAddressToDriver(uint8_t candidate, uint32_t freqHz)
         _wire->end();
         M5IOE1_DELAY_MS(50);
         if (!_wire->begin(_sda, _scl, freqHz)) {
-            M5IOE1_LOG_E(TAG_I2C, "Failed to re-init I2C @%uHz for addr 0x%02X", freqHz, candidate);
+            M5IOE1_LOG_E(TAG_I2C, "Failed to re-init I2C @%" PRIu32 "Hz for addr 0x%02X", freqHz, candidate);
             return M5IOE1_ERR_I2C_CONFIG;
         }
         M5IOE1_DELAY_MS(50);
@@ -4457,7 +4462,8 @@ m5ioe1_err_t M5IOE1::_applyAddressToDriver(uint8_t candidate, uint32_t freqHz)
             };
             esp_err_t ret = i2c_master_bus_add_device(_i2c_master_bus, &dev_cfg, &_i2c_master_dev);
             if (ret != ESP_OK) {
-                M5IOE1_LOG_E(TAG_I2C, "Failed to add device 0x%02X @%uHz: %s", candidate, freqHz, esp_err_to_name(ret));
+                M5IOE1_LOG_E(TAG_I2C, "Failed to add device 0x%02X @%" PRIu32 "Hz: %s", candidate, freqHz,
+                             esp_err_to_name(ret));
                 return M5IOE1_ERR_I2C_CONFIG;
             }
             return M5IOE1_OK;
@@ -4471,7 +4477,7 @@ m5ioe1_err_t M5IOE1::_applyAddressToDriver(uint8_t candidate, uint32_t freqHz)
             }
             _i2c_device = i2c_bus_device_create(_i2c_bus, candidate, freqHz);
             if (!_i2c_device) {
-                M5IOE1_LOG_E(TAG_I2C, "Failed to create bus device 0x%02X @%uHz", candidate, freqHz);
+                M5IOE1_LOG_E(TAG_I2C, "Failed to create bus device 0x%02X @%" PRIu32 "Hz", candidate, freqHz);
                 return M5IOE1_ERR_I2C_CONFIG;
             }
             return M5IOE1_OK;
@@ -4490,7 +4496,7 @@ m5ioe1_err_t M5IOE1::_applyAddressToDriver(uint8_t candidate, uint32_t freqHz)
             cfg.master.clk_speed = freqHz;
             esp_err_t r          = i2c_param_config(_port, &cfg);
             if (r != ESP_OK) {
-                M5IOE1_LOG_E(TAG_I2C, "Legacy i2c_param_config failed @%uHz: %s", freqHz, esp_err_to_name(r));
+                M5IOE1_LOG_E(TAG_I2C, "Legacy i2c_param_config failed @%" PRIu32 "Hz: %s", freqHz, esp_err_to_name(r));
                 return M5IOE1_ERR_I2C_CONFIG;
             }
             return M5IOE1_OK;
@@ -4579,7 +4585,7 @@ m5ioe1_err_t M5IOE1::_finishInit(m5ioe1_int_mode_t intMode)
     _snapshotI2cConfig();
     M5IOE1_LOG_D(TAG_I2C, "Snapshot completed (pins/pwm/adc/aw8737a/i2c)");
 
-    M5IOE1_LOG_I(TAG_I2C, "M5IOE1 initialized at address 0x%02X (I2C: %u Hz)", _addr, _requestedSpeed);
+    M5IOE1_LOG_I(TAG_I2C, "M5IOE1 initialized at address 0x%02X (I2C: %" PRIu32 " Hz)", _addr, _requestedSpeed);
 
     if (intMode != M5IOE1_INT_MODE_DISABLED) {
         m5ioe1_err_t err = setInterruptMode(intMode);
