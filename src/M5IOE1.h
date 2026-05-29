@@ -76,7 +76,9 @@ typedef enum {
 // 设备常量
 // Device Constants
 // ============================
-#define M5IOE1_DEFAULT_ADDR     0x6F
+#define M5IOE1_DEFAULT_ADDR     0x6F  // 默认 I2C 地址 / Default I2C address
+#define M5IOE1_DEFAULT_ADDR_2   0x4F  // 第二地址(部分作为从机的产品) / Second address (for some slave products)
+#define M5IOE1_AUTODETECT_ADDR  0xFF  // 自动检测地址（0x6F~0x76:A 0x4F~0x50:W） / Auto-detect address
 #define M5IOE1_MAX_GPIO_PINS    14
 #define M5IOE1_MAX_ADC_CHANNELS 4
 #define M5IOE1_MAX_PWM_CHANNELS 4
@@ -1794,6 +1796,62 @@ private:
     bool _snapshotAw8737a();
     void _clearAw8737a();
     void _autoSnapshotUpdate(uint8_t domains = M5IOE1_SNAPSHOT_DOMAIN_ALL);
+
+    // ========================
+    // 地址候选与 REV 规则辅助
+    // Address candidate & REV rule helpers
+    // ========================
+
+    // 地址段 <-> 允许 REV 字符列表
+    // Address range to allowed REV character list
+    struct m5ioe1_rev_rule_t {
+        uint8_t start;
+        uint8_t end;
+        const char* valid_revs;  // 允许的 REV 字符（字符串，每个字符为一个允许值）
+                                 // Allowed REV characters (string, each char is one allowed value)
+    };
+    static const m5ioe1_rev_rule_t kRevRules[];
+
+    // REV 校验三态结果
+    // REV check tri-state result
+    enum class RevCheckResult {
+        NO_RESPONSE,  // 地址无响应
+                      // No response at address
+        MATCHED,      // REV 在允许列表中
+                      // REV is in allowed list
+        MISMATCH,     // 地址有响应但 REV 不在允许列表中
+                      // Address responded but REV not in allowed list
+        NO_RULE,      // 该地址段无规则（允许通过）
+                      // No rule for this address range (allow through)
+    };
+
+    const m5ioe1_rev_rule_t* _findRevRule(uint8_t addr) const;
+    bool _isRevisionAllowed(uint8_t addr, uint8_t rev) const;
+
+    // 低噪声探测 REV 寄存器（不打 error 日志）
+    // Low-noise probe for REV register (no error log)
+    RevCheckResult _checkAddressRevision(uint8_t addr) const;
+
+    // 构建候选地址列表，返回实际候选数
+    // Build candidate address list, returns actual candidate count
+    static constexpr uint8_t kMaxCandidates = 12;
+    static uint8_t _buildAddressCandidates(uint8_t requested, uint8_t* candidates);
+
+    // 针对当前驱动上下文，将候选地址应用到 I2C 句柄（必要时重建 device handle）
+    // Apply candidate address to I2C handle for current driver context (rebuild device handle if needed)
+    m5ioe1_err_t _applyAddressToDriver(uint8_t candidate, uint32_t freqHz);
+
+    // 对单个候选地址执行完整初始化尝试（100K → 800ms → 100K → 400K），不做 REV 检查
+    // Perform full init attempt for one candidate (100K→800ms→100K→400K), no REV check
+    m5ioe1_err_t _tryInitAtAddress(uint8_t candidate);
+
+    // 初始化成功后的收尾流程（快照、setI2cConfig、中断模式）
+    // Post-init finalization (snapshot, setI2cConfig, interrupt mode)
+    m5ioe1_err_t _finishInit(m5ioe1_int_mode_t intMode);
+
+    // 地址解析与初始化核心流程（必须在 bus 初始化完成后调用）
+    // Address resolution and init core flow (must be called after bus init is complete)
+    m5ioe1_err_t _resolveAndInit(uint8_t requestedAddr, m5ioe1_int_mode_t intMode);
 
     bool _initDevice();
     void _handleInterrupt();

@@ -26,39 +26,39 @@ static const char* TAG_SYS  = "M5IOE1_SYS";
 // Arduino log level control
 static m5ioe1_log_level_t _m5ioe1_log_level = M5IOE1_LOG_LEVEL_INFO;
 
-#define M5IOE1_LOG_I(tag, fmt, ...)                                   \
-    do {                                                              \
-        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_INFO) {             \
-            Serial.printf("[I][%s] " fmt "\r\n", tag, ##__VA_ARGS__); \
-        }                                                             \
+#define M5IOE1_LOG_I(tag, fmt, ...)                                \
+    do {                                                           \
+        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_INFO) {          \
+            log_printf("[I][%s] " fmt "\r\n", tag, ##__VA_ARGS__); \
+        }                                                          \
     } while (0)
 
-#define M5IOE1_LOG_W(tag, fmt, ...)                                   \
-    do {                                                              \
-        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_WARN) {             \
-            Serial.printf("[W][%s] " fmt "\r\n", tag, ##__VA_ARGS__); \
-        }                                                             \
+#define M5IOE1_LOG_W(tag, fmt, ...)                                \
+    do {                                                           \
+        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_WARN) {          \
+            log_printf("[W][%s] " fmt "\r\n", tag, ##__VA_ARGS__); \
+        }                                                          \
     } while (0)
 
-#define M5IOE1_LOG_E(tag, fmt, ...)                                   \
-    do {                                                              \
-        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_ERROR) {            \
-            Serial.printf("[E][%s] " fmt "\r\n", tag, ##__VA_ARGS__); \
-        }                                                             \
+#define M5IOE1_LOG_E(tag, fmt, ...)                                \
+    do {                                                           \
+        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_ERROR) {         \
+            log_printf("[E][%s] " fmt "\r\n", tag, ##__VA_ARGS__); \
+        }                                                          \
     } while (0)
 
-#define M5IOE1_LOG_D(tag, fmt, ...)                                   \
-    do {                                                              \
-        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_DEBUG) {            \
-            Serial.printf("[D][%s] " fmt "\r\n", tag, ##__VA_ARGS__); \
-        }                                                             \
+#define M5IOE1_LOG_D(tag, fmt, ...)                                \
+    do {                                                           \
+        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_DEBUG) {         \
+            log_printf("[D][%s] " fmt "\r\n", tag, ##__VA_ARGS__); \
+        }                                                          \
     } while (0)
 
-#define M5IOE1_LOG_V(tag, fmt, ...)                                   \
-    do {                                                              \
-        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_VERBOSE) {          \
-            Serial.printf("[V][%s] " fmt "\r\n", tag, ##__VA_ARGS__); \
-        }                                                             \
+#define M5IOE1_LOG_V(tag, fmt, ...)                                \
+    do {                                                           \
+        if (_m5ioe1_log_level >= M5IOE1_LOG_LEVEL_VERBOSE) {       \
+            log_printf("[V][%s] " fmt "\r\n", tag, ##__VA_ARGS__); \
+        }                                                          \
     } while (0)
 
 // (Arduino 轮询/中断任务句柄已移至实例成员 _pollTask，支持多实例)
@@ -323,105 +323,9 @@ m5ioe1_err_t M5IOE1::begin(TwoWire* wire, uint8_t addr, uint8_t sda, uint8_t scl
     // Give the I2C bus time to stabilize after initialization
     M5IOE1_DELAY_MS(100);
 
-    // 尝试唤醒设备 - 发送 I2C START 信号
-    // Try to wake up the device - send I2C START signal
-    // M5IOE1 可能处于睡眠状态，需要先唤醒
-    // M5IOE1 may be in sleep mode, need to wake up first
-    M5IOE1_I2C_ARDUINO_SEND_WAKE(_wire, _addr);
-    M5IOE1_DELAY_MS(10);
-
-    // 步骤 1: 先尝试100K通信
-    // Step 1: Try 100K communication first
-    if (!_initDevice()) {
-        // 步骤 2: 100K失败，等待800ms后再尝试一次100K
-        // Step 2: 100K failed, wait 800ms and retry 100K
-        M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
-        M5IOE1_DELAY_MS(800);
-
-        M5IOE1_I2C_ARDUINO_SEND_WAKE(_wire, _addr);
-        M5IOE1_DELAY_MS(10);
-
-        if (!_initDevice()) {
-            // 步骤 3: 100K第二次失败，尝试400K
-            // Step 3: 100K failed again, try 400K
-            M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz (retry), trying 400KHz...");
-
-            _wire->end();
-            M5IOE1_DELAY_MS(50);
-
-            if (!_wire->begin(sda, scl, M5IOE1_I2C_FREQ_400K)) {
-                M5IOE1_LOG_E(TAG_I2C, "Failed to initialize I2C bus at 400KHz");
-                return M5IOE1_ERR_I2C_CONFIG;
-            }
-            M5IOE1_DELAY_MS(100);
-
-            M5IOE1_I2C_ARDUINO_SEND_WAKE(_wire, _addr);
-            M5IOE1_DELAY_MS(10);
-
-            if (!_initDevice()) {
-                // 步骤 4: 都失败，初始化失败
-                // Step 4: All attempts failed, initialization failed
-                M5IOE1_LOG_E(TAG_I2C, "Failed at 100KHz (twice) and 400KHz");
-                return M5IOE1_ERR_I2C_COMM;
-            }
-        }
-    }
-
-    // 步骤 4: 通信成功，设置为已初始化
-    // Step 4: Communication succeeded, set as initialized
-    _initialized = true;
-
-    // 步骤 5: 强制配置I2C（用户请求的频率 + 关闭休眠）
-    // 注意：setI2cConfig 内部会自动切换主机 I2C 总线速度
-    // Step 5: Force configure I2C (user requested speed + disable sleep)
-    // Note: setI2cConfig will automatically switch host I2C bus speed internally
-    m5ioe1_i2c_speed_t targetSpeed =
-        (_requestedSpeed == M5IOE1_I2C_FREQ_400K) ? M5IOE1_I2C_SPEED_400K : M5IOE1_I2C_SPEED_100K;
-
-    // 检查当前速度
-    // Check current speed
-    m5ioe1_i2c_speed_t currentSpeed;
-    if (getI2cSpeed(&currentSpeed) == M5IOE1_OK) {
-        if (currentSpeed == targetSpeed) {
-            M5IOE1_LOG_I(TAG_I2C, "Current I2C speed matches user request (%s)",
-                         (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
-        } else {
-            M5IOE1_LOG_I(TAG_I2C, "Current I2C speed differs from user request (Current: %s, Requested: %s)",
-                         (currentSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K",
-                         (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
-        }
-    } else {
-        M5IOE1_LOG_W(TAG_I2C, "Failed to read current I2C speed");
-    }
-
-    // 使用setI2cConfig一次性配置：sleepTime=0, 用户速度, 默认唤醒边沿, 默认上拉
-    // Use setI2cConfig to configure at once: sleepTime=0, user speed, default wake edge, default pull
-    if (setI2cConfig(0, targetSpeed, M5IOE1_WAKE_EDGE_FALLING, M5IOE1_PULL_ENABLED) != M5IOE1_OK) {
-        M5IOE1_LOG_W(TAG_I2C, "Failed to set I2C config");
-    }
-
-    // 步骤 6: 快照
-    // Step 6: Snapshot
-    _snapshotPinStates();
-    _snapshotPwmStates();
-    _snapshotAdcState();
-    _snapshotAw8737a();
-    _snapshotI2cConfig();
-    M5IOE1_LOG_D(TAG_I2C, "Snapshot completed (pins/pwm/adc/aw8737a/i2c)");
-
-    M5IOE1_LOG_I(TAG_I2C, "M5IOE1 initialized at address 0x%02X (I2C: %u Hz)", _addr, _requestedSpeed);
-
-    // 步骤 7: 设置中断模式
-    // Step 7: Set interrupt mode
-    if (intMode != M5IOE1_INT_MODE_DISABLED) {
-        m5ioe1_err_t err = setInterruptMode(intMode);
-        if (err != M5IOE1_OK) {
-            _initialized = false;
-            return err;
-        }
-    }
-
-    return M5IOE1_OK;
+    // 使用地址解析流程：探测候选地址、REV 校验、完整初始化
+    // Use address resolution: probe candidates, REV check, full init
+    return _resolveAndInit(addr, intMode);
 }
 
 #if M5IOE1_HAS_M5UNIFIED_I2C
@@ -458,95 +362,13 @@ m5ioe1_err_t M5IOE1::begin(m5::I2C_Class* i2c, uint8_t addr, uint32_t speed, m5i
 
     M5IOE1_LOG_I(TAG_I2C, "Initializing M5IOE1 with 100KHz (device default)");
 
-    // 步骤 1: 尝试唤醒设备
-    // Step 1: Try to wake up the device
+    // 步骤 1: 尝试唤醒设备（初始 100K）
+    // Step 1: Wake device at initial 100K
     _commFreq = M5IOE1_I2C_FREQ_100K;
-    M5IOE1_M5UNIFIED_SEND_WAKE(_m5_i2c, _addr, _commFreq);
-    M5IOE1_DELAY_MS(10);
 
-    // 步骤 2: 先尝试100K通信
-    // Step 2: Try 100K communication first
-    if (!_initDevice()) {
-        // 步骤 3: 100K失败，等待800ms后再尝试一次100K
-        // Step 3: 100K failed, wait 800ms and retry 100K
-        M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
-        M5IOE1_DELAY_MS(800);
-
-        M5IOE1_M5UNIFIED_SEND_WAKE(_m5_i2c, _addr, _commFreq);
-        M5IOE1_DELAY_MS(10);
-
-        if (!_initDevice()) {
-            // 步骤 4: 100K第二次失败，尝试400K
-            // Step 4: 100K failed again, try 400K
-            M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz (retry), trying 400KHz...");
-            _commFreq = M5IOE1_I2C_FREQ_400K;
-
-            M5IOE1_M5UNIFIED_SEND_WAKE(_m5_i2c, _addr, _commFreq);
-            M5IOE1_DELAY_MS(10);
-
-            if (!_initDevice()) {
-                // 步骤 5: 都失败，初始化失败
-                // Step 5: All attempts failed, initialization failed
-                M5IOE1_LOG_E(TAG_I2C, "Failed at 100KHz (twice) and 400KHz");
-                _m5_i2c = nullptr;
-                return M5IOE1_ERR_I2C_COMM;
-            }
-        }
-    }
-
-    // 步骤 6: 通信成功，设置为已初始化
-    // Step 6: Communication succeeded, set as initialized
-    _initialized = true;
-
-    // 步骤 7: 强制配置I2C（用户请求的频率 + 关闭休眠）
-    // Step 7: Force configure I2C (user requested speed + disable sleep)
-    m5ioe1_i2c_speed_t targetSpeed =
-        (_requestedSpeed == M5IOE1_I2C_FREQ_400K) ? M5IOE1_I2C_SPEED_400K : M5IOE1_I2C_SPEED_100K;
-
-    // 检查当前速度
-    // Check current speed
-    m5ioe1_i2c_speed_t currentSpeed;
-    if (getI2cSpeed(&currentSpeed) == M5IOE1_OK) {
-        if (currentSpeed == targetSpeed) {
-            M5IOE1_LOG_I(TAG_I2C, "Current I2C speed matches user request (%s)",
-                         (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
-        } else {
-            M5IOE1_LOG_I(TAG_I2C, "Current I2C speed differs from user request (Current: %s, Requested: %s)",
-                         (currentSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K",
-                         (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
-        }
-    } else {
-        M5IOE1_LOG_W(TAG_I2C, "Failed to read current I2C speed");
-    }
-
-    if (setI2cConfig(0, targetSpeed, M5IOE1_WAKE_EDGE_FALLING, M5IOE1_PULL_ENABLED) != M5IOE1_OK) {
-        M5IOE1_LOG_W(TAG_I2C, "Failed to set I2C config");
-    }
-
-    // 切换到目标频率
-    // Switch to target frequency
-    _commFreq = _requestedSpeed;
-
-    // 步骤 8: 快照
-    // Step 8: Snapshot
-    _snapshotPinStates();
-    _snapshotPwmStates();
-    _snapshotAdcState();
-    _snapshotAw8737a();
-    _snapshotI2cConfig();
-    M5IOE1_LOG_D(TAG_I2C, "Snapshot completed (pins/pwm/adc/aw8737a/i2c)");
-
-    M5IOE1_LOG_I(TAG_I2C, "M5IOE1 initialized at address 0x%02X (I2C: %u Hz)", _addr, _requestedSpeed);
-
-    if (intMode != M5IOE1_INT_MODE_DISABLED) {
-        m5ioe1_err_t err = setInterruptMode(intMode);
-        if (err != M5IOE1_OK) {
-            _initialized = false;
-            return err;
-        }
-    }
-
-    return M5IOE1_OK;
+    // 使用地址解析流程：探测候选地址、REV 校验、完整初始化
+    // Use address resolution: probe candidates, REV check, full init
+    return _resolveAndInit(addr, intMode);
 }
 
 // =====================================================
@@ -640,96 +462,23 @@ m5ioe1_err_t M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint
         return M5IOE1_ERR_I2C_CONFIG;
     }
 
-    // 在 100KHz 创建设备句柄
-    // Create device handle at 100KHz
-    i2c_device_config_t dev_config = {
-        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-        .device_address  = _addr,
-        .scl_speed_hz    = M5IOE1_I2C_FREQ_100K,
-        .scl_wait_us     = 0,
-        .flags =
-            {
-                .disable_ack_check = false,
-            },
-    };
-
-    // 在 100KHz 创建设备句柄
-    // Create device handle at 100KHz
-    ret = i2c_master_bus_add_device(_i2c_master_bus, &dev_config, &_i2c_master_dev);
-    if (ret != ESP_OK) {
-        M5IOE1_LOG_E(TAG_I2C, "Failed to add I2C device: %s", esp_err_to_name(ret));
-        i2c_del_master_bus(_i2c_master_bus);
-        _i2c_master_bus = nullptr;
-        return M5IOE1_ERR_I2C_CONFIG;
-    }
-
-    // 尝试唤醒设备 - 发送 I2C START 信号
-    // Try to wake up the device - send I2C START signal
-    // M5IOE1 可能处于睡眠状态，需要先唤醒
-    // M5IOE1 may be in sleep mode, need to wake up first
-    M5IOE1_I2C_MASTER_SEND_WAKE(_i2c_master_bus, _addr);
-    M5IOE1_DELAY_MS(10);
-
-    // 步骤 1: 先尝试100K通信
-    // Step 1: Try 100K communication first
-    if (!_initDevice()) {
-        // 步骤 2: 100K失败，等待800ms后再尝试一次100K
-        // Step 2: 100K failed, wait 800ms and retry 100K
-        M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
-        M5IOE1_DELAY_MS(800);
-
-        M5IOE1_I2C_MASTER_SEND_WAKE(_i2c_master_bus, _addr);
-        M5IOE1_DELAY_MS(10);
-
-        if (!_initDevice()) {
-            // 步骤 3: 100K第二次失败，尝试400K
-            // Step 3: 100K failed again, try 400K
-            M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz (retry), trying 400KHz...");
-
-            // 删除当前100K设备句柄
-            // Remove current 100K device handle
+    // 使用地址解析流程：探测候选地址、REV 校验、完整初始化
+    // Use address resolution: probe candidates, REV check, full init
+    m5ioe1_err_t res = _resolveAndInit(addr, intMode);
+    if (res != M5IOE1_OK) {
+        // 清理自创建的总线
+        // Cleanup self-created bus on failure
+        if (_i2c_master_dev) {
             i2c_master_bus_rm_device(_i2c_master_dev);
             _i2c_master_dev = nullptr;
-
-            // 以400K重新创建设备句柄
-            // Recreate device handle at 400K
-            i2c_device_config_t dev_config_400k = {
-                .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-                .device_address  = _addr,
-                .scl_speed_hz    = M5IOE1_I2C_FREQ_400K,
-                .scl_wait_us     = 0,
-                .flags =
-                    {
-                        .disable_ack_check = false,
-                    },
-            };
-
-            ret = i2c_master_bus_add_device(_i2c_master_bus, &dev_config_400k, &_i2c_master_dev);
-            if (ret != ESP_OK) {
-                M5IOE1_LOG_E(TAG_I2C, "Failed to add I2C device at 400KHz: %s", esp_err_to_name(ret));
-                i2c_del_master_bus(_i2c_master_bus);
-                _i2c_master_bus = nullptr;
-                return M5IOE1_ERR_I2C_CONFIG;
-            }
-
-            M5IOE1_I2C_MASTER_SEND_WAKE(_i2c_master_bus, _addr);
-            M5IOE1_DELAY_MS(10);
-
-            if (!_initDevice()) {
-                // 步骤 4: 都失败，初始化失败
-                // Step 4: All attempts failed, initialization failed
-                M5IOE1_LOG_E(TAG_I2C, "Failed at 100KHz (twice) and 400KHz");
-                i2c_master_bus_rm_device(_i2c_master_dev);
-                i2c_del_master_bus(_i2c_master_bus);
-                _i2c_master_dev = nullptr;
-                _i2c_master_bus = nullptr;
-                return M5IOE1_ERR_I2C_COMM;
-            }
         }
+        i2c_del_master_bus(_i2c_master_bus);
+        _i2c_master_bus = nullptr;
     }
+    return res;
 
 #else  // !M5IOE1_HAS_I2C_MASTER
-    // 始终以 100KHz 开始 - Legacy API (IDF < 5.3.0)
+    // Legacy API (IDF < 5.3.0)
     M5IOE1_LOG_I(TAG_I2C, "Initializing M5IOE1 with 100KHz (Legacy API, IDF < 5.3.0)");
 
     i2c_config_t i2c_conf     = {};
@@ -752,103 +501,15 @@ m5ioe1_err_t M5IOE1::begin(i2c_port_t port, uint8_t addr, int sda, int scl, uint
         return M5IOE1_ERR_I2C_CONFIG;
     }
 
-    // 尝试唤醒设备 - 发送 I2C START 信号
-    // Try to wake up the device - send I2C START signal
-    M5IOE1_I2C_LEGACY_SEND_WAKE(port, _addr);
-    M5IOE1_DELAY_MS(10);
-
-    // 步骤 1: 先尝试100K通信
-    // Step 1: Try 100K communication first
-    if (!_initDevice()) {
-        // 步骤 2: 100K失败，等待800ms后再尝试一次100K
-        // Step 2: 100K failed, wait 800ms and retry 100K
-        M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
-        M5IOE1_DELAY_MS(800);
-
-        M5IOE1_I2C_LEGACY_SEND_WAKE(port, _addr);
-        M5IOE1_DELAY_MS(10);
-
-        if (!_initDevice()) {
-            // 步骤 3: 100K第二次失败，尝试400K
-            // Step 3: 100K failed again, try 400K
-            M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz (retry), trying 400KHz...");
-
-            i2c_conf.master.clk_speed = M5IOE1_I2C_FREQ_400K;
-            ret                       = i2c_param_config(port, &i2c_conf);
-            if (ret != ESP_OK) {
-                M5IOE1_LOG_E(TAG_I2C, "i2c_param_config (400K) failed: %s", esp_err_to_name(ret));
-                i2c_driver_delete(port);
-                return M5IOE1_ERR_I2C_CONFIG;
-            }
-
-            M5IOE1_I2C_LEGACY_SEND_WAKE(port, _addr);
-            M5IOE1_DELAY_MS(10);
-
-            if (!_initDevice()) {
-                // 步骤 4: 都失败，初始化失败
-                // Step 4: All attempts failed, initialization failed
-                M5IOE1_LOG_E(TAG_I2C, "Failed at 100KHz (twice) and 400KHz");
-                i2c_driver_delete(port);
-                return M5IOE1_ERR_I2C_COMM;
-            }
-        }
+    // 使用地址解析流程
+    // Use address resolution flow
+    m5ioe1_err_t res = _resolveAndInit(addr, intMode);
+    if (res != M5IOE1_OK && !_busExternal) {
+        i2c_driver_delete(port);
     }
+    return res;
 
 #endif  // M5IOE1_HAS_I2C_MASTER
-
-    // 步骤 5: 通信成功，设置为已初始化
-    // Step 5: Communication succeeded, set as initialized
-    _initialized = true;
-
-    // 步骤 6: 强制配置I2C（用户请求的频率 + 关闭休眠）
-    // 注意：setI2cConfig 内部会自动切换主机 I2C 总线速度
-    // Step 5: Force configure I2C (user requested speed + disable sleep)
-    // Note: setI2cConfig will automatically switch host I2C bus speed internally
-    m5ioe1_i2c_speed_t targetSpeed =
-        (_requestedSpeed == M5IOE1_I2C_FREQ_400K) ? M5IOE1_I2C_SPEED_400K : M5IOE1_I2C_SPEED_100K;
-
-    // 检查当前速度
-    // Check current speed
-    m5ioe1_i2c_speed_t currentSpeed;
-    if (getI2cSpeed(&currentSpeed) == M5IOE1_OK) {
-        if (currentSpeed == targetSpeed) {
-            M5IOE1_LOG_I(TAG_I2C, "Current I2C speed matches user request (%s)",
-                         (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
-        } else {
-            M5IOE1_LOG_I(TAG_I2C, "Current I2C speed differs from user request (Current: %s, Requested: %s)",
-                         (currentSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K",
-                         (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
-        }
-    } else {
-        M5IOE1_LOG_W(TAG_I2C, "Failed to read current I2C speed");
-    }
-
-    if (setI2cConfig(0, targetSpeed, M5IOE1_WAKE_EDGE_FALLING, M5IOE1_PULL_ENABLED) != M5IOE1_OK) {
-        M5IOE1_LOG_W(TAG_I2C, "Failed to set I2C config");
-    }
-
-    // 步骤 6: 快照
-    // Step 6: Snapshot
-    _snapshotPinStates();
-    _snapshotPwmStates();
-    _snapshotAdcState();
-    _snapshotAw8737a();
-    _snapshotI2cConfig();
-    M5IOE1_LOG_D(TAG_I2C, "Snapshot completed (pins/pwm/adc/aw8737a/i2c)");
-
-    M5IOE1_LOG_I(TAG_I2C, "M5IOE1 initialized at address 0x%02X (I2C: %u Hz)", _addr, _requestedSpeed);
-
-    // 如果未禁用，设置中断模式
-    // Set interrupt mode if not disabled
-    if (intMode != M5IOE1_INT_MODE_DISABLED) {
-        m5ioe1_err_t err = setInterruptMode(intMode);
-        if (err != M5IOE1_OK) {
-            _initialized = false;
-            return err;
-        }
-    }
-
-    return M5IOE1_OK;
 }
 
 // =====================================================
@@ -908,139 +569,14 @@ m5ioe1_err_t M5IOE1::begin(i2c_master_bus_handle_t bus, uint8_t addr, uint32_t s
 
     M5IOE1_LOG_I(TAG_I2C, "Initializing M5IOE1 with 100KHz (device default)");
 
-    // 在 100KHz 创建设备句柄
-    // Create device handle at 100KHz
-    i2c_device_config_t dev_config = {
-        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-        .device_address  = _addr,
-        .scl_speed_hz    = M5IOE1_I2C_FREQ_100K,
-        .scl_wait_us     = 0,
-        .flags =
-            {
-                .disable_ack_check = false,
-            },
-    };
-
-    // 在 100KHz 创建设备句柄
-    // Create device handle at 100KHz
-    esp_err_t ret = i2c_master_bus_add_device(_i2c_master_bus, &dev_config, &_i2c_master_dev);
-    if (ret != ESP_OK) {
-        M5IOE1_LOG_E(TAG_I2C, "Failed to add I2C device: %s", esp_err_to_name(ret));
-        return M5IOE1_ERR_I2C_CONFIG;
+    // 使用地址解析流程
+    // Use address resolution flow
+    m5ioe1_err_t res = _resolveAndInit(addr, intMode);
+    if (res != M5IOE1_OK && _i2c_master_dev) {
+        i2c_master_bus_rm_device(_i2c_master_dev);
+        _i2c_master_dev = nullptr;
     }
-
-    // 尝试唤醒设备 - 发送 I2C START 信号
-    // Try to wake up the device - send I2C START signal
-    // M5IOE1 可能处于睡眠状态，需要先唤醒
-    // M5IOE1 may be in sleep mode, need to wake up first
-    M5IOE1_I2C_MASTER_SEND_WAKE(_i2c_master_bus, _addr);
-    M5IOE1_DELAY_MS(10);
-
-    // 步骤 1: 先尝试100K通信
-    // Step 1: Try 100K communication first
-    if (!_initDevice()) {
-        // 步骤 2: 100K失败，等待800ms后再尝试一次100K
-        // Step 2: 100K failed, wait 800ms and retry 100K
-        M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
-        M5IOE1_DELAY_MS(800);
-
-        M5IOE1_I2C_MASTER_SEND_WAKE(_i2c_master_bus, _addr);
-        M5IOE1_DELAY_MS(10);
-
-        if (!_initDevice()) {
-            // 步骤 3: 100K第二次失败，尝试400K
-            // Step 3: 100K failed again, try 400K
-            M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz (retry), trying 400KHz...");
-
-            // 删除当前100K设备句柄
-            // Remove current 100K device handle
-            i2c_master_bus_rm_device(_i2c_master_dev);
-            _i2c_master_dev = nullptr;
-
-            // 以400K重新创建设备句柄
-            // Recreate device handle at 400K
-            i2c_device_config_t dev_config_400k = {
-                .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-                .device_address  = _addr,
-                .scl_speed_hz    = M5IOE1_I2C_FREQ_400K,
-                .scl_wait_us     = 0,
-                .flags =
-                    {
-                        .disable_ack_check = false,
-                    },
-            };
-
-            ret = i2c_master_bus_add_device(_i2c_master_bus, &dev_config_400k, &_i2c_master_dev);
-            if (ret != ESP_OK) {
-                M5IOE1_LOG_E(TAG_I2C, "Failed to add I2C device at 400KHz: %s", esp_err_to_name(ret));
-                return M5IOE1_ERR_I2C_CONFIG;
-            }
-
-            M5IOE1_I2C_MASTER_SEND_WAKE(_i2c_master_bus, _addr);
-            M5IOE1_DELAY_MS(10);
-
-            if (!_initDevice()) {
-                // 步骤 4: 都失败，初始化失败
-                // Step 4: All attempts failed, initialization failed
-                M5IOE1_LOG_E(TAG_I2C, "Failed at 100KHz (twice) and 400KHz");
-                i2c_master_bus_rm_device(_i2c_master_dev);
-                _i2c_master_dev = nullptr;
-                return M5IOE1_ERR_I2C_COMM;
-            }
-        }
-    }
-
-    // 步骤 5: 通信成功，设置为已初始化
-    // Step 5: Communication succeeded, set as initialized
-    _initialized = true;
-
-    // 步骤 6: 强制配置I2C（用户请求的频率 + 关闭休眠）
-    // 注意：setI2cConfig 内部会自动切换主机 I2C 总线速度
-    // Step 5: Force configure I2C (user requested speed + disable sleep)
-    // Note: setI2cConfig will automatically switch host I2C bus speed internally
-    m5ioe1_i2c_speed_t targetSpeed =
-        (_requestedSpeed == M5IOE1_I2C_FREQ_400K) ? M5IOE1_I2C_SPEED_400K : M5IOE1_I2C_SPEED_100K;
-
-    // 检查当前速度
-    // Check current speed
-    m5ioe1_i2c_speed_t currentSpeed;
-    if (getI2cSpeed(&currentSpeed) == M5IOE1_OK) {
-        if (currentSpeed == targetSpeed) {
-            M5IOE1_LOG_I(TAG_I2C, "Current I2C speed matches user request (%s)",
-                         (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
-        } else {
-            M5IOE1_LOG_I(TAG_I2C, "Current I2C speed differs from user request (Current: %s, Requested: %s)",
-                         (currentSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K",
-                         (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
-        }
-    } else {
-        M5IOE1_LOG_W(TAG_I2C, "Failed to read current I2C speed");
-    }
-
-    if (setI2cConfig(0, targetSpeed, M5IOE1_WAKE_EDGE_FALLING, M5IOE1_PULL_ENABLED) != M5IOE1_OK) {
-        M5IOE1_LOG_W(TAG_I2C, "Failed to set I2C config");
-    }
-
-    // 步骤 6: 快照
-    // Step 6: Snapshot
-    _snapshotPinStates();
-    _snapshotPwmStates();
-    _snapshotAdcState();
-    _snapshotAw8737a();
-    _snapshotI2cConfig();
-    M5IOE1_LOG_D(TAG_I2C, "Snapshot completed (pins/pwm/adc/aw8737a/i2c)");
-
-    M5IOE1_LOG_I(TAG_I2C, "M5IOE1 initialized at address 0x%02X (I2C: %u Hz)", _addr, _requestedSpeed);
-
-    if (intMode != M5IOE1_INT_MODE_DISABLED) {
-        m5ioe1_err_t err = setInterruptMode(intMode);
-        if (err != M5IOE1_OK) {
-            _initialized = false;
-            return err;
-        }
-    }
-
-    return M5IOE1_OK;
+    return res;
 }
 
 // =====================================================
@@ -1101,115 +637,14 @@ m5ioe1_err_t M5IOE1::begin(i2c_bus_handle_t bus, uint8_t addr, uint32_t speed, m
 
     M5IOE1_LOG_I(TAG_I2C, "Initializing M5IOE1 with 100KHz (device default)");
 
-    // 在 100KHz 创建设备句柄
-    // Create device handle at 100KHz
-    _i2c_device = i2c_bus_device_create(_i2c_bus, _addr, M5IOE1_I2C_FREQ_100K);
-    if (_i2c_device == nullptr) {
-        M5IOE1_LOG_E(TAG_I2C, "Failed to create I2C device");
-        return M5IOE1_ERR_I2C_CONFIG;
+    // 使用地址解析流程
+    // Use address resolution flow
+    m5ioe1_err_t res = _resolveAndInit(addr, intMode);
+    if (res != M5IOE1_OK && _i2c_device) {
+        i2c_bus_device_delete(&_i2c_device);
+        _i2c_device = nullptr;
     }
-
-    // 尝试唤醒设备 - 发送 I2C START 信号
-    // Try to wake up the device - send I2C START signal
-    // M5IOE1 可能处于睡眠状态，需要先唤醒
-    // M5IOE1 may be in sleep mode, need to wake up first
-    M5IOE1_I2C_BUS_SEND_WAKE(_i2c_device, M5IOE1_REG_REV);
-    M5IOE1_DELAY_MS(10);
-
-    // 步骤 1: 先尝试100K通信
-    // Step 1: Try 100K communication first
-    if (!_initDevice()) {
-        // 步骤 2: 100K失败，等待800ms后再尝试一次100K
-        // Step 2: 100K failed, wait 800ms and retry 100K
-        M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
-        M5IOE1_DELAY_MS(800);
-
-        M5IOE1_I2C_BUS_SEND_WAKE(_i2c_device, M5IOE1_REG_REV);
-        M5IOE1_DELAY_MS(10);
-
-        if (!_initDevice()) {
-            // 步骤 3: 100K第二次失败，尝试400K
-            // Step 3: 100K failed again, try 400K
-            M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz (retry), trying 400KHz...");
-
-            // 删除当前100K设备句柄
-            // Remove current 100K device handle
-            i2c_bus_device_delete(&_i2c_device);
-            _i2c_device = nullptr;
-
-            // 以400K重新创建设备句柄
-            // Recreate device handle at 400K
-            _i2c_device = i2c_bus_device_create(_i2c_bus, _addr, M5IOE1_I2C_FREQ_400K);
-            if (_i2c_device == nullptr) {
-                M5IOE1_LOG_E(TAG_I2C, "Failed to create I2C device at 400KHz");
-                return M5IOE1_ERR_I2C_CONFIG;
-            }
-
-            M5IOE1_I2C_BUS_SEND_WAKE(_i2c_device, M5IOE1_REG_REV);
-            M5IOE1_DELAY_MS(10);
-
-            if (!_initDevice()) {
-                // 步骤 4: 都失败，初始化失败
-                // Step 4: All attempts failed, initialization failed
-                M5IOE1_LOG_E(TAG_I2C, "Failed at 100KHz (twice) and 400KHz");
-                i2c_bus_device_delete(&_i2c_device);
-                _i2c_device = nullptr;
-                return M5IOE1_ERR_I2C_COMM;
-            }
-        }
-    }
-
-    // 步骤 5: 通信成功，设置为已初始化
-    // Step 5: Communication succeeded, set as initialized
-    _initialized = true;
-
-    // 步骤 6: 强制配置I2C（用户请求的频率 + 关闭休眠）
-    // 注意：setI2cConfig 内部会自动切换主机 I2C 总线速度
-    // Step 5: Force configure I2C (user requested speed + disable sleep)
-    // Note: setI2cConfig will automatically switch host I2C bus speed internally
-    m5ioe1_i2c_speed_t targetSpeed =
-        (_requestedSpeed == M5IOE1_I2C_FREQ_400K) ? M5IOE1_I2C_SPEED_400K : M5IOE1_I2C_SPEED_100K;
-
-    // 检查当前速度
-    // Check current speed
-    m5ioe1_i2c_speed_t currentSpeed;
-    if (getI2cSpeed(&currentSpeed) == M5IOE1_OK) {
-        if (currentSpeed == targetSpeed) {
-            M5IOE1_LOG_I(TAG_I2C, "Current I2C speed matches user request (%s)",
-                         (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
-        } else {
-            M5IOE1_LOG_I(TAG_I2C, "Current I2C speed differs from user request (Current: %s, Requested: %s)",
-                         (currentSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K",
-                         (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
-        }
-    } else {
-        M5IOE1_LOG_W(TAG_I2C, "Failed to read current I2C speed");
-    }
-
-    if (setI2cConfig(0, targetSpeed, M5IOE1_WAKE_EDGE_FALLING, M5IOE1_PULL_ENABLED) != M5IOE1_OK) {
-        M5IOE1_LOG_W(TAG_I2C, "Failed to set I2C config");
-    }
-
-    // 步骤 6: 快照
-    // Step 6: Snapshot
-    _snapshotPinStates();
-    _snapshotPwmStates();
-    _snapshotAdcState();
-    _snapshotAw8737a();
-    _snapshotI2cConfig();
-    M5IOE1_LOG_D(TAG_I2C, "Snapshot completed (pins/pwm/adc/aw8737a/i2c)");
-
-    M5IOE1_LOG_I(TAG_I2C, "M5IOE1 initialized at address 0x%02X (I2C: %u Hz)", _addr, _requestedSpeed);
-
-    if (intMode != M5IOE1_INT_MODE_DISABLED) {
-        m5ioe1_err_t err = setInterruptMode(intMode);
-        if (err != M5IOE1_OK) {
-            _initialized = false;
-            return err;
-        }
-    }
-
-    return M5IOE1_OK;
+    return res;
 }
 
 // =====================================================
@@ -1274,95 +709,13 @@ m5ioe1_err_t M5IOE1::begin(m5::I2C_Class* i2c, uint8_t addr, uint32_t speed, m5i
 
     M5IOE1_LOG_I(TAG_I2C, "Initializing M5IOE1 with 100KHz (device default)");
 
-    // 步骤 1: 尝试唤醒设备
-    // Step 1: Try to wake up the device
+    // 步骤 1: 设置初始通信频率
+    // Step 1: Set initial communication frequency
     _commFreq = M5IOE1_I2C_FREQ_100K;
-    M5IOE1_M5UNIFIED_SEND_WAKE(_m5_i2c, _addr, _commFreq);
-    M5IOE1_DELAY_MS(10);
 
-    // 步骤 2: 先尝试100K通信
-    // Step 2: Try 100K communication first
-    if (!_initDevice()) {
-        // 步骤 3: 100K失败，等待800ms后再尝试一次100K
-        // Step 3: 100K failed, wait 800ms and retry 100K
-        M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz, waiting 800ms and retrying 100KHz...");
-        M5IOE1_DELAY_MS(800);
-
-        M5IOE1_M5UNIFIED_SEND_WAKE(_m5_i2c, _addr, _commFreq);
-        M5IOE1_DELAY_MS(10);
-
-        if (!_initDevice()) {
-            // 步骤 4: 100K第二次失败，尝试400K
-            // Step 4: 100K failed again, try 400K
-            M5IOE1_LOG_W(TAG_I2C, "Failed at 100KHz (retry), trying 400KHz...");
-            _commFreq = M5IOE1_I2C_FREQ_400K;
-
-            M5IOE1_M5UNIFIED_SEND_WAKE(_m5_i2c, _addr, _commFreq);
-            M5IOE1_DELAY_MS(10);
-
-            if (!_initDevice()) {
-                // 步骤 5: 都失败，初始化失败
-                // Step 5: All attempts failed, initialization failed
-                M5IOE1_LOG_E(TAG_I2C, "Failed at 100KHz (twice) and 400KHz");
-                _m5_i2c = nullptr;
-                return M5IOE1_ERR_I2C_COMM;
-            }
-        }
-    }
-
-    // 步骤 6: 通信成功，设置为已初始化
-    // Step 6: Communication succeeded, set as initialized
-    _initialized = true;
-
-    // 步骤 7: 强制配置I2C（用户请求的频率 + 关闭休眠）
-    // Step 7: Force configure I2C (user requested speed + disable sleep)
-    m5ioe1_i2c_speed_t targetSpeed =
-        (_requestedSpeed == M5IOE1_I2C_FREQ_400K) ? M5IOE1_I2C_SPEED_400K : M5IOE1_I2C_SPEED_100K;
-
-    // 检查当前速度
-    // Check current speed
-    m5ioe1_i2c_speed_t currentSpeed;
-    if (getI2cSpeed(&currentSpeed) == M5IOE1_OK) {
-        if (currentSpeed == targetSpeed) {
-            M5IOE1_LOG_I(TAG_I2C, "Current I2C speed matches user request (%s)",
-                         (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
-        } else {
-            M5IOE1_LOG_I(TAG_I2C, "Current I2C speed differs from user request (Current: %s, Requested: %s)",
-                         (currentSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K",
-                         (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
-        }
-    } else {
-        M5IOE1_LOG_W(TAG_I2C, "Failed to read current I2C speed");
-    }
-
-    if (setI2cConfig(0, targetSpeed, M5IOE1_WAKE_EDGE_FALLING, M5IOE1_PULL_ENABLED) != M5IOE1_OK) {
-        M5IOE1_LOG_W(TAG_I2C, "Failed to set I2C config");
-    }
-
-    // 切换到目标频率
-    // Switch to target frequency
-    _commFreq = _requestedSpeed;
-
-    // 步骤 8: 快照
-    // Step 8: Snapshot
-    _snapshotPinStates();
-    _snapshotPwmStates();
-    _snapshotAdcState();
-    _snapshotAw8737a();
-    _snapshotI2cConfig();
-    M5IOE1_LOG_D(TAG_I2C, "Snapshot completed (pins/pwm/adc/aw8737a/i2c)");
-
-    M5IOE1_LOG_I(TAG_I2C, "M5IOE1 initialized at address 0x%02X (I2C: %u Hz)", _addr, _requestedSpeed);
-
-    if (intMode != M5IOE1_INT_MODE_DISABLED) {
-        m5ioe1_err_t err = setInterruptMode(intMode);
-        if (err != M5IOE1_OK) {
-            _initialized = false;
-            return err;
-        }
-    }
-
-    return M5IOE1_OK;
+    // 使用地址解析流程
+    // Use address resolution flow
+    return _resolveAndInit(addr, intMode);
 }
 
 // =====================================================
@@ -4927,6 +4280,400 @@ m5ioe1_err_t M5IOE1::switchI2cSpeed(m5ioe1_i2c_speed_t speed)
 
     M5IOE1_LOG_I(TAG_I2C, "Successfully switched to %u Hz I2C mode", targetFreq);
     return M5IOE1_OK;
+}
+
+// ============================
+// 地址候选与 REV 规则辅助实现
+// Address candidate & REV rule helpers implementation
+// ============================
+
+// 地址段 <-> 允许 REV 字符列表
+// Address range -> allowed REV characters (each char = one allowed revision)
+const M5IOE1::m5ioe1_rev_rule_t M5IOE1::kRevRules[] = {
+    {0x6F, 0x76, "A"},
+    {0x4F, 0x50, "W"},
+};
+
+const M5IOE1::m5ioe1_rev_rule_t* M5IOE1::_findRevRule(uint8_t addr) const
+{
+    for (size_t i = 0; i < sizeof(kRevRules) / sizeof(kRevRules[0]); ++i) {
+        if (addr >= kRevRules[i].start && addr <= kRevRules[i].end) {
+            return &kRevRules[i];
+        }
+    }
+    return nullptr;
+}
+
+bool M5IOE1::_isRevisionAllowed(uint8_t addr, uint8_t rev) const
+{
+    const m5ioe1_rev_rule_t* rule = _findRevRule(addr);
+    if (!rule) return true;  // 无规则则放行
+    const char* p = rule->valid_revs;
+    while (*p) {
+        if ((uint8_t)(*p) == rev) return true;
+        ++p;
+    }
+    return false;
+}
+
+// 对当前已应用的 _addr 探测 REV 寄存器，不打 ERROR 日志（直接调底层读取一次）
+// Probe REV register for currently applied _addr, no ERROR log (single low-level read)
+M5IOE1::RevCheckResult M5IOE1::_checkAddressRevision(uint8_t addr) const
+{
+    // 读取一次，不走 retry
+    uint8_t rev = 0;
+    bool ok     = false;
+
+#ifdef ARDUINO
+#if M5IOE1_HAS_M5UNIFIED_I2C
+    if (_m5_i2c) {
+        ok = M5IOE1_M5UNIFIED_READ_BYTE(_m5_i2c, addr, M5IOE1_REG_REV, &rev, _commFreq);
+    } else
+#endif
+    {
+        ok = M5IOE1_I2C_ARDUINO_READ_BYTE(_wire, addr, M5IOE1_REG_REV, &rev);
+    }
+#else
+    switch (_i2cDriverType) {
+#if M5IOE1_HAS_I2C_MASTER
+        case M5IOE1_I2C_DRIVER_SELF_CREATED:
+        case M5IOE1_I2C_DRIVER_MASTER:
+            ok = (M5IOE1_I2C_MASTER_READ_BYTE(_i2c_master_dev, M5IOE1_REG_REV, &rev) == ESP_OK);
+            break;
+#endif
+#if M5IOE1_HAS_I2C_BUS
+        case M5IOE1_I2C_DRIVER_BUS:
+            ok = (M5IOE1_I2C_BUS_READ_BYTE(_i2c_device, M5IOE1_REG_REV, &rev) == ESP_OK);
+            break;
+#endif
+#if !M5IOE1_HAS_I2C_MASTER && !M5IOE1_HAS_I2C_BUS
+        case M5IOE1_I2C_DRIVER_LEGACY:
+            ok = (M5IOE1_I2C_LEGACY_READ_BYTE(_port, addr, M5IOE1_REG_REV, &rev) == ESP_OK);
+            break;
+#endif
+#if M5IOE1_HAS_M5UNIFIED_I2C
+        case M5IOE1_I2C_DRIVER_M5UNIFIED:
+            ok = M5IOE1_M5UNIFIED_READ_BYTE(_m5_i2c, addr, M5IOE1_REG_REV, &rev, _commFreq);
+            break;
+#endif
+        default:
+            ok = false;
+            break;
+    }
+#endif
+
+    if (!ok) {
+        return RevCheckResult::NO_RESPONSE;
+    }
+
+    const m5ioe1_rev_rule_t* rule = _findRevRule(addr);
+    if (!rule) {
+        M5IOE1_LOG_D(TAG_I2C, "Addr 0x%02X REV=0x%02X(%c), no rule -> allow", addr, rev, rev);
+        return RevCheckResult::NO_RULE;
+    }
+    if (_isRevisionAllowed(addr, rev)) {
+        M5IOE1_LOG_D(TAG_I2C, "Addr 0x%02X REV=0x%02X(%c) matched", addr, rev, rev);
+        return RevCheckResult::MATCHED;
+    }
+    M5IOE1_LOG_W(TAG_I2C, "Addr 0x%02X REV=0x%02X(%c) not in allowed list '%s', abort", addr, rev, rev,
+                 rule->valid_revs);
+    return RevCheckResult::MISMATCH;
+}
+
+// 构建候选地址列表
+// Build candidate address list
+// 规则：
+//   0xFF (AUTODETECT): 按固定序列 0x4F, 0x6F, 0x70..0x76, 0x50
+//   0x6F: 如失败，兜底尝试 0x4F
+//   0x4F: 如失败，兜底尝试 0x6F
+//   其他: 如失败，兜底尝试 0x4F, 0x6F
+uint8_t M5IOE1::_buildAddressCandidates(uint8_t requested, uint8_t* candidates)
+{
+    uint8_t n = 0;
+    if (requested == M5IOE1_AUTODETECT_ADDR) {
+        // 自动探测序列：0x4F, 0x6F, 0x70..0x76, 0x50
+        // Auto-detect sequence: 0x4F, 0x6F, 0x70..0x76, 0x50
+        candidates[n++] = 0x4F;
+        candidates[n++] = 0x6F;
+        for (uint8_t a = 0x70; a <= 0x76; ++a) candidates[n++] = a;
+        candidates[n++] = 0x50;
+    } else {
+        // 显式地址：先放用户地址，再放兜底地址
+        // Explicit address: user address first, then fallback addresses
+        candidates[n++] = requested;
+        if (requested == 0x6F) {
+            candidates[n++] = 0x4F;
+        } else if (requested == 0x4F) {
+            candidates[n++] = 0x6F;
+        } else {
+            candidates[n++] = 0x4F;
+            candidates[n++] = 0x6F;
+        }
+    }
+    return n;
+}
+
+// 将候选地址（及速度）应用到当前驱动上下文（重建 device handle 如有必要）
+// Apply candidate address and speed to current driver context (rebuild device handle if needed)
+m5ioe1_err_t M5IOE1::_applyAddressToDriver(uint8_t candidate, uint32_t freqHz)
+{
+    _addr = candidate;
+#ifdef ARDUINO
+#if M5IOE1_HAS_M5UNIFIED_I2C
+    if (_m5_i2c) {
+        _commFreq = freqHz;
+        return M5IOE1_OK;
+    }
+#endif
+    // TwoWire: 需要重新 begin 以切换频率
+    // TwoWire: need to re-begin to switch frequency
+    if (_wire != nullptr) {
+        _wire->end();
+        M5IOE1_DELAY_MS(50);
+        if (!_wire->begin(_sda, _scl, freqHz)) {
+            M5IOE1_LOG_E(TAG_I2C, "Failed to re-init I2C @%uHz for addr 0x%02X", freqHz, candidate);
+            return M5IOE1_ERR_I2C_CONFIG;
+        }
+        M5IOE1_DELAY_MS(50);
+    }
+    return M5IOE1_OK;
+#else
+    switch (_i2cDriverType) {
+#if M5IOE1_HAS_I2C_MASTER
+        case M5IOE1_I2C_DRIVER_SELF_CREATED:
+        case M5IOE1_I2C_DRIVER_MASTER: {
+            // 删除旧 device handle，以新地址和速度重新创建
+            // Delete old device handle and recreate with new address and speed
+            if (_i2c_master_dev) {
+                i2c_master_bus_rm_device(_i2c_master_dev);
+                _i2c_master_dev = nullptr;
+            }
+            i2c_device_config_t dev_cfg = {
+                .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+                .device_address  = candidate,
+                .scl_speed_hz    = freqHz,
+                .scl_wait_us     = 0,
+                .flags           = {.disable_ack_check = false},
+            };
+            esp_err_t ret = i2c_master_bus_add_device(_i2c_master_bus, &dev_cfg, &_i2c_master_dev);
+            if (ret != ESP_OK) {
+                M5IOE1_LOG_E(TAG_I2C, "Failed to add device 0x%02X @%uHz: %s", candidate, freqHz, esp_err_to_name(ret));
+                return M5IOE1_ERR_I2C_CONFIG;
+            }
+            return M5IOE1_OK;
+        }
+#endif
+#if M5IOE1_HAS_I2C_BUS
+        case M5IOE1_I2C_DRIVER_BUS: {
+            if (_i2c_device) {
+                i2c_bus_device_delete(&_i2c_device);
+                _i2c_device = nullptr;
+            }
+            _i2c_device = i2c_bus_device_create(_i2c_bus, candidate, freqHz);
+            if (!_i2c_device) {
+                M5IOE1_LOG_E(TAG_I2C, "Failed to create bus device 0x%02X @%uHz", candidate, freqHz);
+                return M5IOE1_ERR_I2C_CONFIG;
+            }
+            return M5IOE1_OK;
+        }
+#endif
+#if !M5IOE1_HAS_I2C_MASTER && !M5IOE1_HAS_I2C_BUS
+        case M5IOE1_I2C_DRIVER_LEGACY: {
+            // Legacy: 重新配置 I2C 参数以更新速度
+            // Legacy: reconfigure I2C params to update speed
+            i2c_config_t cfg     = {};
+            cfg.mode             = I2C_MODE_MASTER;
+            cfg.sda_io_num       = _sda;
+            cfg.scl_io_num       = _scl;
+            cfg.sda_pullup_en    = GPIO_PULLUP_ENABLE;
+            cfg.scl_pullup_en    = GPIO_PULLUP_ENABLE;
+            cfg.master.clk_speed = freqHz;
+            esp_err_t r          = i2c_param_config(_port, &cfg);
+            if (r != ESP_OK) {
+                M5IOE1_LOG_E(TAG_I2C, "Legacy i2c_param_config failed @%uHz: %s", freqHz, esp_err_to_name(r));
+                return M5IOE1_ERR_I2C_CONFIG;
+            }
+            return M5IOE1_OK;
+        }
+#endif
+#if M5IOE1_HAS_M5UNIFIED_I2C
+        case M5IOE1_I2C_DRIVER_M5UNIFIED:
+            _commFreq = freqHz;
+            return M5IOE1_OK;
+#endif
+        default:
+            return M5IOE1_ERR_I2C_CONFIG;
+    }
+#endif
+}
+
+// 对单个候选地址执行完整初始化尝试（100K → 800ms → 100K → 400K）
+// Full init attempt for one candidate (100K→800ms→100K→400K)
+m5ioe1_err_t M5IOE1::_tryInitAtAddress(uint8_t candidate)
+{
+    // 以 100KHz 切换候选地址
+    m5ioe1_err_t err = _applyAddressToDriver(candidate, M5IOE1_I2C_FREQ_100K);
+    if (err != M5IOE1_OK) return err;
+
+    // 发送唤醒
+    sendWakeSignal();
+    M5IOE1_DELAY_MS(10);
+
+    // 尝试1：100K
+    if (_initDevice()) return M5IOE1_OK;
+
+    // 尝试2：等待 800ms 后再尝试 100K
+    M5IOE1_LOG_W(TAG_I2C, "Addr 0x%02X: 100K failed, waiting 800ms and retrying...", candidate);
+    M5IOE1_DELAY_MS(800);
+    sendWakeSignal();
+    M5IOE1_DELAY_MS(10);
+    if (_initDevice()) return M5IOE1_OK;
+
+    // 尝试3：切换到 400K
+    M5IOE1_LOG_W(TAG_I2C, "Addr 0x%02X: 100K retry failed, trying 400K...", candidate);
+    err = _applyAddressToDriver(candidate, M5IOE1_I2C_FREQ_400K);
+    if (err != M5IOE1_OK) return err;
+
+    sendWakeSignal();
+    M5IOE1_DELAY_MS(10);
+    if (_initDevice()) return M5IOE1_OK;
+
+    M5IOE1_LOG_E(TAG_I2C, "Addr 0x%02X: all attempts failed", candidate);
+    return M5IOE1_ERR_I2C_COMM;
+}
+
+// 初始化成功后的收尾流程
+// Post-init finalization
+m5ioe1_err_t M5IOE1::_finishInit(m5ioe1_int_mode_t intMode)
+{
+    _initialized = true;
+
+    // 强制配置 I2C（用户请求的频率 + 关闭休眠）
+    // Force configure I2C (user requested speed + disable sleep)
+    m5ioe1_i2c_speed_t targetSpeed =
+        (_requestedSpeed == M5IOE1_I2C_FREQ_400K) ? M5IOE1_I2C_SPEED_400K : M5IOE1_I2C_SPEED_100K;
+
+    m5ioe1_i2c_speed_t currentSpeed;
+    if (getI2cSpeed(&currentSpeed) == M5IOE1_OK) {
+        M5IOE1_LOG_I(TAG_I2C, "Current I2C speed: %s, Requested: %s",
+                     (currentSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K",
+                     (targetSpeed == M5IOE1_I2C_SPEED_400K) ? "400K" : "100K");
+    }
+
+    if (setI2cConfig(0, targetSpeed, M5IOE1_WAKE_EDGE_FALLING, M5IOE1_PULL_ENABLED) != M5IOE1_OK) {
+        M5IOE1_LOG_W(TAG_I2C, "Failed to set I2C config");
+    }
+
+#if defined(M5IOE1_HAS_M5UNIFIED_I2C) && M5IOE1_HAS_M5UNIFIED_I2C
+#ifdef ARDUINO
+    if (_m5_i2c) _commFreq = _requestedSpeed;
+#else
+    if (_i2cDriverType == M5IOE1_I2C_DRIVER_M5UNIFIED) _commFreq = _requestedSpeed;
+#endif
+#endif
+
+    _snapshotPinStates();
+    _snapshotPwmStates();
+    _snapshotAdcState();
+    _snapshotAw8737a();
+    _snapshotI2cConfig();
+    M5IOE1_LOG_D(TAG_I2C, "Snapshot completed (pins/pwm/adc/aw8737a/i2c)");
+
+    M5IOE1_LOG_I(TAG_I2C, "M5IOE1 initialized at address 0x%02X (I2C: %u Hz)", _addr, _requestedSpeed);
+
+    if (intMode != M5IOE1_INT_MODE_DISABLED) {
+        m5ioe1_err_t err = setInterruptMode(intMode);
+        if (err != M5IOE1_OK) {
+            _initialized = false;
+            return err;
+        }
+    }
+    return M5IOE1_OK;
+}
+
+// ============================
+// 地址解析与初始化核心流程
+// Address resolution and init core flow
+// ============================
+// 调用此函数前，调用方必须已完成 bus 初始化和 _requestedSpeed 设置。
+// Caller must have completed bus init and set _requestedSpeed before calling this.
+// 此函数负责地址探测/兜底、REV 校验、完整通信初始化、以及调用 _finishInit。
+// This function handles address probe/fallback, REV validation, full comms init, and calls _finishInit.
+m5ioe1_err_t M5IOE1::_resolveAndInit(uint8_t requestedAddr, m5ioe1_int_mode_t intMode)
+{
+    uint8_t candidates[kMaxCandidates];
+    uint8_t nCandidates = _buildAddressCandidates(requestedAddr, candidates);
+
+    bool firstCandidate = true;
+
+    for (uint8_t i = 0; i < nCandidates; ++i) {
+        uint8_t candidate = candidates[i];
+
+        // 兜底候选（非首个候选）以及自动探测的所有候选都需要 REV 校验
+        // Fallback candidates (non-first) and all auto-detect candidates need REV check
+        bool needRevCheck = (!firstCandidate) || (requestedAddr == M5IOE1_AUTODETECT_ADDR);
+        firstCandidate    = false;
+
+        if (needRevCheck) {
+            // 先以 100K 读取 REV。若无响应，再仅切到 400K 读取 REV。
+            // Read REV first at 100K. If there is no response, try REV-only probe at 400K.
+            if (_applyAddressToDriver(candidate, M5IOE1_I2C_FREQ_100K) != M5IOE1_OK) {
+                continue;
+            }
+
+            RevCheckResult revResult = _checkAddressRevision(candidate);
+            if (revResult == RevCheckResult::NO_RESPONSE) {
+                if (_applyAddressToDriver(candidate, M5IOE1_I2C_FREQ_400K) != M5IOE1_OK) {
+                    continue;
+                }
+                revResult = _checkAddressRevision(candidate);
+            }
+
+            if (revResult == RevCheckResult::MISMATCH) {
+                // REV 不匹配：立即中止，不继续探测后续地址
+                // REV mismatch: abort immediately, do not try further addresses
+                M5IOE1_LOG_E(TAG_I2C, "Addr 0x%02X: REV mismatch, aborting address resolution", candidate);
+                return M5IOE1_ERR_I2C_COMM;
+            }
+            if (revResult == RevCheckResult::NO_RESPONSE) {
+                M5IOE1_LOG_D(TAG_I2C, "Addr 0x%02X: no response during REV probe, trying next", candidate);
+                continue;
+            }
+            // MATCHED 或 NO_RULE：继续完整初始化
+            M5IOE1_LOG_D(TAG_I2C, "Addr 0x%02X: REV probe passed (%s), proceeding with full init", candidate,
+                         (revResult == RevCheckResult::MATCHED) ? "MATCHED" : "NO_RULE");
+        } else {
+            M5IOE1_LOG_D(TAG_I2C, "Addr 0x%02X: primary address, skipping REV pre-check", candidate);
+        }
+
+        // 执行完整初始化尝试（内部会以 100K 开始）
+        // Perform full init attempt (starts at 100K internally)
+        m5ioe1_err_t err = _tryInitAtAddress(candidate);
+        if (err == M5IOE1_OK) {
+            M5IOE1_LOG_I(TAG_I2C, "Device found at address 0x%02X", candidate);
+
+            // 兜底成功：用户显式指定了地址，但通过备用地址才完成初始化
+            // 明确告知用户硬件实际地址与传入参数不一致，建议修正调用方代码以避免后续维护混淆
+            // Fallback success: user explicitly specified an address but init succeeded via a fallback
+            // candidate. Notify the user that the hardware's actual address differs from the argument
+            // and recommend updating the caller to prevent future maintenance confusion.
+            if (requestedAddr != M5IOE1_AUTODETECT_ADDR && candidate != requestedAddr) {
+                M5IOE1_LOG_W(TAG_I2C,
+                             "[Address Fallback Notice] M5IOE1 initialization completed using a fallback address. "
+                             "Requested address: 0x%02X, actual device address: 0x%02X. "
+                             "Please update your initialization parameters to 0x%02X to ensure deterministic behavior "
+                             "and avoid relying on the fallback mechanism.",
+                             requestedAddr, candidate, candidate);
+            }
+
+            return _finishInit(intMode);
+        }
+
+        M5IOE1_LOG_W(TAG_I2C, "Addr 0x%02X: full init failed, trying next candidate", candidate);
+    }
+
+    M5IOE1_LOG_E(TAG_I2C, "No M5IOE1 device found (requested=0x%02X)", requestedAddr);
+    return M5IOE1_ERR_I2C_COMM;
 }
 
 bool M5IOE1::_initDevice()
